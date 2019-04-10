@@ -73,9 +73,23 @@ add_subdirectory(extern/polymesh)
 # Add GLOW Extras lib
 add_subdirectory(extern/glow-extras)
 
+# Add EntityX
+option(ENTITYX_BUILD_SHARED "" OFF)
+add_subdirectory(extern/entityx EXCLUDE_FROM_ALL)
 
 # Folder grouping
-foreach(TARGET_NAME glfw ctracer glad glow glow-extras imgui lodepng stb polymesh)
+foreach(TARGET_NAME
+    glfw
+    ctracer
+    glad
+    glow
+    glow-extras
+    imgui
+    lodepng
+    stb
+    polymesh
+    entityx
+    )
   set_property(TARGET ${TARGET_NAME} PROPERTY FOLDER "Extern") 
 endforeach()
 
@@ -103,6 +117,7 @@ target_link_libraries(${PROJECT_NAME} PUBLIC
     glow-extras
     polymesh
     imgui
+    entityx
 )
 
 # Compile flags
