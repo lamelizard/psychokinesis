@@ -194,6 +194,19 @@ void Game::onResize(int w, int h)
         t->bind().resize(w, h);
 }
 
+bool Game::onKey(int key, int scancode, int action, int mods)
+{
+    // handle imgui and more
+    glow::glfw::GlfwApp::onKey(key, scancode, action, mods);
+
+    // fullscreen = Alt + Enter
+    if (action == GLFW_PRESS && key == GLFW_KEY_ENTER)
+        if (isKeyPressed(GLFW_KEY_LEFT_ALT) || isKeyPressed(GLFW_KEY_RIGHT_ALT))
+            toggleFullscreen();
+
+    return false;
+}
+
 void Game::updateCamera(float elapsedSeconds)
 {
     auto const speed = elapsedSeconds * 3;

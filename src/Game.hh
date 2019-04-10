@@ -57,6 +57,7 @@ public:
     void onGui() override;                      // called once per frame to set up UI
 
     void onResize(int w, int h) override; // called when window is resized
+	bool onKey(int key, int scancode, int action, int mods) override; // called when a key is pressed
 
     void updateCamera(float elapsedSeconds);
 };
