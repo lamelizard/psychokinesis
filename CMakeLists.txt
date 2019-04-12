@@ -73,9 +73,21 @@ add_subdirectory(extern/polymesh)
 # Add GLOW Extras lib
 add_subdirectory(extern/glow-extras)
 
+# "some dependencies want to build as shared libs"
+# -> well, not anymore I guess since the following were added by me
+# needed for Bullet
+set(BUILD_SHARED_LIBS OFF CACHE BOOL " " FORCE)
+
 # Add EntityX
 option(ENTITYX_BUILD_SHARED "" OFF)
 add_subdirectory(extern/entityx EXCLUDE_FROM_ALL)
+
+# Add Bullet
+set(BULLET_VERSION "2.88")
+option(BUILD_BULLET3 "" OFF)
+include_directories(extern/bullet/src)
+add_subdirectory(extern/bullet/src)
+
 
 # Folder grouping
 foreach(TARGET_NAME
@@ -89,6 +101,12 @@ foreach(TARGET_NAME
     stb
     polymesh
     entityx
+    Bullet3Common
+    BulletCollision
+    BulletDynamics
+    BulletInverseDynamics
+    BulletSoftBody
+    LinearMath
     )
   set_property(TARGET ${TARGET_NAME} PROPERTY FOLDER "Extern") 
 endforeach()
@@ -118,6 +136,9 @@ target_link_libraries(${PROJECT_NAME} PUBLIC
     polymesh
     imgui
     entityx
+    BulletDynamics
+    BulletCollision
+    LinearMath
 )
 
 # Compile flags
