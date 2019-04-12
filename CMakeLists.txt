@@ -88,6 +88,12 @@ option(BUILD_BULLET3 "" OFF)
 include_directories(extern/bullet/src)
 add_subdirectory(extern/bullet/src)
 
+# Add Assimp
+option(ASSIMP_BUILD_ZLIB "" ON)
+option(ASSIMP_BUILD_ASSIMP_TOOLS "" OFF)
+option(ASSIMP_BUILD_TESTS "" OFF)
+add_subdirectory(extern/assimp EXCLUDE_FROM_ALL)
+include_directories(extern/assimp/include)
 
 # Folder grouping
 foreach(TARGET_NAME
@@ -107,6 +113,9 @@ foreach(TARGET_NAME
     BulletInverseDynamics
     BulletSoftBody
     LinearMath
+    assimp
+    IrrXML
+    zlibstatic
     )
   set_property(TARGET ${TARGET_NAME} PROPERTY FOLDER "Extern") 
 endforeach()
@@ -139,6 +148,7 @@ target_link_libraries(${PROJECT_NAME} PUBLIC
     BulletDynamics
     BulletCollision
     LinearMath
+    assimp
 )
 
 # Compile flags
