@@ -153,3 +153,9 @@ else()
         -Wno-unused-variable # not a useful warning
     )
 endif()
+
+# Visual Studio
+if(MSVC)
+    set_property(TARGET ${PROJECT_NAME} PROPERTY VS_DEBUGGER_WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}/bin)
+    set_property(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR} PROPERTY VS_STARTUP_PROJECT ${PROJECT_NAME})
+endif()
