@@ -81,6 +81,7 @@ set(BUILD_SHARED_LIBS OFF CACHE BOOL " " FORCE)
 # Add EntityX
 option(ENTITYX_BUILD_SHARED "" OFF)
 add_subdirectory(extern/entityx EXCLUDE_FROM_ALL)
+include_directories(extern/entityx)
 
 # Add Bullet
 set(BULLET_VERSION "2.88")
