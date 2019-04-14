@@ -54,6 +54,8 @@ private:
     std::unique_ptr<btBroadphaseInterface> overlappingPairCache = nullptr;
     std::unique_ptr<btSequentialImpulseConstraintSolver> solver = nullptr;
     std::unique_ptr<btDiscreteDynamicsWorld> dynamicsWorld = nullptr;
+    //test
+    btDefaultMotionState* boxMotionState = nullptr;
 
     // ctor
 public:

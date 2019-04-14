@@ -78,6 +78,33 @@ void Game::init()
         solver = make_unique<btSequentialImpulseConstraintSolver>();
         dynamicsWorld = make_unique<btDiscreteDynamicsWorld>(dispatcher.get(), overlappingPairCache.get(), solver.get(), collisionConfiguration.get());
         dynamicsWorld->setGravity(btVector3(0, -9.81, 0));
+
+        // test cube + sphere
+        //from hello world
+        btCollisionShape* groundShape = new btBoxShape(btVector3(btScalar(50.), btScalar(50.), btScalar(50.)));
+        btTransform groundTransform;
+        groundTransform.setIdentity();
+        groundTransform.setOrigin(btVector3(0, -50, 0));
+        btVector3 localInertia(0, 0, 0);
+
+        btRigidBody::btRigidBodyConstructionInfo rbInfo(0., nullptr, groundShape, localInertia);
+        dynamicsWorld->addRigidBody(new btRigidBody(rbInfo));
+
+
+        btBoxShape* colBox = nullptr;
+        colBox = new btBoxShape(btVector3(mCubeSize, mCubeSize, mCubeSize));
+        btRigidBody* bulCube = nullptr;
+        btTransform startTransform;
+        startTransform.setIdentity();
+        colBox->calculateLocalInertia(1., localInertia);
+        startTransform.setOrigin(btVector3(2, 0, 0));
+        // using motionstate is optional, it provides interpolation capabilities, and only synchronizes 'active' objects
+        boxMotionState = new btDefaultMotionState(groundTransform);
+        btRigidBody::btRigidBodyConstructionInfo rbInfo2(1, boxMotionState, colBox, localInertia);
+        btRigidBody* body = new btRigidBody(rbInfo2);
+
+        dynamicsWorld->addRigidBody(body);
+
     }
 }
 
@@ -126,8 +153,16 @@ void Game::render(float elapsedSeconds)
 
         // render cube and sphere
         {
+            //get transform from bullet
+            btTransform trans;
+            boxMotionState->getWorldTransform(trans);
+            //btScalar m[16];
+            glm::mat4x4 mat;
+            trans.getOpenGLMatrix(glm::value_ptr(mat));
+
             // build model matrix
-            auto modelCube = glm::translate(mCubePosition) * glm::scale(glm::vec3(mCubeSize));
+            //auto modelCube = glm::translate(mCubePosition) * glm::scale(glm::vec3(mCubeSize));
+            auto modelCube = mat * glm::scale(glm::vec3(mCubeSize));
             auto modelSphere = glm::translate(mSpherePosition) * glm::scale(glm::vec3(mSphereSize));
 
             // let light rotate around the objects
