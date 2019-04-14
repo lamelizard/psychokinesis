@@ -24,6 +24,8 @@
 
 #include "load_mesh.hh" // helper function for loading .obj into VertexArrays
 
+using namespace std;
+
 Game::Game() : GlfwApp(Gui::ImGui) {}
 
 void Game::init()
@@ -67,11 +69,29 @@ void Game::init()
         mShaderObject = glow::Program::createFromFile("../data/shaders/object");
         mShaderOutput = glow::Program::createFromFile("../data/shaders/output");
     }
+
+    // initialize Bullet
+    {
+        collisionConfiguration = make_unique<btDefaultCollisionConfiguration>();
+        dispatcher = make_unique<btCollisionDispatcher>(collisionConfiguration.get());
+        overlappingPairCache = make_unique<btDbvtBroadphase>();
+        solver = make_unique<btSequentialImpulseConstraintSolver>();
+        dynamicsWorld = make_unique<btDiscreteDynamicsWorld>(dispatcher.get(), overlappingPairCache.get(), solver.get(), collisionConfiguration.get());
+        dynamicsWorld->setGravity(btVector3(0, -9.81, 0));
+    }
 }
 
 void Game::update(float elapsedSeconds)
 {
     // update game in 60 Hz fixed timestep
+    // fix debugging?
+    if (elapsedSeconds > 1)
+        elapsedSeconds = 1;
+
+    // Physics
+    // Bullet uses fixed timestep and interpolates
+    // -> probably should put this in render as well to get the interpolation
+    dynamicsWorld->stepSimulation(elapsedSeconds, 10);
 }
 
 void Game::render(float elapsedSeconds)
