@@ -7,6 +7,8 @@
 
 #include <btBulletDynamicsCommon.h>
 
+#include "BulletDebugger.hh"
+
 class Game : public glow::glfw::GlfwApp
 {
     // logic
@@ -49,13 +51,16 @@ private:
 
     // Bullet
 private:
-    std::unique_ptr<btDefaultCollisionConfiguration> collisionConfiguration = nullptr;
-    std::unique_ptr<btCollisionDispatcher> dispatcher = nullptr;
-    std::unique_ptr<btBroadphaseInterface> overlappingPairCache = nullptr;
-    std::unique_ptr<btSequentialImpulseConstraintSolver> solver = nullptr;
-    std::unique_ptr<btDiscreteDynamicsWorld> dynamicsWorld = nullptr;
-    //test
+    bool mDebugBullet = true;
+    std::unique_ptr<BulletDebugger> bulletDebugger; // draws lines for debugging
+    std::unique_ptr<btDefaultCollisionConfiguration> collisionConfiguration;
+    std::unique_ptr<btCollisionDispatcher> dispatcher;
+    std::unique_ptr<btBroadphaseInterface> overlappingPairCache;
+    std::unique_ptr<btSequentialImpulseConstraintSolver> solver;
+    std::unique_ptr<btDiscreteDynamicsWorld> dynamicsWorld;
+    // test
     btDefaultMotionState* boxMotionState = nullptr;
+
 
     // ctor
 public:
