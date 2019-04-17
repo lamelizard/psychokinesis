@@ -2,29 +2,42 @@
 
 #include <memory>
 #include <string>
+#include <vector>
 
 #include <glow/fwd.hh>
 
 #include <glm/glm.hpp>
 
-//https://www.khronos.org/opengl/wiki/Skeletal_Animation
+// https://www.khronos.org/opengl/wiki/Skeletal_Animation
 class AssimpModel
 {
 public:
-    struct Vertex
-    {
-        glm::vec3 pos;
-        glm::vec3 normal;
-        glm::vec3 tangent;
-        glm::vec2 texcoord;
-        glm::vec4 bones;//could optimize to short?
-        glm::vec4 boneweights;
-    };
-
-public:
-    static std::shared_ptr<AssimpModel> load(const std::string& filename);
-
+    glm::vec3 aabbMin;
+    glm::vec3 aabbMax;
+    const std::string filename;
 
 private:
-    AssimpModel();
+    struct VertexData
+    {
+        std::vector<glm::vec3> positions;
+        std::vector<glm::vec3> normals;
+        std::vector<glm::vec3> tangents;
+
+        // one vector per channel
+        std::vector<std::vector<glm::vec2>> texCoords;
+        std::vector<std::vector<glm::vec4>> colors; // currently unused
+
+        std::vector<uint32_t> indices;
+    };
+    std::unique_ptr<VertexData> vertexData; // save it here before creating va stuff
+    glow::SharedVertexArray va;
+
+
+public:
+    static std::shared_ptr<AssimpModel> load(const std::string& filename); // safe to do in a thread
+    void draw();                                                           // glow::Program should be active
+
+private:
+    AssimpModel(const std::string& filename) : filename(filename) {}
+    void createVertexArray(); // once on GL thread
 };
