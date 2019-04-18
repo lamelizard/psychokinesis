@@ -4,10 +4,10 @@
 
 #include <glm/glm.hpp>
 
-#include <glow/objects/Program.hh>
 #include <glow/common/log.hh>
 #include <glow/objects/ArrayBuffer.hh>
 #include <glow/objects/ElementArrayBuffer.hh>
+#include <glow/objects/Program.hh>
 #include <glow/objects/VertexArray.hh>
 
 #include <assimp/postprocess.h>
@@ -29,7 +29,7 @@ static glm::vec4 aiCast(aiColor4D const& v)
 // mostly from glow-extras:
 std::shared_ptr<AssimpModel> AssimpModel::load(const std::string& filename)
 {
-    auto model = std::make_shared<AssimpModel>(filename);
+    auto model = std::shared_ptr<AssimpModel>(new AssimpModel(filename));
     model->vertexData = std::make_unique<VertexData>();
 
     if (!std::ifstream(filename).good())
@@ -39,11 +39,23 @@ std::shared_ptr<AssimpModel> AssimpModel::load(const std::string& filename)
         return nullptr;
     }
 
-    uint32_t flags = aiProcess_SortByPType | aiProcess_Triangulate //
-                     | aiProcess_CalcTangentSpace                  //
-                     | aiProcess_GenSmoothNormals                  // if not there
-                     | aiProcess_GenUVCoords                       //
-                     | aiProcess_PreTransformVertices              //
+    //https://gamedev.stackexchange.com/questions/63498/assimp-in-my-program-is-much-slower-to-import-than-assimp-view-program
+    uint32_t flags = aiProcess_SortByPType                //
+                     | aiProcess_Triangulate              //
+                     | aiProcess_JoinIdenticalVertices    //
+                     | aiProcess_ValidateDataStructure    //
+                     | aiProcess_ImproveCacheLocality     //
+                     | aiProcess_RemoveRedundantMaterials //
+                     | aiProcess_FindDegenerates          // err, what's this?
+                     | aiProcess_FindInvalidData          //
+                                                          //| aiProcess_TransformUVCoords //yes,no?
+                                                          //| aiProcess_FindInstances  //???
+                     | aiProcess_LimitBoneWeights         // 4 is max
+                     | aiProcess_OptimizeMeshes           //
+                     | aiProcess_CalcTangentSpace         //
+                     | aiProcess_GenSmoothNormals         // if not there
+                     | aiProcess_GenUVCoords              //
+                     | aiProcess_PreTransformVertices     //
         ;
 
     Assimp::Importer importer;
@@ -112,12 +124,15 @@ std::shared_ptr<AssimpModel> AssimpModel::load(const std::string& filename)
         for (auto f = 0u; f < fCnt; ++f)
         {
             auto const& face = mesh->mFaces[f];
-            if (face.mNumIndices != 3)
+            if (face.mNumIndices < 3)
+                continue; // ignore points and lines, problem?
+            if (face.mNumIndices > 3)
             {
                 error() << "File `" << filename << "':.";
                 error() << "  non-3 faces not implemented/supported";
                 return nullptr;
             }
+
 
             for (auto fi = 0u; fi < face.mNumIndices; ++fi)
             {
@@ -156,7 +171,11 @@ std::shared_ptr<AssimpModel> AssimpModel::load(const std::string& filename)
     return model;
 }
 
-void AssimpModel::draw() {
+void AssimpModel::draw()
+{
+    if (!va)
+        createVertexArray();
+    assert(va);
     assert(Program::getCurrentProgram() != nullptr);
     va->bind().draw();
 }
@@ -170,7 +189,6 @@ void AssimpModel::createVertexArray()
 
     std::vector<SharedArrayBuffer> abs;
 
-
     {
         // positions
         assert(!vertexData->positions.empty());
@@ -179,20 +197,24 @@ void AssimpModel::createVertexArray()
         ab->bind().setData(vertexData->positions);
         abs.push_back(ab);
     }
-    assert(!vertexData->normals.empty())
     {
+        // normals
+        assert(!vertexData->normals.empty());
         auto ab = ArrayBuffer::create();
         ab->defineAttribute<glm::vec3>("aNormal");
         ab->bind().setData(vertexData->normals);
         abs.push_back(ab);
     }
-    if (!vertexData->tangents.empty())
     {
+        // tangents
+        assert(!vertexData->tangents.empty());
         auto ab = ArrayBuffer::create();
         ab->defineAttribute<glm::vec3>("aTangent");
         ab->bind().setData(vertexData->tangents);
         abs.push_back(ab);
     }
+
+    // texture coords
     for (auto i = 0u; i < vertexData->texCoords.size(); ++i)
     {
         auto ab = ArrayBuffer::create();
@@ -209,7 +231,7 @@ void AssimpModel::createVertexArray()
 
     auto eab = ElementArrayBuffer::create(vertexData->indices);
     eab->setObjectLabel(filename);
-    auto va = VertexArray::create(abs, eab, GL_TRIANGLES);
+    va = VertexArray::create(abs, eab, GL_TRIANGLES);
     va->setObjectLabel(filename);
 
     // remove data since it's now on GPU

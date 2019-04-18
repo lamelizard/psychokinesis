@@ -9,6 +9,7 @@
 #include <glm/glm.hpp>
 
 // https://www.khronos.org/opengl/wiki/Skeletal_Animation
+GLOW_SHARED(class, AssimpModel);
 class AssimpModel
 {
 public:
@@ -34,10 +35,10 @@ private:
 
 
 public:
-    static std::shared_ptr<AssimpModel> load(const std::string& filename); // safe to do in a thread
-    void draw();                                                           // glow::Program should be active
+    static SharedAssimpModel load(const std::string& filename); // safe to do in a thread
+    void draw();                                                // glow::Program should be active
 
 private:
     AssimpModel(const std::string& filename) : filename(filename) {}
-    void createVertexArray(); // once on GL thread
+    void createVertexArray(); // once on GL thread (automatic)
 };

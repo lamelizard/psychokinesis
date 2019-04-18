@@ -22,6 +22,8 @@
 
 #include <glm/glm.hpp> // math library
 
+#include <assimp/DefaultLogger.hpp>
+
 #include "load_mesh.hh" // helper function for loading .obj into VertexArrays
 
 Game::Game() : GlfwApp(Gui::ImGui) {}
@@ -35,6 +37,9 @@ void Game::init()
     GlfwApp::init();
 
     setTitle("Game Development 2019");
+
+    // start assimp logging
+    Assimp::DefaultLogger::create();
 
     // create gfx resources
     {
@@ -66,6 +71,9 @@ void Game::init()
         // automatically takes .fsh and .vsh shaders and combines them into a program
         mShaderObject = glow::Program::createFromFile("../data/shaders/object");
         mShaderOutput = glow::Program::createFromFile("../data/shaders/output");
+
+        // Models
+        playerModel = AssimpModel::load("../data/models/earth elemental.fbx");
     }
 }
 
@@ -104,7 +112,7 @@ void Game::render(float elapsedSeconds)
         auto proj = mCamera->getProjectionMatrix();
         auto view = mCamera->getViewMatrix();
 
-        // render cube and sphere
+        // render cube and sphere and 
         {
             // build model matrix
             auto modelCube = glm::translate(mCubePosition) * glm::scale(glm::vec3(mCubeSize));
@@ -128,7 +136,8 @@ void Game::render(float elapsedSeconds)
 
             // bind and render sphere
             shader.setUniform("uModel", modelSphere);
-            mMeshSphere->bind().draw();
+            //mMeshSphere->bind().draw();
+            playerModel->draw();
         }
     }
 

@@ -5,6 +5,8 @@
 #include <glow-extras/camera/Camera.hh>
 #include <glow-extras/glfw/GlfwApp.hh>
 
+#include "assimpModel.hh"
+
 class Game : public glow::glfw::GlfwApp
 {
     // logic
@@ -34,6 +36,9 @@ private:
     glow::SharedVertexArray mMeshCube;
     glow::SharedVertexArray mMeshSphere;
 
+    // models
+    SharedAssimpModel playerModel;
+
     // textures
     glow::SharedTexture2D mTexCubeAlbedo;
     glow::SharedTexture2D mTexCubeNormal;
@@ -56,8 +61,8 @@ public:
     void render(float elapsedSeconds) override; // called once per frame (variable timestep)
     void onGui() override;                      // called once per frame to set up UI
 
-    void onResize(int w, int h) override; // called when window is resized
-	bool onKey(int key, int scancode, int action, int mods) override; // called when a key is pressed
+    void onResize(int w, int h) override;                             // called when window is resized
+    bool onKey(int key, int scancode, int action, int mods) override; // called when a key is pressed
 
     void updateCamera(float elapsedSeconds);
 };

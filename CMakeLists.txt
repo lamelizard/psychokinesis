@@ -95,6 +95,7 @@ option(ASSIMP_BUILD_ASSIMP_TOOLS "" OFF)
 option(ASSIMP_BUILD_TESTS "" OFF)
 add_subdirectory(extern/assimp EXCLUDE_FROM_ALL)
 include_directories(extern/assimp/include)
+include_directories(${CMAKE_CURRENT_BINARY_DIR}/extern/assimp/include)
 
 # Folder grouping
 foreach(TARGET_NAME
