@@ -1,6 +1,7 @@
 #include "assimpModel.hh"
 
 #include <fstream>
+#include <functional>
 
 #include <glm/glm.hpp>
 
@@ -11,8 +12,8 @@
 #include <glow/objects/VertexArray.hh>
 
 #include <assimp/postprocess.h>
-#include <assimp/scene.h>
-#include <assimp/Importer.hpp>
+
+#define MAX_BONES 64
 
 using namespace glow;
 
@@ -26,20 +27,75 @@ static glm::vec4 aiCast(aiColor4D const& v)
     return {v.r, v.g, v.b, v.a};
 }
 
+static glm::mat4 aiCast(aiMatrix4x4 const& v)
+{
+    return glm::mat4(           //
+        v.a1, v.a2, v.a3, v.a4, //
+        v.b1, v.b2, v.b3, v.b4, //
+        v.c1, v.c2, v.c3, v.c4, //
+        v.d1, v.d2, v.d3, v.d4  //
+    );
+}
+
 // mostly from glow-extras:
 std::shared_ptr<AssimpModel> AssimpModel::load(const std::string& filename)
 {
-    auto model = std::shared_ptr<AssimpModel>(new AssimpModel(filename));
-    model->vertexData = std::make_unique<VertexData>();
+    std::shared_ptr<AssimpModel> model;
+    try
+    {
+        model = std::shared_ptr<AssimpModel>(new AssimpModel(filename));
+    }
+    catch (...) // bad
+    {
+        return nullptr;
+    }
+    return model;
+}
 
+void AssimpModel::draw()
+{
+    if (!va)
+        createVertexArray();
+    assert(va);
+    assert(Program::getCurrentProgram() != nullptr);
+    va->bind().draw();
+}
+
+void AssimpModel::draw(const glow::UsedProgram& shader, double time, const std::string& animationStr)
+{
+    if (!va)
+        createVertexArray();
+    assert(va);
+
+    auto animation = animations[animationStr]; // might throw
+    glm::mat4 boneArray[MAX_BONES];
+    //for (int i = 0; i < MAX_BONES; i++)
+    //   boneArray[i] = glm::mat4(); // identity
+    const auto fillArray = [this, &boneArray](aiNode* thisNode, aiMatrix4x4 parent, auto& fillArray) -> void {
+       //https://github.com/vovan4ik123/assimp-Cpp-OpenGL-skeletal-animation/blob/master/Load_3D_model_2/Model.cpp
+        
+        auto transform = parent * thisNode->mTransformation; // does this make sense?????????????????????????????????
+        boneArray[boneIDOfNode[thisNode]] = aiCast(transform * offsetOfNode[thisNode]);//write this better
+        for (int i = 0; i < thisNode->mNumChildren; i++)
+            fillArray(thisNode->mChildren[i], transform, fillArray);
+    };
+    fillArray(scene->mRootNode, aiMatrix4x4(), fillArray);
+
+    shader.setUniform("uBones", MAX_BONES, boneArray);
+
+    va->bind().draw();
+}
+
+AssimpModel::AssimpModel(const std::string& filename) : filename(filename)
+{
     if (!std::ifstream(filename).good())
     {
         error() << "Error loading `" << filename << "' with Assimp.";
         error() << "  File not found/not readable";
-        return nullptr;
+        throw std::exception();
     }
 
-    //https://gamedev.stackexchange.com/questions/63498/assimp-in-my-program-is-much-slower-to-import-than-assimp-view-program
+    // https://gamedev.stackexchange.com/questions/63498/assimp-in-my-program-is-much-slower-to-import-than-assimp-view-program
     uint32_t flags = aiProcess_SortByPType                //
                      | aiProcess_Triangulate              //
                      | aiProcess_JoinIdenticalVertices    //
@@ -48,49 +104,52 @@ std::shared_ptr<AssimpModel> AssimpModel::load(const std::string& filename)
                      | aiProcess_RemoveRedundantMaterials //
                      | aiProcess_FindDegenerates          // err, what's this?
                      | aiProcess_FindInvalidData          //
-                                                          //| aiProcess_TransformUVCoords //yes,no?
-                                                          //| aiProcess_FindInstances  //???
-                     | aiProcess_LimitBoneWeights         // 4 is max
-                     | aiProcess_OptimizeMeshes           //
-                     | aiProcess_CalcTangentSpace         //
-                     | aiProcess_GenSmoothNormals         // if not there
-                     | aiProcess_GenUVCoords              //
-                     | aiProcess_PreTransformVertices     //
+                     | aiProcess_TransformUVCoords        // yes,no?
+                     //| aiProcess_FindInstances  //???
+                     | aiProcess_LimitBoneWeights // 4 is max
+                     | aiProcess_OptimizeMeshes   //
+                     | aiProcess_CalcTangentSpace //
+                     | aiProcess_GenSmoothNormals // if not there
+                     | aiProcess_GenUVCoords      //
+                     //| aiProcess_PreTransformVertices // removes animations...
+                     | aiProcess_FlipUVs // test for mech
         ;
 
-    Assimp::Importer importer;
-    auto scene = importer.ReadFile(filename, flags);
+
+    scene = importer.ReadFile(filename, flags);
 
     if (!scene)
     {
         error() << "Error loading `" << filename << "' with Assimp.";
         error() << "  " << importer.GetErrorString();
-        return nullptr;
+        throw std::exception();
     }
 
     if (!scene->HasMeshes())
     {
         error() << "File `" << filename << "' has no meshes.";
-        return nullptr;
+        throw std::exception();
     }
 
-    glm::vec3& aabbMin = model->aabbMin;
-    glm::vec3& aabbMax = model->aabbMax;
-
-    std::vector<glm::vec3>& positions = model->vertexData->positions;
-    std::vector<glm::vec3>& normals = model->vertexData->normals;
-    std::vector<glm::vec3>& tangents = model->vertexData->tangents;
-
-    // one vector per channel
-    std::vector<std::vector<glm::vec2>>& texCoords = model->vertexData->texCoords;
-    std::vector<std::vector<glm::vec4>>& colors = model->vertexData->colors;
-
-    std::vector<uint32_t>& indices = model->vertexData->indices;
-
-
     auto baseIdx = 0u;
-    for (auto i = 0u; i < scene->mNumMeshes; ++i)
+    assert(scene->mNumMeshes == 1);
+    // for (auto i = 0u; i < scene->mNumMeshes; ++i)
     {
+        auto i = 0u;
+
+        vertexData = std::make_unique<VertexData>();
+        auto& positions = vertexData->positions;
+        auto& normals = vertexData->normals;
+        auto& tangents = vertexData->tangents;
+        auto& bones = vertexData->bones;
+        auto& boneWeights = vertexData->boneWeights;
+
+        // one vector per channel
+        std::vector<std::vector<glm::vec2>>& texCoords = vertexData->texCoords;
+        std::vector<std::vector<glm::vec4>>& colors = vertexData->colors;
+
+        auto& indices = vertexData->indices;
+
         auto const& mesh = scene->mMeshes[i];
         auto colorsCnt = mesh->GetNumColorChannels();
         auto texCoordsCnt = mesh->GetNumUVChannels();
@@ -107,7 +166,7 @@ std::shared_ptr<AssimpModel> AssimpModel::load(const std::string& filename)
         {
             error() << "File `" << filename << "':";
             error() << "  contains inconsistent texture coordinate counts";
-            return nullptr;
+            throw std::exception();
         }
 
         if (colors.empty())
@@ -116,7 +175,7 @@ std::shared_ptr<AssimpModel> AssimpModel::load(const std::string& filename)
         {
             error() << "File `" << filename << "':";
             error() << "  contains inconsistent vertex color counts";
-            return nullptr;
+            throw std::exception();
         }
 
         // add faces
@@ -130,7 +189,7 @@ std::shared_ptr<AssimpModel> AssimpModel::load(const std::string& filename)
             {
                 error() << "File `" << filename << "':.";
                 error() << "  non-3 faces not implemented/supported";
-                return nullptr;
+                throw std::exception();
             }
 
 
@@ -145,6 +204,11 @@ std::shared_ptr<AssimpModel> AssimpModel::load(const std::string& filename)
 
         // add vertices
         auto vCnt = mesh->mNumVertices;
+        positions.reserve(vCnt);
+        normals.reserve(vCnt);
+        tangents.reserve(vCnt);
+        bones.reserve(vCnt);
+        boneWeights.reserve(vCnt);
         for (auto v = 0u; v < vCnt; ++v)
         {
             auto const vertexPosition = aiCast(mesh->mVertices[v]);
@@ -159,6 +223,9 @@ std::shared_ptr<AssimpModel> AssimpModel::load(const std::string& filename)
             assert(mesh->HasTangentsAndBitangents());
             tangents.push_back(aiCast(mesh->mTangents[v]));
 
+            bones.push_back(glm::u16vec4(0, 0, 0, 0));
+            boneWeights.push_back(glm::vec4(0, 0, 0, 0));
+
             for (auto t = 0u; t < texCoordsCnt; ++t)
                 texCoords[t].push_back((glm::vec2)aiCast(mesh->mTextureCoords[t][v]));
             for (auto t = 0u; t < colorsCnt; ++t)
@@ -166,18 +233,53 @@ std::shared_ptr<AssimpModel> AssimpModel::load(const std::string& filename)
         }
 
         baseIdx = static_cast<unsigned>(positions.size());
+
+        // bones
+        if (mesh->HasBones())
+            for (int j = 0; j < mesh->mNumBones; j++)
+            {
+                auto bone = mesh->mBones[j];
+                auto node = scene->mRootNode->FindNode(bone->mName);
+                assert(node);
+                boneIDOfNode[node] = j;
+                offsetOfNode[node] = bone->mOffsetMatrix;
+
+                // weights
+                for (int k = 0; k < bone->mNumWeights; k++)
+                {
+                    auto vid = bone->mWeights[k].mVertexId;
+                    auto weight = bone->mWeights[k].mWeight;
+                    if (boneWeights[vid].x == 0)
+                    {
+                        bones[vid].x = j;
+                        boneWeights[vid].x = weight;
+                    }
+                    else if (boneWeights[vid].y == 0)
+                    {
+                        bones[vid].y = j;
+                        boneWeights[vid].y = weight;
+                    }
+                    else if (boneWeights[vid].z == 0)
+                    {
+                        bones[vid].z = j;
+                        boneWeights[vid].z = weight;
+                    }
+                    else if (boneWeights[vid].w == 0)
+                    {
+                        bones[vid].w = j;
+                        boneWeights[vid].w = weight;
+                    }
+                }
+            }
     }
 
-    return model;
-}
+    // check bone number
+    assert(boneIDOfNode.size() <= MAX_BONES);
 
-void AssimpModel::draw()
-{
-    if (!va)
-        createVertexArray();
-    assert(va);
-    assert(Program::getCurrentProgram() != nullptr);
-    va->bind().draw();
+    // animations
+    if (scene->HasAnimations())
+        for (int i = 0; i < scene->mNumAnimations; i++)
+            animations[scene->mAnimations[i]->mName.C_Str()] = scene->mAnimations[i];
 }
 
 // mostly from glow-extras:
@@ -211,6 +313,20 @@ void AssimpModel::createVertexArray()
         auto ab = ArrayBuffer::create();
         ab->defineAttribute<glm::vec3>("aTangent");
         ab->bind().setData(vertexData->tangents);
+        abs.push_back(ab);
+    }
+    {
+        // bones
+        auto ab = ArrayBuffer::create();
+        ab->defineAttribute<glm::vec4>("aBoneIDs");
+        ab->bind().setData(vertexData->bones);
+        abs.push_back(ab);
+    }
+    {
+        // boneWeights
+        auto ab = ArrayBuffer::create();
+        ab->defineAttribute<glm::vec4>("aBoneWeights");
+        ab->bind().setData(vertexData->boneWeights);
         abs.push_back(ab);
     }
 

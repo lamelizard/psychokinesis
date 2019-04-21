@@ -37,7 +37,9 @@ private:
     glow::SharedVertexArray mMeshSphere;
 
     // models
-    SharedAssimpModel playerModel;
+    glow::SharedTexture2D mTexMechAlbedo;
+    glow::SharedTexture2D mTexMechNormal;
+    SharedAssimpModel mechModel;
 
     // textures
     glow::SharedTexture2D mTexCubeAlbedo;
