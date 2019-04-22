@@ -73,6 +73,7 @@ void Game::init()
         mShaderOutput = glow::Program::createFromFile("../data/shaders/output");
 
         // Models
+        mShaderMech = glow::Program::createFromFile("../data/shaders/mech");
         mTexMechAlbedo = glow::Texture2D::createFromFile("../data/textures/mech.albedo.png", glow::ColorSpace::sRGB);
         mTexMechNormal = glow::Texture2D::createFromFile("../data/textures/mech.normal.png", glow::ColorSpace::Linear);
         mechModel = AssimpModel::load("../data/models/mech/mech.fbx");
@@ -118,8 +119,7 @@ void Game::render(float elapsedSeconds)
         {
             // build model matrix
             auto modelCube = glm::translate(mCubePosition) * glm::scale(glm::vec3(mCubeSize));
-            auto modelSphere = glm::translate(mSpherePosition) * glm::scale(glm::vec3(mSphereSize));
-            modelSphere = glm::rotate(modelSphere, glm::radians(-90.f), glm::vec3(0, 1, 0));
+           
             // let light rotate around the objects
             auto lightDir = glm::vec3(glm::cos(getCurrentTime()), 0, glm::sin(getCurrentTime()));
 
@@ -135,10 +135,15 @@ void Game::render(float elapsedSeconds)
             // bind and render cube
             shader.setUniform("uModel", modelCube);
             mMeshCube->bind().draw();
-
-            // bind and render sphere
-            shader.setUniform("uModel", modelSphere);
-            // mMeshSphere->bind().draw();
+        }
+        {
+            //mech
+            auto shader = mShaderMech->use();
+            auto modelMech = glm::translate(mSpherePosition) * glm::scale(glm::vec3(mSphereSize));
+            modelMech = glm::rotate(modelMech, glm::radians(90.f), glm::vec3(1, 0, 0)); // unity?
+            shader.setUniform("uProj", proj);
+            shader.setUniform("uView", view);
+            shader.setUniform("uModel", modelMech);
             shader.setTexture("uTexAlbedo", mTexMechAlbedo);
             shader.setTexture("uTexNormal", mTexMechNormal);
             mechModel->draw(shader, 5, "WalkInPlace");

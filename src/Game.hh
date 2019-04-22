@@ -36,7 +36,8 @@ private:
     glow::SharedVertexArray mMeshCube;
     glow::SharedVertexArray mMeshSphere;
 
-    // models
+    // mech
+    glow::SharedProgram mShaderMech;
     glow::SharedTexture2D mTexMechAlbedo;
     glow::SharedTexture2D mTexMechNormal;
     SharedAssimpModel mechModel;

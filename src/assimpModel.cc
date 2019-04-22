@@ -69,19 +69,20 @@ void AssimpModel::draw(const glow::UsedProgram& shader, double time, const std::
 
     auto animation = animations[animationStr]; // might throw
     glm::mat4 boneArray[MAX_BONES];
-    //for (int i = 0; i < MAX_BONES; i++)
+    // for (int i = 0; i < MAX_BONES; i++)
     //   boneArray[i] = glm::mat4(); // identity
     const auto fillArray = [this, &boneArray](aiNode* thisNode, aiMatrix4x4 parent, auto& fillArray) -> void {
-       //https://github.com/vovan4ik123/assimp-Cpp-OpenGL-skeletal-animation/blob/master/Load_3D_model_2/Model.cpp
-        
+        // https://github.com/vovan4ik123/assimp-Cpp-OpenGL-skeletal-animation/blob/master/Load_3D_model_2/Model.cpp
+
         auto transform = parent * thisNode->mTransformation; // does this make sense?????????????????????????????????
-        boneArray[boneIDOfNode[thisNode]] = aiCast(transform * offsetOfNode[thisNode]);//write this better
+        if (boneIDOfNode.count(thisNode) == 1) // is node a bone?
+            boneArray[boneIDOfNode[thisNode]] = aiCast(transform * offsetOfNode[thisNode]); // write this better
         for (int i = 0; i < thisNode->mNumChildren; i++)
             fillArray(thisNode->mChildren[i], transform, fillArray);
     };
     fillArray(scene->mRootNode, aiMatrix4x4(), fillArray);
 
-    shader.setUniform("uBones", MAX_BONES, boneArray);
+    shader.setUniform("uBones[0]", MAX_BONES, boneArray);// really, uBones[0] instead of uBones...
 
     va->bind().draw();
 }
