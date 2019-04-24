@@ -42,6 +42,7 @@ private:
     Assimp::Importer importer; // will delete scene on detruction?
     const aiScene* scene = nullptr;
     std::map<std::string, aiAnimation*> animations;
+    std::map<aiAnimation*, std::map<aiNode*, aiNodeAnim*>> nodeAnimations;
     std::map<aiNode*, int> boneIDOfNode;
     std::map<aiNode*, aiMatrix4x4> offsetOfNode;
 
@@ -49,9 +50,10 @@ private:
 public:
     static SharedAssimpModel load(const std::string& filename); // safe to do in a thread
     void draw();                                                // glow::Program should be active
-    void draw(const glow::UsedProgram&, double time, const std::string& animation);
+    void draw(const glow::UsedProgram&, double time, bool loop, const std::string& animation);
 
 private:
     AssimpModel(const std::string& filename);
     void createVertexArray(); // once on GL thread (automatic)
+    aiMatrix4x4 getAnimMat(float t, aiNodeAnim* anim);
 };

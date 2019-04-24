@@ -1,5 +1,6 @@
 #include "assimpModel.hh"
 
+#include <cmath>
 #include <fstream>
 #include <functional>
 
@@ -61,30 +62,125 @@ void AssimpModel::draw()
     va->bind().draw();
 }
 
-void AssimpModel::draw(const glow::UsedProgram& shader, double time, const std::string& animationStr)
+void AssimpModel::draw(const glow::UsedProgram& shader, double t, bool loop, const std::string& animationStr)
 {
     if (!va)
         createVertexArray();
     assert(va);
 
     auto animation = animations[animationStr]; // might throw
-    glm::mat4 boneArray[MAX_BONES];
-    // for (int i = 0; i < MAX_BONES; i++)
-    //   boneArray[i] = glm::mat4(); // identity
-    const auto fillArray = [this, &boneArray](aiNode* thisNode, aiMatrix4x4 parent, auto& fillArray) -> void {
-        // https://github.com/vovan4ik123/assimp-Cpp-OpenGL-skeletal-animation/blob/master/Load_3D_model_2/Model.cpp
 
-        auto transform = parent * thisNode->mTransformation; // does this make sense?????????????????????????????????
-        if (boneIDOfNode.count(thisNode) == 1) // is node a bone?
-            boneArray[boneIDOfNode[thisNode]] = aiCast(transform * offsetOfNode[thisNode]); // write this better
+    assert(animation->mTicksPerSecond);
+    auto ticks = t * animation->mTicksPerSecond;
+    if (loop)
+        ticks = fmod(ticks, animation->mDuration);
+    else
+        ticks = std::max(ticks, animation->mDuration);
+
+    glm::mat4 boneArray[MAX_BONES];
+
+    // auto globalInverse= scene->mRootNode->mTransformation;//needed?
+    // globalInverse.Inverse();
+
+    const auto fillArray = [this, &boneArray, animation, ticks /*, globalInverse*/](aiNode* thisNode, aiMatrix4x4 parent, auto& fillArray) -> void {
+        // https://github.com/vovan4ik123/assimp-Cpp-OpenGL-skeletal-animation/blob/master/Load_3D_model_2/Model.cpp
+        auto transform = aiMatrix4x4();
+
+        if (nodeAnimations[animation].count(thisNode)) // node's animated
+            transform = parent * getAnimMat(ticks, nodeAnimations[animation][thisNode]);
+        else
+            transform = parent * thisNode->mTransformation; // node not animated
+
+        if (boneIDOfNode.count(thisNode) == 1) // the node's a bone
+            boneArray[boneIDOfNode[thisNode]] = aiCast(/*globalInverse **/ transform * offsetOfNode[thisNode]);
+
         for (int i = 0; i < thisNode->mNumChildren; i++)
             fillArray(thisNode->mChildren[i], transform, fillArray);
     };
     fillArray(scene->mRootNode, aiMatrix4x4(), fillArray);
 
-    shader.setUniform("uBones[0]", MAX_BONES, boneArray);// really, uBones[0] instead of uBones...
+    shader.setUniform("uBones[0]", MAX_BONES, boneArray); // really, uBones[0] instead of uBones...
 
     va->bind().draw();
+}
+
+aiMatrix4x4 AssimpModel::getAnimMat(float ticks, aiNodeAnim* anim)
+{
+    aiVector3D scaling;
+    aiQuaternion rotation;
+    aiVector3D position;
+
+    // no animation behaviour...
+
+    assert(anim->mNumPositionKeys > 0);
+    assert(anim->mNumRotationKeys > 0);
+    assert(anim->mNumScalingKeys > 0);
+    {
+        // position
+        if (anim->mNumPositionKeys == 1)
+        {
+            position = anim->mPositionKeys[0].mValue;
+        }
+        else
+        {
+            int i = 0;
+            for (; i < anim->mNumPositionKeys - 1; i++)
+                if (ticks < anim->mPositionKeys[i + 1].mTime)
+                    break;
+
+            auto dt = anim->mPositionKeys[i + 1].mTime - anim->mPositionKeys[i].mTime;
+            float alpha = (ticks - anim->mPositionKeys[i].mTime) / dt;
+            assert(!(alpha < 0 || alpha > 1));
+            auto a = anim->mPositionKeys[i].mValue;
+            auto b = anim->mPositionKeys[i + 1].mValue;
+            position = a + alpha * (b - a);
+            //position = anim->mPositionKeys[0].mValue;
+        }
+    }
+    {
+        // scaling
+        if (anim->mNumScalingKeys == 1)
+        {
+            scaling = anim->mScalingKeys[0].mValue;
+        }
+        else
+        {
+            int i = 0;
+            for (; i < anim->mNumScalingKeys - 1; i++)
+                if (ticks < anim->mScalingKeys[i + 1].mTime)
+                    break;
+
+            auto dt = anim->mScalingKeys[i + 1].mTime - anim->mScalingKeys[i].mTime;
+            float alpha = (ticks - anim->mScalingKeys[i].mTime) / dt;
+            assert(!(alpha < 0 || alpha > 1));
+            auto a = anim->mScalingKeys[i].mValue;
+            auto b = anim->mScalingKeys[i + 1].mValue;
+            scaling = a + alpha * (b - a);
+            //scaling = anim->mScalingKeys[0].mValue;
+        }
+    }
+    {
+        // rotation
+        if (anim->mNumRotationKeys == 1)
+        {
+            rotation = anim->mRotationKeys[0].mValue;
+        }
+        else
+        {
+            int i = 0;
+            for (; i < anim->mNumRotationKeys - 1; i++)
+                if (ticks < anim->mRotationKeys[i + 1].mTime)
+                    break;
+
+            auto dt = anim->mRotationKeys[i + 1].mTime - anim->mRotationKeys[i].mTime;
+            float alpha = (ticks - anim->mRotationKeys[i].mTime) / dt;
+            assert(!(alpha < 0 || alpha > 1));
+            aiQuaternion::Interpolate(rotation, anim->mRotationKeys[i].mValue, anim->mRotationKeys[i + 1].mValue, alpha);
+            //rotation = anim->mRotationKeys[0].mValue;
+        }
+    }
+    auto ret = aiMatrix4x4(scaling, rotation, position);
+    return ret;
 }
 
 AssimpModel::AssimpModel(const std::string& filename) : filename(filename)
@@ -280,7 +376,18 @@ AssimpModel::AssimpModel(const std::string& filename) : filename(filename)
     // animations
     if (scene->HasAnimations())
         for (int i = 0; i < scene->mNumAnimations; i++)
-            animations[scene->mAnimations[i]->mName.C_Str()] = scene->mAnimations[i];
+        {
+            auto animation = scene->mAnimations[i];
+            animations[animation->mName.C_Str()] = animation;
+            for (int j = 0; j < animation->mNumChannels; j++)
+            {
+                auto animNode = animation->mChannels[j];
+                auto node = scene->mRootNode->FindNode(animNode->mNodeName);
+                assert(node);
+                // assert(boneIDOfNode.count(node)); // is every animated bone a node? -> no, it's not
+                nodeAnimations[animation][node] = animNode;
+            }
+        }
 }
 
 // mostly from glow-extras:

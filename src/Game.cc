@@ -141,12 +141,15 @@ void Game::render(float elapsedSeconds)
             auto shader = mShaderMech->use();
             auto modelMech = glm::translate(mSpherePosition) * glm::scale(glm::vec3(mSphereSize));
             modelMech = glm::rotate(modelMech, glm::radians(90.f), glm::vec3(1, 0, 0)); // unity?
+            //modelMech = glm::mat4();
             shader.setUniform("uProj", proj);
             shader.setUniform("uView", view);
             shader.setUniform("uModel", modelMech);
             shader.setTexture("uTexAlbedo", mTexMechAlbedo);
             shader.setTexture("uTexNormal", mTexMechNormal);
-            mechModel->draw(shader, 5, "WalkInPlace");
+            static auto timer = 0;
+            timer += elapsedSeconds;
+            mechModel->draw(shader, timer, true, "WalkInPlace");
         }
     }
 
