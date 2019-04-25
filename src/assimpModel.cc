@@ -93,18 +93,19 @@ void AssimpModel::draw(const glow::UsedProgram& shader, double t, bool loop, con
         else
             transform = parent * thisNode->mTransformation; // node not animated
 
-        //debug
-        if(thisNode != scene->mRootNode){
-             aiVector3D parentPos, pos, scal;
-             aiQuaternion rot;
-             parent.Decompose(scal, rot, parentPos);
-             transform.Decompose(scal, rot, pos);
-             debugRenderer.renderLine(aiCast(parentPos), aiCast(pos));
+        // debug
+        if (thisNode != scene->mRootNode)
+        {
+            aiVector3D parentPos, pos, scal;
+            aiQuaternion rot;
+            parent.Decompose(scal, rot, parentPos);
+            transform.Decompose(scal, rot, pos);
+            debugRenderer.renderLine(aiCast(parentPos), aiCast(pos));
         }
 
 
         if (boneIDOfNode.count(thisNode) == 1) // the node's a bone
-            boneArray[boneIDOfNode[thisNode]] = aiCast(/*globalInverse **/ transform * offsetOfNode[thisNode]);
+            boneArray[boneIDOfNode[thisNode]] = aiCast(/*globalInverse **/ /*aiMatrix4x4::RotationX(-90, aiMatrix4x4()) **/ transform * offsetOfNode[thisNode]);
 
         for (auto i = 0u; i < thisNode->mNumChildren; i++)
             fillArray(thisNode->mChildren[i], transform, fillArray);
@@ -144,17 +145,17 @@ aiMatrix4x4 AssimpModel::getAnimMat(float ticks, aiNodeAnim* anim)
         }
         else
         {
-                auto i = 0u;
-                for (; i < anim->mNumPositionKeys - 1; i++)
-                    if (ticks < anim->mPositionKeys[i + 1].mTime)
-                        break;
+            auto i = 0u;
+            for (; i < anim->mNumPositionKeys - 1; i++)
+                if (ticks < anim->mPositionKeys[i + 1].mTime)
+                    break;
 
-                auto dt = anim->mPositionKeys[i + 1].mTime - anim->mPositionKeys[i].mTime;
-                float alpha = (ticks - anim->mPositionKeys[i].mTime) / dt;
-                assert(!(alpha < 0 || alpha > 1));
-                auto a = anim->mPositionKeys[i].mValue;
-                auto b = anim->mPositionKeys[i + 1].mValue;
-                position = a + alpha * (b - a);
+            auto dt = anim->mPositionKeys[i + 1].mTime - anim->mPositionKeys[i].mTime;
+            float alpha = (ticks - anim->mPositionKeys[i].mTime) / dt;
+            assert(!(alpha < 0 || alpha > 1));
+            auto a = anim->mPositionKeys[i].mValue;
+            auto b = anim->mPositionKeys[i + 1].mValue;
+            position = a + alpha * (b - a);
         }
     }
     {
@@ -186,27 +187,26 @@ aiMatrix4x4 AssimpModel::getAnimMat(float ticks, aiNodeAnim* anim)
         }
         else
         {
-                auto i = 0u;
-                for (; i < anim->mNumRotationKeys - 1; i++)
-                    if (ticks < anim->mRotationKeys[i + 1].mTime)
-                        break;
+            auto i = 0u;
+            for (; i < anim->mNumRotationKeys - 1; i++)
+                if (ticks < anim->mRotationKeys[i + 1].mTime)
+                    break;
 
-                auto dt = anim->mRotationKeys[i + 1].mTime - anim->mRotationKeys[i].mTime;
-                float alpha = (ticks - anim->mRotationKeys[i].mTime) / dt;
-                assert(!(alpha < 0 || alpha > 1));
-                aiQuaternion::Interpolate(rotation, anim->mRotationKeys[i].mValue, anim->mRotationKeys[i + 1].mValue, alpha);
-
+            auto dt = anim->mRotationKeys[i + 1].mTime - anim->mRotationKeys[i].mTime;
+            float alpha = (ticks - anim->mRotationKeys[i].mTime) / dt;
+            assert(!(alpha < 0 || alpha > 1));
+            anim->mRotationKeys[i].mValue.aiQuaternion::Interpolate(rotation, anim->mRotationKeys[i].mValue, anim->mRotationKeys[i + 1].mValue, alpha);
         }
 
-        //default behaviour
-        if((anim->mPreState == aiAnimBehaviour_DEFAULT && ticks < anim->mPositionKeys[0].mTime)
-                || (anim->mPostState == aiAnimBehaviour_DEFAULT && ticks > anim->mPositionKeys[anim->mNumPositionKeys-1].mTime))
+        // default behaviour
+        if ((anim->mPreState == aiAnimBehaviour_DEFAULT && ticks < anim->mPositionKeys[0].mTime)
+            || (anim->mPostState == aiAnimBehaviour_DEFAULT && ticks > anim->mPositionKeys[anim->mNumPositionKeys - 1].mTime))
             position = defPosition;
-        if((anim->mPreState == aiAnimBehaviour_DEFAULT && ticks < anim->mScalingKeys[0].mTime)
-                || (anim->mPostState == aiAnimBehaviour_DEFAULT && ticks > anim->mScalingKeys[anim->mNumScalingKeys-1].mTime))
+        if ((anim->mPreState == aiAnimBehaviour_DEFAULT && ticks < anim->mScalingKeys[0].mTime)
+            || (anim->mPostState == aiAnimBehaviour_DEFAULT && ticks > anim->mScalingKeys[anim->mNumScalingKeys - 1].mTime))
             scaling = defScaling;
-        if((anim->mPreState == aiAnimBehaviour_DEFAULT && ticks < anim->mRotationKeys[0].mTime)
-                || (anim->mPostState == aiAnimBehaviour_DEFAULT && ticks > anim->mRotationKeys[anim->mNumRotationKeys -1].mTime))
+        if ((anim->mPreState == aiAnimBehaviour_DEFAULT && ticks < anim->mRotationKeys[0].mTime)
+            || (anim->mPostState == aiAnimBehaviour_DEFAULT && ticks > anim->mRotationKeys[anim->mNumRotationKeys - 1].mTime))
             rotation = defRotation;
     }
     auto ret = aiMatrix4x4(scaling, rotation, position);
@@ -232,15 +232,19 @@ AssimpModel::AssimpModel(const std::string& filename) : filename(filename)
                      | aiProcess_FindDegenerates          // err, what's this?
                      | aiProcess_FindInvalidData          //
                      | aiProcess_TransformUVCoords        // yes,no?
-                     //| aiProcess_FindInstances  //???
-                     | aiProcess_LimitBoneWeights // 4 is max
-                     | aiProcess_OptimizeMeshes   //
-                     | aiProcess_CalcTangentSpace //
-                     | aiProcess_GenSmoothNormals // if not there
-                     | aiProcess_GenUVCoords      //
+                     | aiProcess_LimitBoneWeights         // 4 is max
+                     | aiProcess_OptimizeMeshes           //
+                     | aiProcess_OptimizeGraph            //
+                     | aiProcess_CalcTangentSpace         //
+                     | aiProcess_GenSmoothNormals         // if not there
+                     | aiProcess_GenUVCoords              //
                      //| aiProcess_PreTransformVertices // removes animations...
+                     // | aiProcess_Debone
+                     // aiProcess_GlobalScale // but what scale?
                      | aiProcess_FlipUVs // test for mech
         ;
+
+    importer.SetPropertyInteger(AI_CONFIG_PP_SBP_REMOVE, aiPrimitiveType_POINT | aiPrimitiveType_LINE);
 
 
     scene = importer.ReadFile(filename, flags);
@@ -252,7 +256,8 @@ AssimpModel::AssimpModel(const std::string& filename) : filename(filename)
         throw std::exception();
     }
 
-    if(scene->mFlags & AI_SCENE_FLAGS_INCOMPLETE){
+    if (scene->mFlags & AI_SCENE_FLAGS_INCOMPLETE)
+    {
         error() << "File `" << filename << "' incomplete.";
         throw std::exception();
     }
@@ -355,7 +360,7 @@ AssimpModel::AssimpModel(const std::string& filename) : filename(filename)
             assert(mesh->HasTangentsAndBitangents());
             tangents.push_back(aiCast(mesh->mTangents[v]));
 
-            bones.push_back(glm::u16vec4(0, 0, 0, 0));
+            bones.push_back(glm::ivec4(0, 0, 0, 0));
             boneWeights.push_back(glm::vec4(0, 0, 0, 0));
 
             for (auto t = 0u; t < texCoordsCnt; ++t)
@@ -368,12 +373,12 @@ AssimpModel::AssimpModel(const std::string& filename) : filename(filename)
 
         // bones
         if (mesh->HasBones())
-            for (int j = 0; j < mesh->mNumBones; j++)
+            for (int boneID = 0; boneID < mesh->mNumBones; boneID++)
             {
-                auto bone = mesh->mBones[j];
+                auto bone = mesh->mBones[boneID];
                 auto node = scene->mRootNode->FindNode(bone->mName);
                 assert(node);
-                boneIDOfNode[node] = j;
+                boneIDOfNode[node] = boneID;
                 offsetOfNode[node] = bone->mOffsetMatrix;
 
                 // weights
@@ -381,24 +386,26 @@ AssimpModel::AssimpModel(const std::string& filename) : filename(filename)
                 {
                     auto vid = bone->mWeights[k].mVertexId;
                     auto weight = bone->mWeights[k].mWeight;
+                    if (weight < 0.01)
+                        continue;
                     if (boneWeights[vid].x == 0)
                     {
-                        bones[vid].x = j;
+                        bones[vid].x = boneID;
                         boneWeights[vid].x = weight;
                     }
                     else if (boneWeights[vid].y == 0)
                     {
-                        bones[vid].y = j;
+                        bones[vid].y = boneID;
                         boneWeights[vid].y = weight;
                     }
                     else if (boneWeights[vid].z == 0)
                     {
-                        bones[vid].z = j;
+                        bones[vid].z = boneID;
                         boneWeights[vid].z = weight;
                     }
                     else if (boneWeights[vid].w == 0)
                     {
-                        bones[vid].w = j;
+                        bones[vid].w = boneID;
                         boneWeights[vid].w = weight;
                     }
                 }
@@ -424,11 +431,10 @@ AssimpModel::AssimpModel(const std::string& filename) : filename(filename)
             }
         }
 
-    //test
-    for(const auto& v : vertexData->boneWeights)
-        if(v.x+v.y+v.z+v.w > 1.1)
-            error() << v.x+v.y+v.z+v.w;
-
+    // test
+    for (const auto& v : vertexData->boneWeights)
+        if (v.x + v.y + v.z + v.w > 1.1)
+            error() << v.x + v.y + v.z + v.w;
 }
 
 // mostly from glow-extras:
@@ -467,7 +473,7 @@ void AssimpModel::createVertexArray()
     {
         // bones
         auto ab = ArrayBuffer::create();
-        ab->defineAttribute<glm::vec4>("aBoneIDs");
+        ab->defineAttribute<glm::ivec4>("aBoneIDs");
         ab->bind().setData(vertexData->bones);
         abs.push_back(ab);
     }

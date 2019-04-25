@@ -7,7 +7,7 @@ in vec3 aPosition;
 in vec3 aNormal;
 in vec3 aTangent;
 in vec2 aTexCoord;
-in vec4 aBoneIDs;
+in ivec4 aBoneIDs;
 in vec4 aBoneWeights;
 
 out vec3 vWorldPos;
@@ -17,10 +17,10 @@ out vec2 vTexCoord;
 
 void main()
 {
-    vec4 pos = (uBones[int(aBoneIDs.x)] * vec4(aPosition, 1)) * aBoneWeights.x   //
-               + (uBones[int(aBoneIDs.y)] * vec4(aPosition, 1)) * aBoneWeights.y //
-               + (uBones[int(aBoneIDs.z)] * vec4(aPosition, 1)) * aBoneWeights.z //
-               + (uBones[int(aBoneIDs.w)] * vec4(aPosition, 1)) * aBoneWeights.w;
+    vec4 pos = (uBones[aBoneIDs.x] * vec4(aPosition, 1)) * aBoneWeights.x   //
+               + (uBones[aBoneIDs.y] * vec4(aPosition, 1)) * aBoneWeights.y //
+               + (uBones[aBoneIDs.z] * vec4(aPosition, 1)) * aBoneWeights.z //
+               + (uBones[aBoneIDs.w] * vec4(aPosition, 1)) * aBoneWeights.w;
 
 
     // assume uModel has no non-uniform scaling

@@ -28,7 +28,7 @@ private:
         std::vector<glm::vec3> positions;
         std::vector<glm::vec3> normals;
         std::vector<glm::vec3> tangents;
-        std::vector<glm::vec4> bones;
+        std::vector<glm::ivec4> bones;
         std::vector<glm::vec4> boneWeights;
 
         // one vector per channel
