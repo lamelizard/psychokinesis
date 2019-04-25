@@ -6,6 +6,7 @@
 #include <vector>
 
 #include <glow/fwd.hh>
+#include <glow-extras/debugging/DebugRenderer.hh>
 
 #include <assimp/scene.h>
 #include <assimp/Importer.hpp>
@@ -56,4 +57,7 @@ private:
     AssimpModel(const std::string& filename);
     void createVertexArray(); // once on GL thread (automatic)
     aiMatrix4x4 getAnimMat(float t, aiNodeAnim* anim);
+
+public:
+    glow::debugging::DebugRenderer debugRenderer;
 };

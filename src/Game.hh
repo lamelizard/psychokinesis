@@ -41,6 +41,7 @@ private:
     glow::SharedTexture2D mTexMechAlbedo;
     glow::SharedTexture2D mTexMechNormal;
     SharedAssimpModel mechModel;
+    float debugTime = 0;
 
     // textures
     glow::SharedTexture2D mTexCubeAlbedo;

@@ -141,7 +141,7 @@ void Game::render(float elapsedSeconds)
             auto shader = mShaderMech->use();
             auto modelMech = glm::translate(mSpherePosition) * glm::scale(glm::vec3(mSphereSize));
             modelMech = glm::rotate(modelMech, glm::radians(90.f), glm::vec3(1, 0, 0)); // unity?
-            //modelMech = glm::mat4();
+            modelMech = glm::mat4();
             shader.setUniform("uProj", proj);
             shader.setUniform("uView", view);
             shader.setUniform("uModel", modelMech);
@@ -149,7 +149,10 @@ void Game::render(float elapsedSeconds)
             shader.setTexture("uTexNormal", mTexMechNormal);
             static auto timer = 0;
             timer += elapsedSeconds;
-            mechModel->draw(shader, timer, true, "WalkInPlace");
+            //mechModel->draw(shader, timer, true, "WalkInPlace");
+            mechModel->draw(shader, debugTime, true, "WalkInPlace");
+            //skeleton
+            mechModel->debugRenderer.render(proj*view*glm::scale(glm::vec3(0.01)));
         }
     }
 
@@ -200,6 +203,7 @@ void Game::onGui()
             ImGui::ColorEdit3("Background Color", &mBackgroundColor.r);
             ImGui::Unindent();
         }
+        ImGui::SliderFloat("mechtime", &debugTime, 0.0, 2.0);
     }
     ImGui::End();
 }

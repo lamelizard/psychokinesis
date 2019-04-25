@@ -68,6 +68,8 @@ void AssimpModel::draw(const glow::UsedProgram& shader, double t, bool loop, con
         createVertexArray();
     assert(va);
 
+    debugRenderer.clear();
+
     auto animation = animations[animationStr]; // might throw
 
     assert(animation->mTicksPerSecond);
@@ -87,14 +89,24 @@ void AssimpModel::draw(const glow::UsedProgram& shader, double t, bool loop, con
         auto transform = aiMatrix4x4();
 
         if (nodeAnimations[animation].count(thisNode)) // node's animated
-            transform = parent * getAnimMat(ticks, nodeAnimations[animation][thisNode]);
+            transform = parent * this->getAnimMat(ticks, nodeAnimations[animation][thisNode]);
         else
             transform = parent * thisNode->mTransformation; // node not animated
+
+        //debug
+        if(thisNode != scene->mRootNode){
+             aiVector3D parentPos, pos, scal;
+             aiQuaternion rot;
+             parent.Decompose(scal, rot, parentPos);
+             transform.Decompose(scal, rot, pos);
+             debugRenderer.renderLine(aiCast(parentPos), aiCast(pos));
+        }
+
 
         if (boneIDOfNode.count(thisNode) == 1) // the node's a bone
             boneArray[boneIDOfNode[thisNode]] = aiCast(/*globalInverse **/ transform * offsetOfNode[thisNode]);
 
-        for (int i = 0; i < thisNode->mNumChildren; i++)
+        for (auto i = 0u; i < thisNode->mNumChildren; i++)
             fillArray(thisNode->mChildren[i], transform, fillArray);
     };
     fillArray(scene->mRootNode, aiMatrix4x4(), fillArray);
@@ -109,12 +121,21 @@ aiMatrix4x4 AssimpModel::getAnimMat(float ticks, aiNodeAnim* anim)
     aiVector3D scaling;
     aiQuaternion rotation;
     aiVector3D position;
+    aiVector3D defScaling;
+    aiQuaternion defRotation;
+    aiVector3D defPosition;
+    auto deftMat = scene->mRootNode->FindNode(anim->mNodeName)->mTransformation;
+    deftMat.Decompose(defScaling, defRotation, defPosition);
 
-    // no animation behaviour...
+    // break if not implemented yet
+    assert(anim->mPreState == aiAnimBehaviour_DEFAULT);
+    assert(anim->mPostState == aiAnimBehaviour_DEFAULT);
 
     assert(anim->mNumPositionKeys > 0);
     assert(anim->mNumRotationKeys > 0);
     assert(anim->mNumScalingKeys > 0);
+
+
     {
         // position
         if (anim->mNumPositionKeys == 1)
@@ -123,18 +144,17 @@ aiMatrix4x4 AssimpModel::getAnimMat(float ticks, aiNodeAnim* anim)
         }
         else
         {
-            int i = 0;
-            for (; i < anim->mNumPositionKeys - 1; i++)
-                if (ticks < anim->mPositionKeys[i + 1].mTime)
-                    break;
+                auto i = 0u;
+                for (; i < anim->mNumPositionKeys - 1; i++)
+                    if (ticks < anim->mPositionKeys[i + 1].mTime)
+                        break;
 
-            auto dt = anim->mPositionKeys[i + 1].mTime - anim->mPositionKeys[i].mTime;
-            float alpha = (ticks - anim->mPositionKeys[i].mTime) / dt;
-            assert(!(alpha < 0 || alpha > 1));
-            auto a = anim->mPositionKeys[i].mValue;
-            auto b = anim->mPositionKeys[i + 1].mValue;
-            position = a + alpha * (b - a);
-            //position = anim->mPositionKeys[0].mValue;
+                auto dt = anim->mPositionKeys[i + 1].mTime - anim->mPositionKeys[i].mTime;
+                float alpha = (ticks - anim->mPositionKeys[i].mTime) / dt;
+                assert(!(alpha < 0 || alpha > 1));
+                auto a = anim->mPositionKeys[i].mValue;
+                auto b = anim->mPositionKeys[i + 1].mValue;
+                position = a + alpha * (b - a);
         }
     }
     {
@@ -145,7 +165,7 @@ aiMatrix4x4 AssimpModel::getAnimMat(float ticks, aiNodeAnim* anim)
         }
         else
         {
-            int i = 0;
+            auto i = 0u;
             for (; i < anim->mNumScalingKeys - 1; i++)
                 if (ticks < anim->mScalingKeys[i + 1].mTime)
                     break;
@@ -156,7 +176,6 @@ aiMatrix4x4 AssimpModel::getAnimMat(float ticks, aiNodeAnim* anim)
             auto a = anim->mScalingKeys[i].mValue;
             auto b = anim->mScalingKeys[i + 1].mValue;
             scaling = a + alpha * (b - a);
-            //scaling = anim->mScalingKeys[0].mValue;
         }
     }
     {
@@ -167,17 +186,28 @@ aiMatrix4x4 AssimpModel::getAnimMat(float ticks, aiNodeAnim* anim)
         }
         else
         {
-            int i = 0;
-            for (; i < anim->mNumRotationKeys - 1; i++)
-                if (ticks < anim->mRotationKeys[i + 1].mTime)
-                    break;
+                auto i = 0u;
+                for (; i < anim->mNumRotationKeys - 1; i++)
+                    if (ticks < anim->mRotationKeys[i + 1].mTime)
+                        break;
 
-            auto dt = anim->mRotationKeys[i + 1].mTime - anim->mRotationKeys[i].mTime;
-            float alpha = (ticks - anim->mRotationKeys[i].mTime) / dt;
-            assert(!(alpha < 0 || alpha > 1));
-            aiQuaternion::Interpolate(rotation, anim->mRotationKeys[i].mValue, anim->mRotationKeys[i + 1].mValue, alpha);
-            //rotation = anim->mRotationKeys[0].mValue;
+                auto dt = anim->mRotationKeys[i + 1].mTime - anim->mRotationKeys[i].mTime;
+                float alpha = (ticks - anim->mRotationKeys[i].mTime) / dt;
+                assert(!(alpha < 0 || alpha > 1));
+                aiQuaternion::Interpolate(rotation, anim->mRotationKeys[i].mValue, anim->mRotationKeys[i + 1].mValue, alpha);
+
         }
+
+        //default behaviour
+        if((anim->mPreState == aiAnimBehaviour_DEFAULT && ticks < anim->mPositionKeys[0].mTime)
+                || (anim->mPostState == aiAnimBehaviour_DEFAULT && ticks > anim->mPositionKeys[anim->mNumPositionKeys-1].mTime))
+            position = defPosition;
+        if((anim->mPreState == aiAnimBehaviour_DEFAULT && ticks < anim->mScalingKeys[0].mTime)
+                || (anim->mPostState == aiAnimBehaviour_DEFAULT && ticks > anim->mScalingKeys[anim->mNumScalingKeys-1].mTime))
+            scaling = defScaling;
+        if((anim->mPreState == aiAnimBehaviour_DEFAULT && ticks < anim->mRotationKeys[0].mTime)
+                || (anim->mPostState == aiAnimBehaviour_DEFAULT && ticks > anim->mRotationKeys[anim->mNumRotationKeys -1].mTime))
+            rotation = defRotation;
     }
     auto ret = aiMatrix4x4(scaling, rotation, position);
     return ret;
@@ -219,6 +249,11 @@ AssimpModel::AssimpModel(const std::string& filename) : filename(filename)
     {
         error() << "Error loading `" << filename << "' with Assimp.";
         error() << "  " << importer.GetErrorString();
+        throw std::exception();
+    }
+
+    if(scene->mFlags & AI_SCENE_FLAGS_INCOMPLETE){
+        error() << "File `" << filename << "' incomplete.";
         throw std::exception();
     }
 
@@ -388,6 +423,12 @@ AssimpModel::AssimpModel(const std::string& filename) : filename(filename)
                 nodeAnimations[animation][node] = animNode;
             }
         }
+
+    //test
+    for(const auto& v : vertexData->boneWeights)
+        if(v.x+v.y+v.z+v.w > 1.1)
+            error() << v.x+v.y+v.z+v.w;
+
 }
 
 // mostly from glow-extras:

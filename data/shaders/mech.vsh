@@ -22,12 +22,14 @@ void main()
                + (uBones[int(aBoneIDs.z)] * vec4(aPosition, 1)) * aBoneWeights.z //
                + (uBones[int(aBoneIDs.w)] * vec4(aPosition, 1)) * aBoneWeights.w;
 
+
     // assume uModel has no non-uniform scaling
     vNormal = mat3(uModel) * aNormal;
     vTangent = mat3(uModel) * aTangent;
 
     vTexCoord = aTexCoord;
 
-    vWorldPos = vec3(uModel * pos);
+    //vWorldPos = vec3(uModel * pos);
+    vWorldPos = vec3(pos);
     gl_Position = uProj * uView * vec4(vWorldPos, 1);
 }
