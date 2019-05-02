@@ -22,6 +22,8 @@
 
 #include <glm/glm.hpp> // math library
 
+#include <assimp/DefaultLogger.hpp>
+
 #include "load_mesh.hh" // helper function for loading .obj into VertexArrays
 
 using namespace std;
@@ -37,6 +39,9 @@ void Game::init()
     GlfwApp::init();
 
     setTitle("Game Development 2019");
+
+    // start assimp logging
+    Assimp::DefaultLogger::create();
 
     // create gfx resources
     {
@@ -55,6 +60,7 @@ void Game::init()
         // color textures are usually sRGB and data textures Linear
         mTexCubeAlbedo = glow::Texture2D::createFromFile("../data/textures/cube.albedo.png", glow::ColorSpace::sRGB);
         mTexCubeNormal = glow::Texture2D::createFromFile("../data/textures/cube.normal.png", glow::ColorSpace::Linear);
+        mTexDefNormal = glow::Texture2D::createFromFile("../data/textures/normal.png", glow::ColorSpace::Linear);
 
         // simple procedural quad with vec2 aPosition
         mMeshQuad = glow::geometry::make_quad();
@@ -68,6 +74,15 @@ void Game::init()
         // automatically takes .fsh and .vsh shaders and combines them into a program
         mShaderObject = glow::Program::createFromFile("../data/shaders/object");
         mShaderOutput = glow::Program::createFromFile("../data/shaders/output");
+
+        // Models
+        mShaderMech = glow::Program::createFromFile("../data/shaders/mech");
+        //mTexMechAlbedo = glow::Texture2D::createFromFile("../data/textures/mech.albedo.png", glow::ColorSpace::sRGB);
+        //mTexMechNormal = glow::Texture2D::createFromFile("../data/textures/mech.normal.png", glow::ColorSpace::Linear);
+        mechModel = AssimpModel::load("../data/models/mech/mech.fbx");
+
+        mTexBeholderAlbedo = glow::Texture2D::createFromFile("../data/textures/beholder.png", glow::ColorSpace::sRGB);
+        //beholderModel = AssimpModel::load("../data/models/beholder/beholder.gltf");
     }
 
     // initialize Bullet
@@ -156,7 +171,7 @@ void Game::render(float elapsedSeconds)
         auto proj = mCamera->getProjectionMatrix();
         auto view = mCamera->getViewMatrix();
 
-        // render cube and sphere
+        // render cube and sphere and
         {
             // get transform from bullet
             btTransform trans;
@@ -166,9 +181,10 @@ void Game::render(float elapsedSeconds)
             trans.getOpenGLMatrix(glm::value_ptr(mat));
 
             // build model matrix
+
             // auto modelCube = glm::translate(mCubePosition) * glm::scale(glm::vec3(mCubeSize));
             auto modelCube = mat * glm::scale(glm::vec3(mCubeSize));
-            auto modelSphere = glm::translate(mSpherePosition) * glm::scale(glm::vec3(mSphereSize));
+           
 
             // let light rotate around the objects
             auto lightDir = glm::vec3(glm::cos(getCurrentTime()), 0, glm::sin(getCurrentTime()));
@@ -185,10 +201,34 @@ void Game::render(float elapsedSeconds)
             // bind and render cube
             shader.setUniform("uModel", modelCube);
             mMeshCube->bind().draw();
+        }
+        {
+            //mech
+            auto shader = mShaderMech->use();
+            auto modelMech = glm::translate(mSpherePosition) * glm::scale(glm::vec3(mSphereSize));
+            modelMech = glm::rotate(modelMech, glm::radians(90.f), glm::vec3(1, 0, 0)); // unity?
+            modelMech = glm::mat4();
+            shader.setUniform("uProj", proj);
+            shader.setUniform("uView", view);
+            shader.setUniform("uModel", modelMech);
+            
+            //shader.setTexture("uTexAlbedo", mTexMechAlbedo);
+            //shader.setTexture("uTexNormal", mTexMechNormal);
+            shader.setTexture("uTexAlbedo", mTexDefNormal);
+            shader.setTexture("uTexNormal", mTexDefNormal);
 
-            // bind and render sphere
-            shader.setUniform("uModel", modelSphere);
-            mMeshSphere->bind().draw();
+            static auto timer = 0;
+            timer += elapsedSeconds;
+            //mechModel->draw(shader, timer, true, "WalkInPlace");
+            mechModel->draw(shader, debugTime, true, "Hit");
+            //skeleton
+            mechModel->debugRenderer.render(proj*view*glm::scale(glm::vec3(0.01)));
+
+            shader.setUniform("uModel", glm::translate(mSpherePosition));
+            shader.setTexture("uTexAlbedo", mTexBeholderAlbedo);
+            shader.setTexture("uTexNormal", mTexDefNormal);
+            //beholderModel->draw(shader, debugTime, true, "ArmaBeholder|wait");
+            //beholderModel->debugRenderer.render(proj * view);
         }
 
         // Render Bullet Debug
@@ -247,6 +287,7 @@ void Game::onGui()
             ImGui::ColorEdit3("Background Color", &mBackgroundColor.r);
             ImGui::Unindent();
         }
+        ImGui::SliderFloat("mechtime", &debugTime, 0.0, 2.0);
     }
     ImGui::End();
 }

@@ -5,9 +5,12 @@
 #include <glow-extras/camera/Camera.hh>
 #include <glow-extras/glfw/GlfwApp.hh>
 
-#include <btBulletDynamicsCommon.h>
 
+#include <btBulletDynamicsCommon.h>
 #include "BulletDebugger.hh"
+
+#include "assimpModel.hh"
+
 
 class Game : public glow::glfw::GlfwApp
 {
@@ -38,9 +41,20 @@ private:
     glow::SharedVertexArray mMeshCube;
     glow::SharedVertexArray mMeshSphere;
 
+    // mech
+    glow::SharedProgram mShaderMech;
+    glow::SharedTexture2D mTexMechAlbedo;
+    glow::SharedTexture2D mTexMechNormal;
+    SharedAssimpModel mechModel;
+    //beholder
+    glow::SharedTexture2D mTexBeholderAlbedo;
+    SharedAssimpModel beholderModel;
+    float debugTime = 0;
+
     // textures
     glow::SharedTexture2D mTexCubeAlbedo;
     glow::SharedTexture2D mTexCubeNormal;
+    glow::SharedTexture2D mTexDefNormal;
 
     // intermediate framebuffer with color and depth texture
     glow::SharedFramebuffer mFramebuffer;

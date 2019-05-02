@@ -1,7 +1,7 @@
 Open Asset Import Library (assimp)
 ==================================
 A library to import and export various 3d-model-formats including scene-post-processing to generate missing render data.
-### Current build status ###
+### Current project status ###
 [![Linux Build Status](https://travis-ci.org/assimp/assimp.svg)](https://travis-ci.org/assimp/assimp)
 [![Windows Build Status](https://ci.appveyor.com/api/projects/status/tmo433wax6u6cjp4?svg=true)](https://ci.appveyor.com/project/kimkulling/assimp)
 <a href="https://scan.coverity.com/projects/5607">
@@ -10,6 +10,9 @@ A library to import and export various 3d-model-formats including scene-post-pro
 </a>
 [![Coverage Status](https://coveralls.io/repos/github/assimp/assimp/badge.svg?branch=master)](https://coveralls.io/github/assimp/assimp?branch=master)
 [![Join the chat at https://gitter.im/assimp/assimp](https://badges.gitter.im/assimp/assimp.svg)](https://gitter.im/assimp/assimp?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge&utm_content=badge)
+[![Average time to resolve an issue](http://isitmaintained.com/badge/resolution/assimp/assimp.svg)](http://isitmaintained.com/project/assimp/assimp "Average time to resolve an issue")
+[![Codacy Badge](https://api.codacy.com/project/badge/Grade/5be56faac64f46fc941ac890fb4febef)](https://www.codacy.com/app/kimkulling/assimp?utm_source=github.com&amp;utm_medium=referral&amp;utm_content=assimp/assimp&amp;utm_campaign=Badge_Grade)
+[![Total alerts](https://img.shields.io/lgtm/alerts/g/assimp/assimp.svg?logo=lgtm&logoWidth=18)](https://lgtm.com/projects/g/assimp/assimp/alerts/)
 <br>
 
 APIs are provided for C and C++. There are various bindings to other languages (C#, Java, Python, Delphi, D). Assimp also runs on Android and iOS.
@@ -30,34 +33,36 @@ One-off donations via PayPal:
 
 Please check our Wiki as well: https://github.com/assimp/assimp/wiki
 
+If you want to check our Model-Database, use the following repo: https://github.com/assimp/assimp-mdb
+
 #### Supported file formats ####
 
-A full list [is here](http://assimp.org/main_features_formats.html).
 __Importers__:
+
 - 3D
-- 3DS
-- 3MF
+- [3DS](https://en.wikipedia.org/wiki/.3ds)
+- [3MF](https://en.wikipedia.org/wiki/3D_Manufacturing_Format)
 - AC
-- AC3D
+- [AC3D](https://en.wikipedia.org/wiki/AC3D)
 - ACC
 - AMJ
 - ASE
 - ASK
-- B3D;
-- BLEND (Blender)
-- BVH
-- COB
+- B3D
+- [BLEND](https://en.wikipedia.org/wiki/.blend_(file_format))
+- [BVH](https://en.wikipedia.org/wiki/Biovision_Hierarchy)
 - CMS
-- DAE/Collada
-- DXF
+- COB
+- [DAE/Collada](https://en.wikipedia.org/wiki/COLLADA)
+- [DXF](https://en.wikipedia.org/wiki/AutoCAD_DXF)
 - ENFF
-- FBX
-- glTF 1.0 + GLB
-- glTF 2.0
+- [FBX](https://en.wikipedia.org/wiki/FBX)
+- [glTF 1.0](https://en.wikipedia.org/wiki/GlTF#glTF_1.0) + GLB
+- [glTF 2.0](https://en.wikipedia.org/wiki/GlTF#glTF_2.0)
 - HMB
 - IFC-STEP
 - IRR / IRRMESH
-- LWO
+- [LWO](https://en.wikipedia.org/wiki/LightWave_3D)
 - LWS
 - LXO
 - MD2
@@ -70,10 +75,10 @@ __Importers__:
 - MS3D
 - NDO
 - NFF
-- OBJ
-- OFF
-- OGEX
-- PLY
+- [OBJ](https://en.wikipedia.org/wiki/Wavefront_.obj_file)
+- [OFF](https://en.wikipedia.org/wiki/OFF_(file_format))
+- [OGEX](https://en.wikipedia.org/wiki/Open_Game_Engine_Exchange)
+- [PLY](https://en.wikipedia.org/wiki/PLY_(file_format))
 - PMX
 - PRJ
 - Q3O
@@ -82,19 +87,19 @@ __Importers__:
 - SCN
 - SIB
 - SMD
-- STL
-- STP
+- [STP](https://en.wikipedia.org/wiki/ISO_10303-21)
+- [STL](https://en.wikipedia.org/wiki/STL_(file_format))
 - TER
 - UC
 - VTA
 - X
-- X3D
+- [X3D](https://en.wikipedia.org/wiki/X3D)
 - XGL
 - ZGL
 
 Additionally, some formats are supported by dependency on non-free code or external SDKs (not built by default):
 
-- C4D (https://github.com/assimp/assimp/wiki/Cinema4D-&-Melange)
+- [C4D](https://en.wikipedia.org/wiki/Cinema_4D) (https://github.com/assimp/assimp/wiki/Cinema4D-&-Melange)
 
 __Exporters__:
 
@@ -109,9 +114,11 @@ __Exporters__:
 - STEP
 - glTF 1.0 (partial)
 - glTF 2.0 (partial)
+- 3MF ( experimental )
+- FBX ( experimental )
 
 ### Building ###
-Take a look into the `INSTALL` file. Our build system is CMake, if you used CMake before there is a good chance you know what to do.
+Take a look into the https://github.com/assimp/assimp/blob/master/Build.md file. Our build system is CMake, if you used CMake before there is a good chance you know what to do.
 
 ### Ports ###
 * [Android](port/AndroidJNI/README.md)
@@ -120,7 +127,7 @@ Take a look into the `INSTALL` file. Our build system is CMake, if you used CMak
 * [Pascal](port/AssimpPascal/Readme.md)
 * [Javascript (Alpha)](https://github.com/makc/assimp2json)
 * [Unity 3d Plugin](https://www.assetstore.unity3d.com/en/#!/content/91777)
-* [JVM](https://github.com/kotlin-graphics/assimp) Full jvm port (currently supported obj, ply, stl, collada, md2)
+* [JVM](https://github.com/kotlin-graphics/assimp) Full jvm port (current [status](https://github.com/kotlin-graphics/assimp/wiki/Status))
 
 ### Other tools ###
 [open3mod](https://github.com/acgessler/open3mod) is a powerful 3D model viewer based on Assimp's import and export abilities.
@@ -138,8 +145,6 @@ Open Asset Import Library is implemented in C++. The directory structure is:
 	/tools		Tools (old assimp viewer, command line `assimp`)
 	/samples	A small number of samples to illustrate possible
                         use cases for Assimp
-	/workspaces	Build environments for vc,xcode,... (deprecated,
-			CMake has superseeded all legacy build options!)
 
 
 ### Where to get help ###
