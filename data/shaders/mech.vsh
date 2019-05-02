@@ -29,7 +29,7 @@ void main()
 
     vTexCoord = aTexCoord;
 
-    //vWorldPos = vec3(uModel * pos);
-    vWorldPos = vec3(pos);
+    vWorldPos = vec3(uModel * pos);
+    //vWorldPos = vec3(pos);
     gl_Position = uProj * uView * vec4(vWorldPos, 1);
 }

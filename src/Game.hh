@@ -41,11 +41,15 @@ private:
     glow::SharedTexture2D mTexMechAlbedo;
     glow::SharedTexture2D mTexMechNormal;
     SharedAssimpModel mechModel;
+    //beholder
+    glow::SharedTexture2D mTexBeholderAlbedo;
+    SharedAssimpModel beholderModel;
     float debugTime = 0;
 
     // textures
     glow::SharedTexture2D mTexCubeAlbedo;
     glow::SharedTexture2D mTexCubeNormal;
+    glow::SharedTexture2D mTexDefNormal;
 
     // intermediate framebuffer with color and depth texture
     glow::SharedFramebuffer mFramebuffer;

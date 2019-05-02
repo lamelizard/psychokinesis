@@ -72,8 +72,11 @@ void AssimpModel::draw(const glow::UsedProgram& shader, double t, bool loop, con
 
     auto animation = animations[animationStr]; // might throw
 
-    assert(animation->mTicksPerSecond);
-    auto ticks = t * animation->mTicksPerSecond;
+    double ticks = 0.;
+    if (animation->mTicksPerSecond)
+        ticks = t * animation->mTicksPerSecond;
+    else
+        ticks = t * 24; // guessing
     if (loop)
         ticks = fmod(ticks, animation->mDuration);
     else
@@ -81,14 +84,14 @@ void AssimpModel::draw(const glow::UsedProgram& shader, double t, bool loop, con
 
     glm::mat4 boneArray[MAX_BONES];
 
-    // auto globalInverse= scene->mRootNode->mTransformation;//needed?
-    // globalInverse.Inverse();
+    auto globalInverse= scene->mRootNode->mTransformation;//needed?
+    globalInverse.Inverse();
 
     const auto fillArray = [this, &boneArray, animation, ticks /*, globalInverse*/](aiNode* thisNode, aiMatrix4x4 parent, auto& fillArray) -> void {
         // https://github.com/vovan4ik123/assimp-Cpp-OpenGL-skeletal-animation/blob/master/Load_3D_model_2/Model.cpp
         auto transform = aiMatrix4x4();
 
-        if (nodeAnimations[animation].count(thisNode)) // node's animated
+        if (nodeAnimations[animation].count(thisNode) && thisNode->mName == aiString("Foot01_R")) // node's animated
             transform = parent * this->getAnimMat(ticks, nodeAnimations[animation][thisNode]);
         else
             transform = parent * thisNode->mTransformation; // node not animated
@@ -103,9 +106,12 @@ void AssimpModel::draw(const glow::UsedProgram& shader, double t, bool loop, con
             debugRenderer.renderLine(aiCast(parentPos), aiCast(pos));
         }
 
+        //test
+        auto test = aiMatrix4x4(1, 0, 0, 0, 0, 0, 1, 0, 0, -1, 0, 0, 0, 0, 0, 1);
 
         if (boneIDOfNode.count(thisNode) == 1) // the node's a bone
-            boneArray[boneIDOfNode[thisNode]] = aiCast(/*globalInverse **/ /*aiMatrix4x4::RotationX(-90, aiMatrix4x4()) **/ transform * offsetOfNode[thisNode]);
+            boneArray[boneIDOfNode[thisNode]]
+                = aiCast(globalInverse * /*aiMatrix4x4::RotationX(-90, aiMatrix4x4()) **/ transform * offsetOfNode[thisNode]);
 
         for (auto i = 0u; i < thisNode->mNumChildren; i++)
             fillArray(thisNode->mChildren[i], transform, fillArray);
@@ -195,7 +201,8 @@ aiMatrix4x4 AssimpModel::getAnimMat(float ticks, aiNodeAnim* anim)
             auto dt = anim->mRotationKeys[i + 1].mTime - anim->mRotationKeys[i].mTime;
             float alpha = (ticks - anim->mRotationKeys[i].mTime) / dt;
             assert(!(alpha < 0 || alpha > 1));
-            anim->mRotationKeys[i].mValue.aiQuaternion::Interpolate(rotation, anim->mRotationKeys[i].mValue, anim->mRotationKeys[i + 1].mValue, alpha);
+            aiQuaternion::Interpolate(rotation, anim->mRotationKeys[i].mValue, anim->mRotationKeys[i + 1].mValue, alpha);
+            //rotation = aiQuaternion(rotation.GetMatrix().Inverse());//why?
         }
 
         // default behaviour
@@ -234,7 +241,7 @@ AssimpModel::AssimpModel(const std::string& filename) : filename(filename)
                      | aiProcess_TransformUVCoords        // yes,no?
                      | aiProcess_LimitBoneWeights         // 4 is max
                      | aiProcess_OptimizeMeshes           //
-                     | aiProcess_OptimizeGraph            //
+                     | aiProcess_OptimizeGraph            // buggy? or not?
                      | aiProcess_CalcTangentSpace         //
                      | aiProcess_GenSmoothNormals         // if not there
                      | aiProcess_GenUVCoords              //
@@ -270,6 +277,12 @@ AssimpModel::AssimpModel(const std::string& filename) : filename(filename)
 
     auto baseIdx = 0u;
     assert(scene->mNumMeshes == 1);
+
+    // unity test
+    // auto uRot = aiMatrix4x4::RotationX(3.14 / 2., aiMatrix4x4());
+    // for (auto i = 0u; i < scene->mMeshes[0]->mNumVertices; i++)
+    //    scene->mMeshes[0]->mVertices[i] = uRot * scene->mMeshes[0]->mVertices[i];
+
     // for (auto i = 0u; i < scene->mNumMeshes; ++i)
     {
         auto i = 0u;
@@ -348,7 +361,12 @@ AssimpModel::AssimpModel(const std::string& filename) : filename(filename)
         boneWeights.reserve(vCnt);
         for (auto v = 0u; v < vCnt; ++v)
         {
-            auto const vertexPosition = aiCast(mesh->mVertices[v]);
+            auto vertexPosition = aiCast(mesh->mVertices[v]);
+
+            // test unity
+            //auto temp = vertexPosition.y;
+            //vertexPosition.y = -vertexPosition.z;
+            //vertexPosition.z = temp;
 
             aabbMin = glm::min(aabbMin, vertexPosition);
             aabbMax = glm::max(aabbMax, vertexPosition);
@@ -431,10 +449,8 @@ AssimpModel::AssimpModel(const std::string& filename) : filename(filename)
             }
         }
 
-    // test
-    for (const auto& v : vertexData->boneWeights)
-        if (v.x + v.y + v.z + v.w > 1.1)
-            error() << v.x + v.y + v.z + v.w;
+    // for (auto& w : vertexData->boneWeights)
+    //  w = glm::normalize(w);
 }
 
 // mostly from glow-extras:
