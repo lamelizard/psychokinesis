@@ -5,6 +5,7 @@
 #include <glow-extras/camera/Camera.hh>
 #include <glow-extras/glfw/GlfwApp.hh>
 
+#include <entityx/entityx.h>
 
 #include <btBulletDynamicsCommon.h>
 #include "BulletDebugger.hh"
@@ -21,10 +22,15 @@ private:
 
     glm::vec3 mSpherePosition = {2, 0, 0};
     float mSphereSize = 1.0f;
+    
+    //for the cubes
+    int cubesWorldMin = -24;
+    int cubesWorldMax = 25;
+
 
     // gfx settings
-private:
-    glm::vec3 mBackgroundColor = {.10f, .46f, .83f};
+    private : glm::vec3 mBackgroundColor
+              = {.10f, .46f, .83f};
     bool mShowWireframe = false;
     bool mShowPostProcess = false;
 
@@ -46,7 +52,7 @@ private:
     glow::SharedTexture2D mTexMechAlbedo;
     glow::SharedTexture2D mTexMechNormal;
     SharedAssimpModel mechModel;
-    //beholder
+    // beholder
     glow::SharedTexture2D mTexBeholderAlbedo;
     SharedAssimpModel beholderModel;
     float debugTime = 0;
@@ -63,15 +69,24 @@ private:
 
     std::vector<glow::SharedTextureRectangle> mTargets;
 
+    // EntityX
+private:
+    entityx::EntityX ex;
+
     // Bullet
 private:
     bool mDebugBullet = true;
+    std::unique_ptr<btBoxShape> colBox;
+    entityx::Entity createCube(const glm::vec3& pos);
+    // main
     std::unique_ptr<BulletDebugger> bulletDebugger; // draws lines for debugging
     std::unique_ptr<btDefaultCollisionConfiguration> collisionConfiguration;
     std::unique_ptr<btCollisionDispatcher> dispatcher;
     std::unique_ptr<btBroadphaseInterface> overlappingPairCache;
     std::unique_ptr<btSequentialImpulseConstraintSolver> solver;
     std::unique_ptr<btDiscreteDynamicsWorld> dynamicsWorld;
+
+
     // test
     btDefaultMotionState* boxMotionState = nullptr;
 
@@ -82,11 +97,10 @@ public:
 
     // events
 public:
-    void init() override;                       // called once after OpenGL is set up
-    void update(float elapsedSeconds) override; // called in 60 Hz fixed timestep
-    void render(float elapsedSeconds) override; // called once per frame (variable timestep)
-    void onGui() override;                      // called once per frame to set up UI
-
+    void init() override;                                             // called once after OpenGL is set up
+    void update(float elapsedSeconds) override;                       // called in 60 Hz fixed timestep
+    void render(float elapsedSeconds) override;                       // called once per frame (variable timestep)
+    void onGui() override;                                            // called once per frame to set up UI
     void onResize(int w, int h) override;                             // called when window is resized
     bool onKey(int key, int scancode, int action, int mods) override; // called when a key is pressed
 

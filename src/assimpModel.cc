@@ -84,10 +84,10 @@ void AssimpModel::draw(const glow::UsedProgram& shader, double t, bool loop, con
 
     glm::mat4 boneArray[MAX_BONES];
 
-    auto globalInverse= scene->mRootNode->mTransformation;//needed?
+    auto globalInverse = scene->mRootNode->mTransformation; // needed?
     globalInverse.Inverse();
 
-    const auto fillArray = [this, &boneArray, animation, ticks /*, globalInverse*/](aiNode* thisNode, aiMatrix4x4 parent, auto& fillArray) -> void {
+    const auto fillArray = [this, &boneArray, animation, ticks, globalInverse](aiNode* thisNode, aiMatrix4x4 parent, auto& fillArray) -> void {
         // https://github.com/vovan4ik123/assimp-Cpp-OpenGL-skeletal-animation/blob/master/Load_3D_model_2/Model.cpp
         auto transform = aiMatrix4x4();
 
@@ -106,12 +106,11 @@ void AssimpModel::draw(const glow::UsedProgram& shader, double t, bool loop, con
             debugRenderer.renderLine(aiCast(parentPos), aiCast(pos));
         }
 
-        //test
+        // test
         auto test = aiMatrix4x4(1, 0, 0, 0, 0, 0, 1, 0, 0, -1, 0, 0, 0, 0, 0, 1);
 
         if (boneIDOfNode.count(thisNode) == 1) // the node's a bone
-            boneArray[boneIDOfNode[thisNode]]
-                = aiCast(globalInverse * /*aiMatrix4x4::RotationX(-90, aiMatrix4x4()) **/ transform * offsetOfNode[thisNode]);
+            boneArray[boneIDOfNode[thisNode]] = aiCast(globalInverse * /*aiMatrix4x4::RotationX(-90, aiMatrix4x4()) **/ transform * offsetOfNode[thisNode]);
 
         for (auto i = 0u; i < thisNode->mNumChildren; i++)
             fillArray(thisNode->mChildren[i], transform, fillArray);
@@ -202,7 +201,7 @@ aiMatrix4x4 AssimpModel::getAnimMat(float ticks, aiNodeAnim* anim)
             float alpha = (ticks - anim->mRotationKeys[i].mTime) / dt;
             assert(!(alpha < 0 || alpha > 1));
             aiQuaternion::Interpolate(rotation, anim->mRotationKeys[i].mValue, anim->mRotationKeys[i + 1].mValue, alpha);
-            //rotation = aiQuaternion(rotation.GetMatrix().Inverse());//why?
+            // rotation = aiQuaternion(rotation.GetMatrix().Inverse());//why?
         }
 
         // default behaviour
@@ -364,9 +363,9 @@ AssimpModel::AssimpModel(const std::string& filename) : filename(filename)
             auto vertexPosition = aiCast(mesh->mVertices[v]);
 
             // test unity
-            //auto temp = vertexPosition.y;
-            //vertexPosition.y = -vertexPosition.z;
-            //vertexPosition.z = temp;
+            // auto temp = vertexPosition.y;
+            // vertexPosition.y = -vertexPosition.z;
+            // vertexPosition.z = temp;
 
             aabbMin = glm::min(aabbMin, vertexPosition);
             aabbMax = glm::max(aabbMax, vertexPosition);

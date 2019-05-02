@@ -26,7 +26,21 @@
 
 #include "load_mesh.hh" // helper function for loading .obj into VertexArrays
 
+GLOW_SHARED(class, btRigidBody);
+GLOW_SHARED(class, btMotionState);
+using defMotionState = std::shared_ptr<btDefaultMotionState>;
+
+struct AttMat
+{
+    glm::vec4 a, b, c, d;
+};
+
 using namespace std;
+
+struct Cube
+{
+    // add starting position
+};
 
 Game::Game() : GlfwApp(Gui::ImGui) {}
 
@@ -70,6 +84,16 @@ void Game::init()
 
         // cube.obj contains a cube with normals, tangents, and texture coordinates
         mMeshCube = load_mesh_from_obj("../data/meshes/cube.obj", false /* do not interpolate tangents for cubes */);
+        auto modelMatrices = glow::ArrayBuffer::create();
+        //could be done better with offset I guess
+        modelMatrices->defineAttributes({
+            // mat4, divisor = 1 so each instance new matrix
+            glow::ArrayBufferAttribute(&AttMat::a, "aModel", glow::AttributeMode::Float, 1), //
+            glow::ArrayBufferAttribute(&AttMat::b, "aModelb", glow::AttributeMode::Float, 1), //
+            glow::ArrayBufferAttribute(&AttMat::c, "aModelc", glow::AttributeMode::Float, 1), //
+            glow::ArrayBufferAttribute(&AttMat::d, "aModeld", glow::AttributeMode::Float, 1)  //
+        });
+        mMeshCube->bind().attach(modelMatrices);
 
         // automatically takes .fsh and .vsh shaders and combines them into a program
         mShaderObject = glow::Program::createFromFile("../data/shaders/object");
@@ -77,12 +101,12 @@ void Game::init()
 
         // Models
         mShaderMech = glow::Program::createFromFile("../data/shaders/mech");
-        //mTexMechAlbedo = glow::Texture2D::createFromFile("../data/textures/mech.albedo.png", glow::ColorSpace::sRGB);
-        //mTexMechNormal = glow::Texture2D::createFromFile("../data/textures/mech.normal.png", glow::ColorSpace::Linear);
+        // mTexMechAlbedo = glow::Texture2D::createFromFile("../data/textures/mech.albedo.png", glow::ColorSpace::sRGB);
+        // mTexMechNormal = glow::Texture2D::createFromFile("../data/textures/mech.normal.png", glow::ColorSpace::Linear);
         mechModel = AssimpModel::load("../data/models/mech/mech.fbx");
 
-        mTexBeholderAlbedo = glow::Texture2D::createFromFile("../data/textures/beholder.png", glow::ColorSpace::sRGB);
-        //beholderModel = AssimpModel::load("../data/models/beholder/beholder.gltf");
+        // mTexBeholderAlbedo = glow::Texture2D::createFromFile("../data/textures/beholder.png", glow::ColorSpace::sRGB);
+        // beholderModel = AssimpModel::load("../data/models/beholder/beholder.gltf");
     }
 
     // initialize Bullet
@@ -110,8 +134,7 @@ void Game::init()
         dynamicsWorld->addRigidBody(ground);
 
 
-        btBoxShape* colBox = nullptr;
-        colBox = new btBoxShape(btVector3(mCubeSize, mCubeSize, mCubeSize));
+        colBox = make_unique<btBoxShape>(btVector3(mCubeSize / 2, mCubeSize / 2, mCubeSize / 2)); // half extend
         btRigidBody* bulCube = nullptr;
         btTransform startTransform;
         startTransform.setIdentity();
@@ -120,12 +143,54 @@ void Game::init()
         startTransform.setOrigin(btVector3(0, 10, 0));
 
         // using motionstate is optional, it provides interpolation capabilities, and only synchronizes 'active' objects
-        boxMotionState = new btDefaultMotionState(groundTransform);
-        btRigidBody::btRigidBodyConstructionInfo rbInfo2(1, boxMotionState, colBox, localInertia);
+        boxMotionState = new btDefaultMotionState(startTransform);
+        btRigidBody::btRigidBodyConstructionInfo rbInfo2(1.f, boxMotionState, colBox.get(), localInertia);
         btRigidBody* body = new btRigidBody(rbInfo2);
 
         dynamicsWorld->addRigidBody(body);
     }
+
+    // create world
+    {
+        // floor
+        {
+            auto y = -colBox->getHalfExtentsWithMargin().getY(); // floor is y = 0
+            for (auto x = cubesWorldMin; x <= cubesWorldMax; x++)
+                for (auto z = cubesWorldMin; z <= cubesWorldMax; z++)
+                    createCube(glm::vec3(x, y, z));
+        }
+
+        // pillars
+        {
+            for (auto x = cubesWorldMin + 15; x <= cubesWorldMax - 10; x += 20)
+                for (auto z = cubesWorldMin + 15; z <= cubesWorldMax - 10; z += 20)
+                    for (auto yBottom = 0; yBottom <= 5; yBottom++)
+                    {
+                        auto y = yBottom + colBox->getHalfExtentsWithMargin().getY();
+                        createCube(glm::vec3(x, y, z));
+                        createCube(glm::vec3(x + 1, y, z));
+                        createCube(glm::vec3(x, y, z + 1));
+                        createCube(glm::vec3(x + 1, y, z + 1));
+                    }
+        }
+    }
+}
+
+entityx::Entity Game::createCube(const glm::vec3& pos)
+{
+    static const btVector3 inertia(0, 0, 0);
+    btTransform transform;
+    transform.setIdentity();
+    transform.setOrigin(btVector3(pos.x, pos.y, pos.z));
+    auto motionState = make_shared<btDefaultMotionState>(transform);
+    auto rbCube = make_shared<btRigidBody>(btRigidBody::btRigidBodyConstructionInfo(0., motionState.get(), colBox.get(), inertia));
+    dynamicsWorld->addRigidBody(rbCube.get());
+
+    auto entity = ex.entities.create();
+    entity.assign<SharedbtRigidBody>(rbCube);
+    entity.assign<defMotionState>(motionState);
+    entity.assign<Cube>();
+    return entity;
 }
 
 void Game::update(float elapsedSeconds)
@@ -171,24 +236,11 @@ void Game::render(float elapsedSeconds)
         auto proj = mCamera->getProjectionMatrix();
         auto view = mCamera->getViewMatrix();
 
-        // render cube and sphere and
+        // let light rotate around the objects
+        auto lightDir = glm::vec3(glm::cos(getCurrentTime()), 0, glm::sin(getCurrentTime()));
+
+        // render cubes, instanced
         {
-            // get transform from bullet
-            btTransform trans;
-            boxMotionState->getWorldTransform(trans);
-            // btScalar m[16];
-            glm::mat4x4 mat;
-            trans.getOpenGLMatrix(glm::value_ptr(mat));
-
-            // build model matrix
-
-            // auto modelCube = glm::translate(mCubePosition) * glm::scale(glm::vec3(mCubeSize));
-            auto modelCube = mat * glm::scale(glm::vec3(mCubeSize));
-           
-
-            // let light rotate around the objects
-            auto lightDir = glm::vec3(glm::cos(getCurrentTime()), 0, glm::sin(getCurrentTime()));
-
             // set up shader
             auto shader = mShaderObject->use(); // shader is active until scope ends
             shader.setUniform("uProj", proj);
@@ -198,12 +250,29 @@ void Game::render(float elapsedSeconds)
             shader.setTexture("uTexAlbedo", mTexCubeAlbedo);
             shader.setTexture("uTexNormal", mTexCubeNormal);
 
-            // bind and render cube
-            shader.setUniform("uModel", modelCube);
-            mMeshCube->bind().draw();
+            // model matrices
+            vector<glm::mat4> models;
+            models.reserve(4000);
+            auto cubeEntities = ex.entities.entities_with_components(entityx::ComponentHandle<Cube>());
+            for (auto entity : cubeEntities)
+            {
+                auto motionState = *entity.component<defMotionState>().get();
+                btTransform trans;
+                motionState->getWorldTransform(trans);
+                glm::mat4x4 mat;
+                static_assert(sizeof(AttMat) == sizeof(glm::mat4x4), "bwah");
+                trans.getOpenGLMatrix(glm::value_ptr(mat));
+                auto modelCube = mat * glm::scale(glm::vec3(mCubeSize / 2));
+                models.push_back(modelCube);
+            }
+
+            auto abModels = mMeshCube->getAttributeBuffer("aModel");
+            assert(abModels);
+            abModels->bind().setData(models);
+            mMeshCube->bind().draw(models.size());
         }
         {
-            //mech
+            // mech
             auto shader = mShaderMech->use();
             auto modelMech = glm::translate(mSpherePosition) * glm::scale(glm::vec3(mSphereSize));
             modelMech = glm::rotate(modelMech, glm::radians(90.f), glm::vec3(1, 0, 0)); // unity?
@@ -211,24 +280,24 @@ void Game::render(float elapsedSeconds)
             shader.setUniform("uProj", proj);
             shader.setUniform("uView", view);
             shader.setUniform("uModel", modelMech);
-            
-            //shader.setTexture("uTexAlbedo", mTexMechAlbedo);
-            //shader.setTexture("uTexNormal", mTexMechNormal);
+
+            // shader.setTexture("uTexAlbedo", mTexMechAlbedo);
+            // shader.setTexture("uTexNormal", mTexMechNormal);
             shader.setTexture("uTexAlbedo", mTexDefNormal);
             shader.setTexture("uTexNormal", mTexDefNormal);
 
             static auto timer = 0;
             timer += elapsedSeconds;
-            //mechModel->draw(shader, timer, true, "WalkInPlace");
-            mechModel->draw(shader, debugTime, true, "Hit");
-            //skeleton
-            mechModel->debugRenderer.render(proj*view*glm::scale(glm::vec3(0.01)));
+            // mechModel->draw(shader, timer, true, "WalkInPlace");
+            // mechModel->draw(shader, debugTime, true, "Hit");
+            // skeleton
+            // mechModel->debugRenderer.render(proj*view*glm::scale(glm::vec3(0.01)));
 
             shader.setUniform("uModel", glm::translate(mSpherePosition));
             shader.setTexture("uTexAlbedo", mTexBeholderAlbedo);
             shader.setTexture("uTexNormal", mTexDefNormal);
-            //beholderModel->draw(shader, debugTime, true, "ArmaBeholder|wait");
-            //beholderModel->debugRenderer.render(proj * view);
+            // beholderModel->draw(shader, debugTime, true, "ArmaBeholder|wait");
+            // beholderModel->debugRenderer.render(proj * view);
         }
 
         // Render Bullet Debug
