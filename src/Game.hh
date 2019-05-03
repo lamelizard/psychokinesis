@@ -22,15 +22,15 @@ private:
 
     glm::vec3 mSpherePosition = {2, 0, 0};
     float mSphereSize = 1.0f;
-    
-    //for the cubes
+
+    // for the cubes
     int cubesWorldMin = -24;
     int cubesWorldMax = 25;
 
 
     // gfx settings
-    private : glm::vec3 mBackgroundColor
-              = {.10f, .46f, .83f};
+private:
+    glm::vec3 mBackgroundColor = {.10f, .46f, .83f};
     bool mShowWireframe = false;
     bool mShowPostProcess = false;
 
@@ -40,7 +40,9 @@ private:
 
     // shaders
     glow::SharedProgram mShaderOutput;
-    glow::SharedProgram mShaderObject;
+    glow::SharedProgram mShaderCube;
+    glow::SharedProgram mShaderCubePrepass;
+    glow::SharedProgram mShaderMode;
 
     // meshes
     glow::SharedVertexArray mMeshQuad;
@@ -62,10 +64,23 @@ private:
     glow::SharedTexture2D mTexCubeNormal;
     glow::SharedTexture2D mTexDefNormal;
 
-    // intermediate framebuffer with color and depth texture
-    glow::SharedFramebuffer mFramebuffer;
-    glow::SharedTextureRectangle mTargetColor;
-    glow::SharedTextureRectangle mTargetDepth;
+    // depth pre-pass
+    glow::SharedTextureRectangle mGBufferDepth;
+    glow::SharedFramebuffer mFramebufferDepth;
+
+    // Mode
+    glow::SharedTextureRectangle mBufferMode;
+    glow::SharedFramebuffer mFramebufferMode;
+
+    // opaque
+    glow::SharedTextureRectangle mGBufferAlbedo;
+    glow::SharedTextureRectangle mGBufferMaterial; // metallic roughness
+    glow::SharedTextureRectangle mGBufferNormal;
+    glow::SharedFramebuffer mFramebufferGBuffer;
+
+    // light
+    glow::SharedTextureRectangle mBufferLight;
+    glow::SharedFramebuffer mFramebufferLight;
 
     std::vector<glow::SharedTextureRectangle> mTargets;
 
@@ -77,7 +92,7 @@ private:
 private:
     bool mDebugBullet = true;
     std::unique_ptr<btBoxShape> colBox;
-    entityx::Entity createCube(const glm::vec3& pos);
+    entityx::Entity createCube(const glm::ivec3& pos);
     // main
     std::unique_ptr<BulletDebugger> bulletDebugger; // draws lines for debugging
     std::unique_ptr<btDefaultCollisionConfiguration> collisionConfiguration;
@@ -100,6 +115,8 @@ public:
     void init() override;                                             // called once after OpenGL is set up
     void update(float elapsedSeconds) override;                       // called in 60 Hz fixed timestep
     void render(float elapsedSeconds) override;                       // called once per frame (variable timestep)
+    void drawMech(glow::UsedProgram& shader, float elapsedSeconds);
+    void drawCubes(glow::UsedProgram& shader);
     void onGui() override;                                            // called once per frame to set up UI
     void onResize(int w, int h) override;                             // called when window is resized
     bool onKey(int key, int scancode, int action, int mods) override; // called when a key is pressed

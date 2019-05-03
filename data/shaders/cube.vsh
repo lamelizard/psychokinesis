@@ -14,6 +14,8 @@ out vec3 vNormal;
 out vec3 vTangent;
 out vec2 vTexCoord;
 
+invariant gl_Position;
+
 void main()
 {
     // assume uModel has no non-uniform scaling
@@ -22,6 +24,5 @@ void main()
 
     vTexCoord = aTexCoord;
 
-    vWorldPos = vec3(aModel * vec4(aPosition, 1));
-    gl_Position = uProj * uView * vec4(vWorldPos, 1);
+    gl_Position = uProj * uView * aModel * vec4(aPosition, 1);
 }

@@ -39,7 +39,20 @@ using namespace std;
 
 struct Cube
 {
-    // add starting position
+    glm::ivec3 pos;
+};
+
+enum Mode
+{
+    normal = 0,
+    test = 1
+};
+
+struct ModeArea
+{
+    Mode mode = normal;
+    glm::vec3 pos;
+    float radius;
 };
 
 Game::Game() : GlfwApp(Gui::ImGui) {}
@@ -62,11 +75,37 @@ void Game::init()
         mCamera = glow::camera::Camera::create();
         mCamera->setLookAt({0, 2, 3}, {0, 0, 0});
 
-        // create framebuffer (16bit color + 32bit depth)
-        // size is 1x1 for now and is changed onResize
-        mTargets.push_back(mTargetColor = glow::TextureRectangle::create(1, 1, GL_RGB16F));
-        mTargets.push_back(mTargetDepth = glow::TextureRectangle::create(1, 1, GL_DEPTH_COMPONENT32F));
-        mFramebuffer = glow::Framebuffer::create("fColor", mTargetColor, mTargetDepth);
+        // depth
+        {
+            mTargets.push_back(mGBufferDepth = glow::TextureRectangle::create(1, 1, GL_DEPTH_COMPONENT32F));
+            mFramebufferDepth = glow::Framebuffer::createDepthOnly(mGBufferDepth);
+        }
+
+        // mode
+        {
+            mTargets.push_back(mBufferMode = glow::TextureRectangle::create(1, 1, GL_R8)); // GL_RED_INTEGER misses implementation in glow?
+            mFramebufferMode = glow::Framebuffer::create("fMode", mBufferMode, mGBufferDepth);
+        }
+
+        // GBuffer
+        {
+            // size is 1x1 for now and is changed onResize
+            mTargets.push_back(mGBufferAlbedo = glow::TextureRectangle::create(1, 1, GL_RGB16F));
+            mTargets.push_back(mGBufferMaterial = glow::TextureRectangle::create(1, 1, GL_RG16F));
+            mTargets.push_back(mGBufferNormal = glow::TextureRectangle::create(1, 1, GL_RGB16F));
+            mFramebufferGBuffer = glow::Framebuffer::create();
+            auto fbuffer = mFramebufferGBuffer->bind();
+            fbuffer.attachDepth(mGBufferDepth);
+            fbuffer.attachColor("fAlbedo", mGBufferAlbedo);
+            fbuffer.attachColor("fMaterial", mGBufferMaterial);
+            fbuffer.attachColor("fNormal", mGBufferNormal);
+        }
+
+        // Light
+        {
+            mTargets.push_back(mBufferLight = glow::TextureRectangle::create(1, 1, GL_RGB16F));
+            mFramebufferLight = glow::Framebuffer::create("fLight", mBufferLight, mGBufferDepth);
+        }
     }
 
     // load gfx resources
@@ -85,10 +124,10 @@ void Game::init()
         // cube.obj contains a cube with normals, tangents, and texture coordinates
         mMeshCube = load_mesh_from_obj("../data/meshes/cube.obj", false /* do not interpolate tangents for cubes */);
         auto modelMatrices = glow::ArrayBuffer::create();
-        //could be done better with offset I guess
+        // could be done better with offset I guess
         modelMatrices->defineAttributes({
             // mat4, divisor = 1 so each instance new matrix
-            glow::ArrayBufferAttribute(&AttMat::a, "aModel", glow::AttributeMode::Float, 1), //
+            glow::ArrayBufferAttribute(&AttMat::a, "aModel", glow::AttributeMode::Float, 1),  //
             glow::ArrayBufferAttribute(&AttMat::b, "aModelb", glow::AttributeMode::Float, 1), //
             glow::ArrayBufferAttribute(&AttMat::c, "aModelc", glow::AttributeMode::Float, 1), //
             glow::ArrayBufferAttribute(&AttMat::d, "aModeld", glow::AttributeMode::Float, 1)  //
@@ -96,8 +135,10 @@ void Game::init()
         mMeshCube->bind().attach(modelMatrices);
 
         // automatically takes .fsh and .vsh shaders and combines them into a program
-        mShaderObject = glow::Program::createFromFile("../data/shaders/object");
+        mShaderCube = glow::Program::createFromFile("../data/shaders/cube");
+        mShaderCubePrepass = glow::Program::createFromFile("../data/shaders/cube.pre");
         mShaderOutput = glow::Program::createFromFile("../data/shaders/output");
+        mShaderMode = glow::Program::createFromFile("../data/shaders/mode");
 
         // Models
         mShaderMech = glow::Program::createFromFile("../data/shaders/mech");
@@ -151,37 +192,41 @@ void Game::init()
     }
 
     // create world
+    // floor
     {
-        // floor
-        {
-            auto y = -colBox->getHalfExtentsWithMargin().getY(); // floor is y = 0
-            for (auto x = cubesWorldMin; x <= cubesWorldMax; x++)
-                for (auto z = cubesWorldMin; z <= cubesWorldMax; z++)
-                    createCube(glm::vec3(x, y, z));
-        }
+        auto y = -colBox->getHalfExtentsWithMargin().getY(); // floor is y = 0
+        for (auto x = cubesWorldMin; x <= cubesWorldMax; x++)
+            for (auto z = cubesWorldMin; z <= cubesWorldMax; z++)
+                createCube(glm::vec3(x, y, z));
+    }
 
-        // pillars
-        {
-            for (auto x = cubesWorldMin + 15; x <= cubesWorldMax - 10; x += 20)
-                for (auto z = cubesWorldMin + 15; z <= cubesWorldMax - 10; z += 20)
-                    for (auto yBottom = 0; yBottom <= 5; yBottom++)
-                    {
-                        auto y = yBottom + colBox->getHalfExtentsWithMargin().getY();
-                        createCube(glm::vec3(x, y, z));
-                        createCube(glm::vec3(x + 1, y, z));
-                        createCube(glm::vec3(x, y, z + 1));
-                        createCube(glm::vec3(x + 1, y, z + 1));
-                    }
-        }
+    // pillars
+    {
+        for (auto x = cubesWorldMin + 15; x <= cubesWorldMax - 10; x += 20)
+            for (auto z = cubesWorldMin + 15; z <= cubesWorldMax - 10; z += 20)
+                for (auto yBottom = 0; yBottom <= 5; yBottom++)
+                {
+                    auto y = yBottom + colBox->getHalfExtentsWithMargin().getY();
+                    createCube(glm::vec3(x, y, z));
+                    createCube(glm::vec3(x + 1, y, z));
+                    createCube(glm::vec3(x, y, z + 1));
+                    createCube(glm::vec3(x + 1, y, z + 1));
+                }
+    }
+
+    // test mode area
+    {
+        auto entity = ex.entities.create();
+        entity.assign<ModeArea>(ModeArea{test, {10, 0, 10}, 5});
     }
 }
 
-entityx::Entity Game::createCube(const glm::vec3& pos)
+entityx::Entity Game::createCube(const glm::ivec3& pos)
 {
     static const btVector3 inertia(0, 0, 0);
     btTransform transform;
     transform.setIdentity();
-    transform.setOrigin(btVector3(pos.x, pos.y, pos.z));
+    transform.setOrigin(btVector3(pos.x, (float)pos.y - colBox->getHalfExtentsWithMargin().getY(), pos.z)); // y = 0 is floor
     auto motionState = make_shared<btDefaultMotionState>(transform);
     auto rbCube = make_shared<btRigidBody>(btRigidBody::btRigidBodyConstructionInfo(0., motionState.get(), colBox.get(), inertia));
     dynamicsWorld->addRigidBody(rbCube.get());
@@ -189,7 +234,7 @@ entityx::Entity Game::createCube(const glm::vec3& pos)
     auto entity = ex.entities.create();
     entity.assign<SharedbtRigidBody>(rbCube);
     entity.assign<defMotionState>(motionState);
-    entity.assign<Cube>();
+    entity.assign<Cube>(Cube{pos});
     return entity;
 }
 
@@ -213,117 +258,186 @@ void Game::render(float elapsedSeconds)
 
     // camera update here because it should be coupled tightly to rendering!
     updateCamera(elapsedSeconds);
+    // get camera matrices
+    auto proj = mCamera->getProjectionMatrix();
+    auto view = mCamera->getViewMatrix();
 
-
-    // render everything into 16bit framebuffer
+    // Depth
     {
-        auto fb = mFramebuffer->bind(); // is bound until "fb" goes out-of-scope
-        // glViewport is automatically set by framebuffer
-
-        // enable depth test and backface culling for this scope
+        auto fb = mFramebufferMode->bind();
         GLOW_SCOPED(enable, GL_DEPTH_TEST);
         GLOW_SCOPED(enable, GL_CULL_FACE);
-
-        GLOW_SCOPED(polygonMode, mShowWireframe ? GL_LINE : GL_FILL);
-
-        // clear framebuffer with BG color
-        // also clear depth
-        // NOTE: depth test must be enable, otherwise glClear does not clear depth
-        GLOW_SCOPED(clearColor, mBackgroundColor);
+        GLOW_SCOPED(clearColor, glm::vec3(0, 0, 0));
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-        // get camera matrices
-        auto proj = mCamera->getProjectionMatrix();
-        auto view = mCamera->getViewMatrix();
+        drawCubes(mShaderCubePrepass->use());
+        drawMech(mShaderMech->use(), elapsedSeconds);
+    }
 
-        // let light rotate around the objects
-        auto lightDir = glm::vec3(glm::cos(getCurrentTime()), 0, glm::sin(getCurrentTime()));
+    // GBuffer
+    {
+        auto fb = mFramebufferGBuffer->bind();
+        // glViewport is automatically set by framebuffer
+        GLOW_SCOPED(enable, GL_DEPTH_TEST);
+        GLOW_SCOPED(enable, GL_CULL_FACE);
+        GLOW_SCOPED(depthMask, GL_FALSE);
+        GLOW_SCOPED(depthFunc, GL_EQUAL);
+        GLOW_SCOPED(polygonMode, mShowWireframe ? GL_LINE : GL_FILL);
+        GLOW_SCOPED(clearColor, mBackgroundColor);
+        glClear(GL_COLOR_BUFFER_BIT);
 
-        // render cubes, instanced
-        {
-            // set up shader
-            auto shader = mShaderObject->use(); // shader is active until scope ends
-            shader.setUniform("uProj", proj);
-            shader.setUniform("uView", view);
-            shader.setUniform("uLightDir", lightDir);
-
-            shader.setTexture("uTexAlbedo", mTexCubeAlbedo);
-            shader.setTexture("uTexNormal", mTexCubeNormal);
-
-            // model matrices
-            vector<glm::mat4> models;
-            models.reserve(4000);
-            auto cubeEntities = ex.entities.entities_with_components(entityx::ComponentHandle<Cube>());
-            for (auto entity : cubeEntities)
-            {
-                auto motionState = *entity.component<defMotionState>().get();
-                btTransform trans;
-                motionState->getWorldTransform(trans);
-                glm::mat4x4 mat;
-                static_assert(sizeof(AttMat) == sizeof(glm::mat4x4), "bwah");
-                trans.getOpenGLMatrix(glm::value_ptr(mat));
-                auto modelCube = mat * glm::scale(glm::vec3(mCubeSize / 2));
-                models.push_back(modelCube);
-            }
-
-            auto abModels = mMeshCube->getAttributeBuffer("aModel");
-            assert(abModels);
-            abModels->bind().setData(models);
-            mMeshCube->bind().draw(models.size());
-        }
-        {
-            // mech
-            auto shader = mShaderMech->use();
-            auto modelMech = glm::translate(mSpherePosition) * glm::scale(glm::vec3(mSphereSize));
-            modelMech = glm::rotate(modelMech, glm::radians(90.f), glm::vec3(1, 0, 0)); // unity?
-            modelMech = glm::mat4();
-            shader.setUniform("uProj", proj);
-            shader.setUniform("uView", view);
-            shader.setUniform("uModel", modelMech);
-
-            // shader.setTexture("uTexAlbedo", mTexMechAlbedo);
-            // shader.setTexture("uTexNormal", mTexMechNormal);
-            shader.setTexture("uTexAlbedo", mTexDefNormal);
-            shader.setTexture("uTexNormal", mTexDefNormal);
-
-            static auto timer = 0;
-            timer += elapsedSeconds;
-            // mechModel->draw(shader, timer, true, "WalkInPlace");
-            // mechModel->draw(shader, debugTime, true, "Hit");
-            // skeleton
-            // mechModel->debugRenderer.render(proj*view*glm::scale(glm::vec3(0.01)));
-
-            shader.setUniform("uModel", glm::translate(mSpherePosition));
-            shader.setTexture("uTexAlbedo", mTexBeholderAlbedo);
-            shader.setTexture("uTexNormal", mTexDefNormal);
-            // beholderModel->draw(shader, debugTime, true, "ArmaBeholder|wait");
-            // beholderModel->debugRenderer.render(proj * view);
-        }
+        drawCubes(mShaderCube->use());
+        drawMech(mShaderMech->use(), elapsedSeconds);
 
         // Render Bullet Debug
         if (mDebugBullet)
         {
+            GLOW_SCOPED(disable, GL_DEPTH_TEST);
             dynamicsWorld->debugDrawWorld();
             bulletDebugger->draw(proj * view);
         }
     }
 
+    // Mode
+    // move up after depth prepass ?
+    {
+        auto fb = mFramebufferMode->bind();
+        GLOW_SCOPED(enable, GL_CULL_FACE);
+        GLOW_SCOPED(enable, GL_DEPTH_TEST);
+        GLOW_SCOPED(depthMask, GL_FALSE); // Disable depth write
+        GLOW_SCOPED(enable, GL_BLEND);
+        GLOW_SCOPED(blendEquation, GL_MAX); // priority
+        GLOW_SCOPED(cullFace, GL_FRONT);    // write backfaces
+        GLOW_SCOPED(depthFunc, GL_GREATER); // Inverse z test
+
+        auto shader = mShaderMode->use();
+        auto sphere = mMeshSphere->bind();
+        auto areaHandle = entityx::ComponentHandle<ModeArea>();
+        auto areaEntities = ex.entities.entities_with_components(areaHandle);
+        for (auto entity : areaEntities)
+        {
+            auto r = areaHandle->radius;
+            shader.setTexture("uTexDepth", mGBufferDepth);
+            shader.setUniform("uPos", areaHandle->pos);
+            shader.setUniform("uPVM", proj * view * glm::translate(areaHandle->pos) * glm::scale(glm::vec3(r, r, r)));
+            shader.setUniform("uInvProj", glm::inverse(proj));
+            shader.setUniform("uInvView", glm::inverse(view));
+            shader.setUniform("uRadius", r);
+            shader.setUniform("uMode", (int32_t)areaHandle->mode);
+            sphere.draw();
+        }
+    }
+
+
+    // Light
+    /*
+    {
+        auto fb = mFramebufferLight->bind();
+        // partly from RTGLive
+        GLOW_SCOPED(enable, GL_CULL_FACE);
+        GLOW_SCOPED(enable, GL_DEPTH_TEST);
+        GLOW_SCOPED(depthMask, GL_FALSE); // Disable depth write
+
+        GLOW_SCOPED(clearColor, glm::vec3(0, 0, 0));
+        glClear(GL_COLOR_BUFFER_BIT);
+
+        // todo actuall lights
+        {
+            GLOW_SCOPED(enable, GL_BLEND);
+            GLOW_SCOPED(blendFunc, GL_ONE, GL_ONE);
+            GLOW_SCOPED(cullFace, GL_FRONT);    // write backfaces
+            GLOW_SCOPED(depthFunc, GL_GREATER); // Inverse z test
+        }
+    }
+    */
+
+
     // render framebuffer content to output with small post-processing effect
     {
         // no framebuffer is bound, i.e. render-to-screen
-
-        // post-process does not need depth test or culling
         GLOW_SCOPED(disable, GL_DEPTH_TEST);
         GLOW_SCOPED(disable, GL_CULL_FACE);
 
         // draw a fullscreen quad for outputting the framebuffer and applying a post-process
         auto shader = mShaderOutput->use();
-        shader.setTexture("uTexColor", mTargetColor);
-        shader.setTexture("uTexDepth", mTargetDepth);
+        shader.setTexture("uTexColor", mGBufferAlbedo);
+        shader.setTexture("uTexNormal", mGBufferNormal);
+        shader.setTexture("uTexDepth", mGBufferDepth);
+        shader.setTexture("uTexMode", mBufferMode);
+
+        // let light rotate around the objects
+        // put higher
+        auto lightDir = glm::vec3(glm::cos(getCurrentTime()), 0, glm::sin(getCurrentTime()));
+        shader.setUniform("uLightDir", lightDir);
         shader.setUniform("uShowPostProcess", mShowPostProcess);
         mMeshQuad->bind().draw();
     }
 }
+
+void Game::drawMech(glow::UsedProgram& shader, float elapsedSeconds)
+{
+    auto proj = mCamera->getProjectionMatrix();
+    auto view = mCamera->getViewMatrix();
+
+    auto modelMech = glm::translate(mSpherePosition) * glm::scale(glm::vec3(mSphereSize));
+    modelMech = glm::rotate(modelMech, glm::radians(90.f), glm::vec3(1, 0, 0)); // unity?
+    modelMech = glm::mat4();
+    shader.setUniform("uProj", proj);
+    shader.setUniform("uView", view);
+    shader.setUniform("uModel", modelMech);
+
+    // shader.setTexture("uTexAlbedo", mTexMechAlbedo);
+    // shader.setTexture("uTexNormal", mTexMechNormal);
+    shader.setTexture("uTexAlbedo", mTexDefNormal);
+    shader.setTexture("uTexNormal", mTexDefNormal);
+
+    static auto timer = 0;
+    timer += elapsedSeconds;
+    // mechModel->draw(shader, timer, true, "WalkInPlace");
+    // mechModel->draw(shader, debugTime, true, "Hit");
+    // skeleton
+    // mechModel->debugRenderer.render(proj*view*glm::scale(glm::vec3(0.01)));
+
+    shader.setUniform("uModel", glm::translate(mSpherePosition));
+    shader.setTexture("uTexAlbedo", mTexBeholderAlbedo);
+    shader.setTexture("uTexNormal", mTexDefNormal);
+    // beholderModel->draw(shader, debugTime, true, "ArmaBeholder|wait");
+    // beholderModel->debugRenderer.render(proj * view);
+}
+
+void Game::drawCubes(glow::UsedProgram& shader)
+{
+    auto proj = mCamera->getProjectionMatrix();
+    auto view = mCamera->getViewMatrix();
+
+    shader.setUniform("uProj", proj);
+    shader.setUniform("uView", view);
+
+    shader.setTexture("uTexAlbedo", mTexCubeAlbedo);
+    shader.setTexture("uTexNormal", mTexCubeNormal);
+
+    // model matrices
+    vector<glm::mat4> models;
+    models.reserve(3000);
+    auto cubeEntities = ex.entities.entities_with_components(entityx::ComponentHandle<Cube>());
+    for (auto entity : cubeEntities)
+    {
+        auto motionState = *entity.component<defMotionState>().get();
+        btTransform trans;
+        motionState->getWorldTransform(trans);
+        glm::mat4x4 modelCube;
+        static_assert(sizeof(AttMat) == sizeof(glm::mat4x4), "bwah");
+        trans.getOpenGLMatrix(glm::value_ptr(modelCube));
+        modelCube *= glm::scale(glm::vec3(mCubeSize / 2)); // cube.obj has size 2
+        models.push_back(modelCube);
+    }
+
+    auto abModels = mMeshCube->getAttributeBuffer("aModel");
+    assert(abModels);
+    abModels->bind().setData(models);
+    mMeshCube->bind().draw(models.size());
+}
+
 
 // Update the GUI
 void Game::onGui()

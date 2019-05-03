@@ -1,13 +1,15 @@
 uniform sampler2D uTexAlbedo;
 uniform sampler2D uTexNormal;
-uniform vec3 uLightDir;
 
-in vec3 vWorldPos;
+
+
 in vec3 vNormal;
 in vec3 vTangent;
 in vec2 vTexCoord;
 
-out vec3 fColor;
+out vec3 fAlbedo;
+out vec3 fNormal;
+//out vec3 fMaterial;
 
 void main()
 {
@@ -21,11 +23,8 @@ void main()
     normalMap.xy = normalMap.xy * 2 - 1;
 
     // apply normal map
-    N = normalize(mat3(T, B, N) * normalMap);
-
+    fNormal = normalize(mat3(T, B, N) * normalMap);
+    
     // read color texture
-    vec3 albedo = texture(uTexAlbedo, vTexCoord).rgb;
-
-    // simple diffuse lighting with a little bit of ambient
-    fColor = albedo * max(0.1, dot(normalize(uLightDir), N));
+    fAlbedo = texture(uTexAlbedo, vTexCoord).rgb;
 }
