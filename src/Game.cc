@@ -284,7 +284,7 @@ void Game::render(float elapsedSeconds)
         GLOW_SCOPED(depthFunc, GL_EQUAL);
         GLOW_SCOPED(polygonMode, mShowWireframe ? GL_LINE : GL_FILL);
         GLOW_SCOPED(clearColor, mBackgroundColor);
-        glClear(GL_COLOR_BUFFER_BIT);
+        glClear(GL_COLOR_BUFFER_BIT | GL_STENCIL_BUFFER_BIT);
 
         drawCubes(mShaderCube->use());
         drawMech(mShaderMech->use(), elapsedSeconds);
@@ -394,9 +394,10 @@ void Game::drawMech(glow::UsedProgram& shader, float elapsedSeconds)
     static auto timer = 0;
     timer += elapsedSeconds;
     // mechModel->draw(shader, timer, true, "WalkInPlace");
-    // mechModel->draw(shader, debugTime, true, "Hit");
+    mechModel->draw(shader, debugTime, true, "WalkInPlace");
     // skeleton
-    // mechModel->debugRenderer.render(proj*view*glm::scale(glm::vec3(0.01)));
+
+    //mechModel->debugRenderer.render(proj*view*glm::scale(glm::vec3(0.01)));
 
     shader.setUniform("uModel", glm::translate(mSpherePosition));
     shader.setTexture("uTexAlbedo", mTexBeholderAlbedo);

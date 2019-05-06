@@ -1,8 +1,6 @@
 uniform sampler2D uTexAlbedo;
 uniform sampler2D uTexNormal;
 
-
-
 in vec3 vNormal;
 in vec3 vTangent;
 in vec2 vTexCoord;

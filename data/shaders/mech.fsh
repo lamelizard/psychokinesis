@@ -6,7 +6,8 @@ in vec3 vNormal;
 in vec3 vTangent;
 in vec2 vTexCoord;
 
-out vec3 fColor;
+out vec3 fAlbedo;
+out vec3 fNormal;
 
 void main()
 {
@@ -21,10 +22,11 @@ void main()
 
     // apply normal map
     N = normalize(mat3(T, B, N) * normalMap);
+    fNormal = N;
 
     // read color texture
     vec3 albedo = texture(uTexAlbedo, vTexCoord).rgb;
 
     // simple diffuse lighting with a little bit of ambient
-    fColor = albedo;// * max(0.1, dot(normalize(uLightDir), N));
+    fAlbedo = albedo;// * max(0.1, dot(normalize(uLightDir), N));
 }

@@ -91,7 +91,7 @@ void AssimpModel::draw(const glow::UsedProgram& shader, double t, bool loop, con
         // https://github.com/vovan4ik123/assimp-Cpp-OpenGL-skeletal-animation/blob/master/Load_3D_model_2/Model.cpp
         auto transform = aiMatrix4x4();
 
-        if (nodeAnimations[animation].count(thisNode) && thisNode->mName == aiString("Foot01_R")) // node's animated
+        if (nodeAnimations[animation].count(thisNode) /*&& thisNode->mName == aiString("Foot01_R")*/) // node's animated
             transform = parent * this->getAnimMat(ticks, nodeAnimations[animation][thisNode]);
         else
             transform = parent * thisNode->mTransformation; // node not animated
