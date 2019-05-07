@@ -55,6 +55,13 @@ struct ModeArea
     float radius;
 };
 
+glm::vec3 glcast(const btVector3& v){
+    return glm::vec3(v.x(),v.y(),v.z());
+}
+btVector3 btcast(const glm::vec3& v){
+    return btVector3(v.x,v.y,v.z);
+}
+
 Game::Game() : GlfwApp(Gui::ImGui) {}
 
 void Game::init()
@@ -189,6 +196,19 @@ void Game::init()
         btRigidBody* body = new btRigidBody(rbInfo2);
 
         dynamicsWorld->addRigidBody(body);
+
+        //player
+        colPlayer = make_unique<btCapsuleShape>(0.25, 1);
+        localInertia.setZero();
+        colPlayer->calculateLocalInertia(1, localInertia);
+        startTransform.setOrigin(btVector3(0, 5, 0));
+        playerMotionState = make_unique<btDefaultMotionState>(startTransform);
+        bulPlayer = make_unique<btRigidBody>(btRigidBody::btRigidBodyConstructionInfo(1.f, playerMotionState.get(), colPlayer.get(), localInertia));
+        bulPlayer->setAngularFactor(0);
+        bulPlayer->setCustomDebugColor(btVector3(255,1,1));
+
+
+        dynamicsWorld->addRigidBody(bulPlayer.get());
     }
 
     // create world
@@ -248,8 +268,73 @@ void Game::update(float elapsedSeconds)
     // Physics
     // Bullet uses fixed timestep and interpolates
     // -> probably should put this in render as well to get the interpolation
+    //move character
+    {
+        auto maxSpeed = 3;
+        auto areaHandle = entityx::ComponentHandle<ModeArea>();
+        auto areaEntities = ex.entities.entities_with_components(areaHandle);
+        auto bulPos = bulPlayer->getWorldTransform().getOrigin();
+        auto playerPos = glcast(bulPos);
+        for (auto entity : areaEntities)
+        {
+            auto r = areaHandle->radius;
+            auto pos = areaHandle->pos;
+            if(glm::distance(pos, playerPos) < r)
+                maxSpeed = 1;
+        }
+
+
+        glm::vec3 dir;
+        if (isKeyPressed(GLFW_KEY_LEFT))
+            dir.x -=1;
+        if (isKeyPressed(GLFW_KEY_RIGHT))
+            dir.x += 1;
+        if (isKeyPressed(GLFW_KEY_UP))
+            dir.z -= 1;
+        if (isKeyPressed(GLFW_KEY_DOWN))
+            dir.z += 1;
+
+        if(glm::length(dir) > 0.1)
+            glm::normalize(dir);
+        dir *= 5;//speed
+        bulPlayer->activate();
+        bulPlayer->applyCentralForce(btVector3(dir.x,dir.y,dir.z));
+        auto btSpeed = bulPlayer->getLinearVelocity();
+        auto ySpeed = btSpeed.y();
+        btSpeed.setY(0);
+        //but what about the forces?
+        if(btSpeed.length() > maxSpeed)
+            btSpeed = btSpeed.normalize() * maxSpeed;
+        btSpeed.setY(ySpeed);
+        bulPlayer->setLinearVelocity(btSpeed);
+
+//float
+        //bad, add spring
+        {
+            auto to = bulPos - btVector3(0,colPlayer->getHalfHeight() + 0.3,0);
+            auto closest = btCollisionWorld::ClosestRayResultCallback(bulPos, to);
+            dynamicsWorld->rayTest(bulPos, to , closest);
+            if(closest.hasHit())
+                bulPlayer->applyCentralForce(btVector3(0,20,0));
+        }
+        //bad Jump
+        if (isKeyPressed(GLFW_KEY_SPACE))
+        {
+            auto to = bulPos - btVector3(0,colPlayer->getHalfHeight() + 0.4,0);
+            auto closest = btCollisionWorld::ClosestRayResultCallback(bulPos, to);
+            dynamicsWorld->rayTest(bulPos, to , closest);
+            if(closest.hasHit())
+                bulPlayer->applyCentralForce(btVector3(0,100,0));
+        }
+
+    }
+
+
     dynamicsWorld->stepSimulation(elapsedSeconds, 10);
 }
+
+//*************************************
+//todo: safe normals from one frame and use those for light for some time -> similar to afterimage
 
 void Game::render(float elapsedSeconds)
 {
@@ -271,7 +356,15 @@ void Game::render(float elapsedSeconds)
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
         drawCubes(mShaderCubePrepass->use());
-        drawMech(mShaderMech->use(), elapsedSeconds);
+        if(mDrawMech)
+          drawMech(mShaderMech->use(), elapsedSeconds);
+
+        if (mDebugBullet)
+        {
+            GLOW_SCOPED(disable, GL_DEPTH_TEST);
+            dynamicsWorld->debugDrawWorld();
+            bulletDebugger->draw(proj * view);
+        }
     }
 
     // GBuffer
@@ -287,13 +380,14 @@ void Game::render(float elapsedSeconds)
         glClear(GL_COLOR_BUFFER_BIT | GL_STENCIL_BUFFER_BIT);
 
         drawCubes(mShaderCube->use());
-        drawMech(mShaderMech->use(), elapsedSeconds);
+        if(mDrawMech)
+          drawMech(mShaderMech->use(), elapsedSeconds);
 
         // Render Bullet Debug
         if (mDebugBullet)
         {
             GLOW_SCOPED(disable, GL_DEPTH_TEST);
-            dynamicsWorld->debugDrawWorld();
+            //dynamicsWorld->debugDrawWorld();
             bulletDebugger->draw(proj * view);
         }
     }
@@ -374,7 +468,7 @@ void Game::render(float elapsedSeconds)
     }
 }
 
-void Game::drawMech(glow::UsedProgram& shader, float elapsedSeconds)
+void Game::drawMech(glow::UsedProgram shader, float elapsedSeconds)
 {
     auto proj = mCamera->getProjectionMatrix();
     auto view = mCamera->getViewMatrix();
@@ -396,8 +490,7 @@ void Game::drawMech(glow::UsedProgram& shader, float elapsedSeconds)
     // mechModel->draw(shader, timer, true, "WalkInPlace");
     mechModel->draw(shader, debugTime, true, "WalkInPlace");
     // skeleton
-
-    //mechModel->debugRenderer.render(proj*view*glm::scale(glm::vec3(0.01)));
+    mechModel->debugRenderer.render(proj*view*glm::scale(glm::vec3(0.01)));
 
     shader.setUniform("uModel", glm::translate(mSpherePosition));
     shader.setTexture("uTexAlbedo", mTexBeholderAlbedo);
@@ -406,7 +499,7 @@ void Game::drawMech(glow::UsedProgram& shader, float elapsedSeconds)
     // beholderModel->debugRenderer.render(proj * view);
 }
 
-void Game::drawCubes(glow::UsedProgram& shader)
+void Game::drawCubes(glow::UsedProgram shader)
 {
     auto proj = mCamera->getProjectionMatrix();
     auto view = mCamera->getViewMatrix();
@@ -420,8 +513,9 @@ void Game::drawCubes(glow::UsedProgram& shader)
     // model matrices
     vector<glm::mat4> models;
     models.reserve(3000);
-    auto cubeEntities = ex.entities.entities_with_components(entityx::ComponentHandle<Cube>());
-    for (auto entity : cubeEntities)
+    auto cubeHandle = entityx::ComponentHandle<Cube>();
+    auto cubeEntities = ex.entities.entities_with_components(cubeHandle);
+    for (entityx::Entity entity : cubeEntities)
     {
         auto motionState = *entity.component<defMotionState>().get();
         btTransform trans;
@@ -449,7 +543,7 @@ void Game::onGui()
         {
             ImGui::Indent();
             ImGui::SliderFloat("Cube Size", &mCubeSize, 0.0f, 10.0f);
-            ImGui::SliderFloat3("Cube Position", &mCubePosition.x, -5.0f, 5.0f);
+            //ImGui::SliderFloat3("Cube Position", &mCubePosition.x, -5.0f, 5.0f);
 
             ImGui::Spacing();
 
@@ -467,7 +561,7 @@ void Game::onGui()
             ImGui::Indent();
             ImGui::Checkbox("Show Wireframe", &mShowWireframe);
             ImGui::Checkbox("Debug Bullet", &mDebugBullet);
-            ImGui::Checkbox("Show PostProcess", &mShowPostProcess);
+            ImGui::Checkbox("Show Mech", &mDrawMech);
             ImGui::ColorEdit3("Background Color", &mBackgroundColor.r);
             ImGui::Unindent();
         }

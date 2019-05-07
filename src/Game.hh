@@ -17,7 +17,7 @@ class Game : public glow::glfw::GlfwApp
 {
     // logic
 private:
-    glm::vec3 mCubePosition = {-2, 0, 0};
+    //glm::vec3 mCubePosition = {-2, 0, 0};
     float mCubeSize = 1.0f;
 
     glm::vec3 mSpherePosition = {2, 0, 0};
@@ -33,6 +33,7 @@ private:
     glm::vec3 mBackgroundColor = {.10f, .46f, .83f};
     bool mShowWireframe = false;
     bool mShowPostProcess = false;
+    bool mDrawMech = false;
 
     // gfx objects
 private:
@@ -90,8 +91,11 @@ private:
 
     // Bullet
 private:
-    bool mDebugBullet = true;
+    bool mDebugBullet = false;
     std::unique_ptr<btBoxShape> colBox;
+    std::unique_ptr<btCapsuleShape> colPlayer;
+    std::unique_ptr<btDefaultMotionState> playerMotionState;
+    std::unique_ptr<btRigidBody>bulPlayer;
     entityx::Entity createCube(const glm::ivec3& pos);
     // main
     std::unique_ptr<BulletDebugger> bulletDebugger; // draws lines for debugging
@@ -115,8 +119,8 @@ public:
     void init() override;                                             // called once after OpenGL is set up
     void update(float elapsedSeconds) override;                       // called in 60 Hz fixed timestep
     void render(float elapsedSeconds) override;                       // called once per frame (variable timestep)
-    void drawMech(glow::UsedProgram& shader, float elapsedSeconds);
-    void drawCubes(glow::UsedProgram& shader);
+    void drawMech(glow::UsedProgram shader, float elapsedSeconds);
+    void drawCubes(glow::UsedProgram shader);
     void onGui() override;                                            // called once per frame to set up UI
     void onResize(int w, int h) override;                             // called when window is resized
     bool onKey(int key, int scancode, int action, int mods) override; // called when a key is pressed
