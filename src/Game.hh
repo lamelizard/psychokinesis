@@ -17,11 +17,12 @@ class Game : public glow::glfw::GlfwApp
 {
     // logic
 private:
-    //glm::vec3 mCubePosition = {-2, 0, 0};
+    bool mJumps = false;
+    bool mJumpWasPressed = false; // last frame
     float mCubeSize = 1.0f;
 
-    glm::vec3 mSpherePosition = {2, 0, 0};
-    float mSphereSize = 1.0f;
+    //glm::vec3 mSpherePosition = {2, 0, 0};
+    //float mSphereSize = 1.0f;
 
     // for the cubes
     int cubesWorldMin = -24;
@@ -94,9 +95,10 @@ private:
     bool mDebugBullet = false;
     std::unique_ptr<btBoxShape> colBox;
     std::unique_ptr<btCapsuleShape> colPlayer;
-    std::unique_ptr<btDefaultMotionState> playerMotionState;
-    std::unique_ptr<btRigidBody>bulPlayer;
+    std::shared_ptr<btDefaultMotionState> playerMotionState;
+    std::shared_ptr<btRigidBody>bulPlayer;
     entityx::Entity createCube(const glm::ivec3& pos);
+
     // main
     std::unique_ptr<BulletDebugger> bulletDebugger; // draws lines for debugging
     std::unique_ptr<btDefaultCollisionConfiguration> collisionConfiguration;

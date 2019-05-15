@@ -1,5 +1,7 @@
 #include "Game.hh"
 
+#include <set>
+
 #include <glm/ext.hpp>
 
 // glow OpenGL wrapper
@@ -42,6 +44,10 @@ struct Cube
     glm::ivec3 pos;
 };
 
+struct Health {
+    int amount = 10;
+};
+
 enum Mode
 {
     normal = 0,
@@ -60,6 +66,14 @@ glm::vec3 glcast(const btVector3& v){
 }
 btVector3 btcast(const glm::vec3& v){
     return btVector3(v.x,v.y,v.z);
+}
+btTransform bttransform(const glm::vec3& offset){
+    auto identity = btMatrix3x3();
+    identity.setIdentity();
+    return btTransform(identity, btcast(offset));
+}
+glm::vec3 getWorldPos(const btTransform& t){
+    return glcast(t.getOrigin());
 }
 
 Game::Game() : GlfwApp(Gui::ImGui) {}
@@ -168,47 +182,29 @@ void Game::init()
         bulletDebugger = make_unique<BulletDebugger>();
         dynamicsWorld->setDebugDrawer(bulletDebugger.get());
 
-        // test cube + sphere
-        // from hello world
-        btCollisionShape* groundShape = new btBoxShape(btVector3(btScalar(50.), btScalar(2.), btScalar(50.)));
-        btTransform groundTransform;
-        groundTransform.setIdentity();
-        groundTransform.setOrigin(btVector3(0, -5, 0));
-        btVector3 localInertia(0, 0, 0);
-
-        btRigidBody::btRigidBodyConstructionInfo rbInfo(0., nullptr, groundShape, localInertia);
+        //ground
+        btCollisionShape* groundShape = new btBoxShape(btVector3(btScalar(50.), btScalar(2.), btScalar(50.))); // lost memory
+        btRigidBody::btRigidBodyConstructionInfo rbInfo(0., nullptr, groundShape, btVector3(0,0,0));
         auto ground = new btRigidBody(rbInfo);
-        ground->setWorldTransform(groundTransform);
+        ground->setWorldTransform(bttransform(glm::vec3(0,-5,0)));
         dynamicsWorld->addRigidBody(ground);
 
-
         colBox = make_unique<btBoxShape>(btVector3(mCubeSize / 2, mCubeSize / 2, mCubeSize / 2)); // half extend
-        btRigidBody* bulCube = nullptr;
-        btTransform startTransform;
-        startTransform.setIdentity();
-        localInertia.setX(5);
-        colBox->calculateLocalInertia(1., localInertia);
-        startTransform.setOrigin(btVector3(0, 10, 0));
 
-        // using motionstate is optional, it provides interpolation capabilities, and only synchronizes 'active' objects
-        boxMotionState = new btDefaultMotionState(startTransform);
-        btRigidBody::btRigidBodyConstructionInfo rbInfo2(1.f, boxMotionState, colBox.get(), localInertia);
-        btRigidBody* body = new btRigidBody(rbInfo2);
+    }
 
-        dynamicsWorld->addRigidBody(body);
-
-        //player
+    //player
+    {
+        auto entity = ex.entities.create();
         colPlayer = make_unique<btCapsuleShape>(0.25, 1);
-        localInertia.setZero();
-        colPlayer->calculateLocalInertia(1, localInertia);
-        startTransform.setOrigin(btVector3(0, 5, 0));
-        playerMotionState = make_unique<btDefaultMotionState>(startTransform);
-        bulPlayer = make_unique<btRigidBody>(btRigidBody::btRigidBodyConstructionInfo(1.f, playerMotionState.get(), colPlayer.get(), localInertia));
+        playerMotionState = make_shared<btDefaultMotionState>(bttransform(glm::vec3(0,5,0)));
+        bulPlayer = make_shared<btRigidBody>(btRigidBody::btRigidBodyConstructionInfo(1.f, playerMotionState.get(), colPlayer.get(), btVector3(0,0,0)));
         bulPlayer->setAngularFactor(0);
         bulPlayer->setCustomDebugColor(btVector3(255,1,1));
-
-
         dynamicsWorld->addRigidBody(bulPlayer.get());
+        entity.assign<SharedbtRigidBody>(bulPlayer);
+        entity.assign<defMotionState>(playerMotionState);
+        entity.assign<Health>();
     }
 
     // create world
@@ -243,12 +239,8 @@ void Game::init()
 
 entityx::Entity Game::createCube(const glm::ivec3& pos)
 {
-    static const btVector3 inertia(0, 0, 0);
-    btTransform transform;
-    transform.setIdentity();
-    transform.setOrigin(btVector3(pos.x, (float)pos.y - colBox->getHalfExtentsWithMargin().getY(), pos.z)); // y = 0 is floor
-    auto motionState = make_shared<btDefaultMotionState>(transform);
-    auto rbCube = make_shared<btRigidBody>(btRigidBody::btRigidBodyConstructionInfo(0., motionState.get(), colBox.get(), inertia));
+    auto motionState = make_shared<btDefaultMotionState>(bttransform(glm::vec3(pos.x, (float)pos.y - colBox->getHalfExtentsWithMargin().getY(), pos.z))); // y = 0 is floor
+    auto rbCube = make_shared<btRigidBody>(btRigidBody::btRigidBodyConstructionInfo(0., motionState.get(), colBox.get(), btVector3(0,0,0)));
     dynamicsWorld->addRigidBody(rbCube.get());
 
     auto entity = ex.entities.create();
@@ -265,40 +257,65 @@ void Game::update(float elapsedSeconds)
     if (elapsedSeconds > 1)
         elapsedSeconds = 1;
 
+
+    bulPlayer->activate();
+    const auto playerPos = getWorldPos(bulPlayer->getWorldTransform());
+    const auto bulPos = btcast(playerPos);
+
+    //modes of player, they change the logic
+    //could change mode for any entity!!!
+    set<Mode> playerModes;
+    {
+        auto area = entityx::ComponentHandle<ModeArea>();
+        for (auto entity : ex.entities.entities_with_components(area))
+            if(glm::distance(area->pos, playerPos) < area->radius)
+                playerModes.insert(area->mode);
+    }
+
     // Physics
     // Bullet uses fixed timestep and interpolates
     // -> probably should put this in render as well to get the interpolation
     //move character
     {
         auto maxSpeed = 3;
-        auto areaHandle = entityx::ComponentHandle<ModeArea>();
-        auto areaEntities = ex.entities.entities_with_components(areaHandle);
-        auto bulPos = bulPlayer->getWorldTransform().getOrigin();
-        auto playerPos = glcast(bulPos);
-        for (auto entity : areaEntities)
+        auto forceLength = 5;
+
+
+        //handle slowdown
+        if(playerModes.count(test))
+            maxSpeed = 1;
+
+        bool jumpPressed = isKeyPressed(GLFW_KEY_SPACE);
+
+
+        btVector3 force;
         {
-            auto r = areaHandle->radius;
-            auto pos = areaHandle->pos;
-            if(glm::distance(pos, playerPos) < r)
-                maxSpeed = 1;
+            // reldir = dir without camera
+            glm::vec3 relDir;
+            if (isKeyPressed(GLFW_KEY_LEFT))
+                relDir.x -=1;
+            if (isKeyPressed(GLFW_KEY_RIGHT))
+                relDir.x += 1;
+            if (isKeyPressed(GLFW_KEY_UP))
+                relDir.z -= 1;
+            if (isKeyPressed(GLFW_KEY_DOWN))
+                relDir.z += 1;
+
+            if(glm::length(relDir) > .1f)
+                glm::normalize(relDir);
+
+            //use camera
+              auto forward =  mCamera->getForwardVector();
+            forward.y = 0;
+
+            force = btcast(relDir * forceLength);
         }
 
 
-        glm::vec3 dir;
-        if (isKeyPressed(GLFW_KEY_LEFT))
-            dir.x -=1;
-        if (isKeyPressed(GLFW_KEY_RIGHT))
-            dir.x += 1;
-        if (isKeyPressed(GLFW_KEY_UP))
-            dir.z -= 1;
-        if (isKeyPressed(GLFW_KEY_DOWN))
-            dir.z += 1;
 
-        if(glm::length(dir) > 0.1)
-            glm::normalize(dir);
-        dir *= 5;//speed
-        bulPlayer->activate();
-        bulPlayer->applyCentralForce(btVector3(dir.x,dir.y,dir.z));
+        bulPlayer->applyCentralForce(force);
+
+
         auto btSpeed = bulPlayer->getLinearVelocity();
         auto ySpeed = btSpeed.y();
         btSpeed.setY(0);
@@ -308,25 +325,49 @@ void Game::update(float elapsedSeconds)
         btSpeed.setY(ySpeed);
         bulPlayer->setLinearVelocity(btSpeed);
 
-//float
-        //bad, add spring
+        //close to ground?
+        bool closeToGround = false;
+        float ground = 0; // valid if closeToGround
+        float closeToGroundBorder = 0.3;
+        float floatingHeight = 0.25;
         {
-            auto to = bulPos - btVector3(0,colPlayer->getHalfHeight() + 0.3,0);
-            auto closest = btCollisionWorld::ClosestRayResultCallback(bulPos, to);
-            dynamicsWorld->rayTest(bulPos, to , closest);
-            if(closest.hasHit())
-                bulPlayer->applyCentralForce(btVector3(0,20,0));
-        }
-        //bad Jump
-        if (isKeyPressed(GLFW_KEY_SPACE))
-        {
-            auto to = bulPos - btVector3(0,colPlayer->getHalfHeight() + 0.4,0);
-            auto closest = btCollisionWorld::ClosestRayResultCallback(bulPos, to);
-            dynamicsWorld->rayTest(bulPos, to , closest);
-            if(closest.hasHit())
-                bulPlayer->applyCentralForce(btVector3(0,100,0));
+            auto from = bulPos - btVector3(0,colPlayer->getHalfHeight(),0);
+
+            auto to = from - btVector3(0,closeToGroundBorder,0);
+            auto closest = btCollisionWorld::ClosestRayResultCallback(from, to);
+            dynamicsWorld->rayTest(from, to , closest);
+            if(closest.hasHit()){
+                closeToGround = true;
+                ground = closest.m_hitPointWorld.y();
+            }
         }
 
+        //jumping
+        if(closeToGround){
+            //fall + standing
+            if(bulPlayer->getLinearVelocity().y() <= 0 && !jumpPressed)
+            {
+                 mJumps = false;
+                 //reset y-velocity
+                 auto v = bulPlayer->getLinearVelocity();
+                 v.setY(0);
+                 bulPlayer->setLinearVelocity(v);
+                 //reset y-position
+                 auto t = bulPlayer->getWorldTransform();
+                 auto o = t.getOrigin();
+                 o.setY(ground + floatingHeight);
+                 t.setOrigin(o);
+                 bulPlayer->setWorldTransform(t);
+                 //no y anymore!
+                 bulPlayer->setLinearFactor(btVector3(1,0,1));
+            }
+            //jump
+            if(!mJumps && closeToGround && jumpPressed){
+                mJumps = true;
+                bulPlayer->setLinearFactor(btVector3(1,1,1));
+                bulPlayer->applyCentralForce(btVector3(0,100,0));
+            }
+        }
     }
 
 
@@ -473,9 +514,9 @@ void Game::drawMech(glow::UsedProgram shader, float elapsedSeconds)
     auto proj = mCamera->getProjectionMatrix();
     auto view = mCamera->getViewMatrix();
 
-    auto modelMech = glm::translate(mSpherePosition) * glm::scale(glm::vec3(mSphereSize));
+    glm::mat4 modelMech;//glm::translate(mSpherePosition) * glm::scale(glm::vec3(mSphereSize));
     modelMech = glm::rotate(modelMech, glm::radians(90.f), glm::vec3(1, 0, 0)); // unity?
-    modelMech = glm::mat4();
+    //modelMech = glm::mat4();
     shader.setUniform("uProj", proj);
     shader.setUniform("uView", view);
     shader.setUniform("uModel", modelMech);
@@ -491,12 +532,6 @@ void Game::drawMech(glow::UsedProgram shader, float elapsedSeconds)
     mechModel->draw(shader, debugTime, true, "WalkInPlace");
     // skeleton
     mechModel->debugRenderer.render(proj*view*glm::scale(glm::vec3(0.01)));
-
-    shader.setUniform("uModel", glm::translate(mSpherePosition));
-    shader.setTexture("uTexAlbedo", mTexBeholderAlbedo);
-    shader.setTexture("uTexNormal", mTexDefNormal);
-    // beholderModel->draw(shader, debugTime, true, "ArmaBeholder|wait");
-    // beholderModel->debugRenderer.render(proj * view);
 }
 
 void Game::drawCubes(glow::UsedProgram shader)
@@ -543,12 +578,6 @@ void Game::onGui()
         {
             ImGui::Indent();
             ImGui::SliderFloat("Cube Size", &mCubeSize, 0.0f, 10.0f);
-            //ImGui::SliderFloat3("Cube Position", &mCubePosition.x, -5.0f, 5.0f);
-
-            ImGui::Spacing();
-
-            ImGui::SliderFloat("Sphere Radius", &mSphereSize, 0.0f, 10.0f);
-            ImGui::SliderFloat3("Sphere Position", &mSpherePosition.x, -5.0f, 5.0f);
             ImGui::Unindent();
         }
 

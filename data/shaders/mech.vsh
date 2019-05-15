@@ -17,10 +17,14 @@ out vec2 vTexCoord;
 
 void main()
 {
-    vec4 pos = (uBones[aBoneIDs.x] * vec4(aPosition, 1)) * aBoneWeights.x   //
-               + (uBones[aBoneIDs.y] * vec4(aPosition, 1)) * aBoneWeights.y //
-               + (uBones[aBoneIDs.z] * vec4(aPosition, 1)) * aBoneWeights.z //
-               + (uBones[aBoneIDs.w] * vec4(aPosition, 1)) * aBoneWeights.w;
+
+    vec4 iPosition = vec4(aPosition, 1);
+    iPosition.z = aPosition.y;
+    iPosition.y = -aPosition.z;
+    vec4 pos = (uBones[aBoneIDs.x] * iPosition) * aBoneWeights.x   //
+               + (uBones[aBoneIDs.y] * iPosition) * aBoneWeights.y //
+               + (uBones[aBoneIDs.z] * iPosition) * aBoneWeights.z //
+               + (uBones[aBoneIDs.w] * iPosition) * aBoneWeights.w;
 
 
     // assume uModel has no non-uniform scaling

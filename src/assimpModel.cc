@@ -73,7 +73,7 @@ void AssimpModel::draw(const glow::UsedProgram& shader, double t, bool loop, con
     auto animation = animations[animationStr]; // might throw
 
     double ticks = 0.;
-    if (animation->mTicksPerSecond)
+    if (animation->mTicksPerSecond > 0)
         ticks = t * animation->mTicksPerSecond;
     else
         ticks = t * 24; // guessing
@@ -107,7 +107,7 @@ void AssimpModel::draw(const glow::UsedProgram& shader, double t, bool loop, con
         }
 
         // test
-        auto test = aiMatrix4x4(1, 0, 0, 0, 0, 0, 1, 0, 0, -1, 0, 0, 0, 0, 0, 1);
+        //auto test = aiMatrix4x4(1, 0, 0, 0, 0, 0, 1, 0, 0, -1, 0, 0, 0, 0, 0, 1);
 
         if (boneIDOfNode.count(thisNode) == 1) // the node's a bone
             boneArray[boneIDOfNode[thisNode]] = aiCast(globalInverse * /*aiMatrix4x4::RotationX(-90, aiMatrix4x4()) **/ transform * offsetOfNode[thisNode]);
