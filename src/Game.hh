@@ -34,6 +34,8 @@ private:
     glm::vec3 mBackgroundColor = {.10f, .46f, .83f};
     bool mShowWireframe = false;
     bool mShowPostProcess = false;
+    bool mShowMenu = false;
+    bool mFreeCamera = false;
     bool mDrawMech = false;
 
     // gfx objects
@@ -92,7 +94,11 @@ private:
 
     // Bullet
 private:
+    #ifdef NDEBUG
     bool mDebugBullet = false;
+    #else
+    bool mDebugBullet = true;
+    #endif
     std::unique_ptr<btBoxShape> colBox;
     std::unique_ptr<btCapsuleShape> colPlayer;
     std::shared_ptr<btDefaultMotionState> playerMotionState;
@@ -109,7 +115,7 @@ private:
 
 
     // test
-    btDefaultMotionState* boxMotionState = nullptr;
+    //btDefaultMotionState* boxMotionState = nullptr;
 
 
     // ctor

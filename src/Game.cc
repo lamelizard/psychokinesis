@@ -44,7 +44,8 @@ struct Cube
     glm::ivec3 pos;
 };
 
-struct Health {
+struct Health
+{
     int amount = 10;
 };
 
@@ -61,18 +62,22 @@ struct ModeArea
     float radius;
 };
 
-glm::vec3 glcast(const btVector3& v){
-    return glm::vec3(v.x(),v.y(),v.z());
+glm::vec3 glcast(const btVector3& v)
+{
+    return glm::vec3(v.x(), v.y(), v.z());
 }
-btVector3 btcast(const glm::vec3& v){
-    return btVector3(v.x,v.y,v.z);
+btVector3 btcast(const glm::vec3& v)
+{
+    return btVector3(v.x, v.y, v.z);
 }
-btTransform bttransform(const glm::vec3& offset){
+btTransform bttransform(const glm::vec3& offset)
+{
     auto identity = btMatrix3x3();
     identity.setIdentity();
     return btTransform(identity, btcast(offset));
 }
-glm::vec3 getWorldPos(const btTransform& t){
+glm::vec3 getWorldPos(const btTransform& t)
+{
     return glcast(t.getOrigin());
 }
 
@@ -182,25 +187,24 @@ void Game::init()
         bulletDebugger = make_unique<BulletDebugger>();
         dynamicsWorld->setDebugDrawer(bulletDebugger.get());
 
-        //ground
+        // ground
         btCollisionShape* groundShape = new btBoxShape(btVector3(btScalar(50.), btScalar(2.), btScalar(50.))); // lost memory
-        btRigidBody::btRigidBodyConstructionInfo rbInfo(0., nullptr, groundShape, btVector3(0,0,0));
+        btRigidBody::btRigidBodyConstructionInfo rbInfo(0., nullptr, groundShape, btVector3(0, 0, 0));
         auto ground = new btRigidBody(rbInfo);
-        ground->setWorldTransform(bttransform(glm::vec3(0,-5,0)));
+        ground->setWorldTransform(bttransform(glm::vec3(0, -5, 0)));
         dynamicsWorld->addRigidBody(ground);
 
         colBox = make_unique<btBoxShape>(btVector3(mCubeSize / 2, mCubeSize / 2, mCubeSize / 2)); // half extend
-
     }
 
-    //player
+    // player
     {
         auto entity = ex.entities.create();
         colPlayer = make_unique<btCapsuleShape>(0.25, 1);
-        playerMotionState = make_shared<btDefaultMotionState>(bttransform(glm::vec3(0,5,0)));
-        bulPlayer = make_shared<btRigidBody>(btRigidBody::btRigidBodyConstructionInfo(1.f, playerMotionState.get(), colPlayer.get(), btVector3(0,0,0)));
+        playerMotionState = make_shared<btDefaultMotionState>(bttransform(glm::vec3(0, 5, 0)));
+        bulPlayer = make_shared<btRigidBody>(btRigidBody::btRigidBodyConstructionInfo(1.f, playerMotionState.get(), colPlayer.get(), btVector3(0, 0, 0)));
         bulPlayer->setAngularFactor(0);
-        bulPlayer->setCustomDebugColor(btVector3(255,1,1));
+        bulPlayer->setCustomDebugColor(btVector3(255, 1, 1));
         dynamicsWorld->addRigidBody(bulPlayer.get());
         entity.assign<SharedbtRigidBody>(bulPlayer);
         entity.assign<defMotionState>(playerMotionState);
@@ -240,7 +244,7 @@ void Game::init()
 entityx::Entity Game::createCube(const glm::ivec3& pos)
 {
     auto motionState = make_shared<btDefaultMotionState>(bttransform(glm::vec3(pos.x, (float)pos.y - colBox->getHalfExtentsWithMargin().getY(), pos.z))); // y = 0 is floor
-    auto rbCube = make_shared<btRigidBody>(btRigidBody::btRigidBodyConstructionInfo(0., motionState.get(), colBox.get(), btVector3(0,0,0)));
+    auto rbCube = make_shared<btRigidBody>(btRigidBody::btRigidBodyConstructionInfo(0., motionState.get(), colBox.get(), btVector3(0, 0, 0)));
     dynamicsWorld->addRigidBody(rbCube.get());
 
     auto entity = ex.entities.create();
@@ -262,27 +266,25 @@ void Game::update(float elapsedSeconds)
     const auto playerPos = getWorldPos(bulPlayer->getWorldTransform());
     const auto bulPos = btcast(playerPos);
 
-    //modes of player, they change the logic
-    //could change mode for any entity!!!
+    // modes of player, they change the logic
+    // could change mode for any entity!!!
     set<Mode> playerModes;
     {
         auto area = entityx::ComponentHandle<ModeArea>();
         for (auto entity : ex.entities.entities_with_components(area))
-            if(glm::distance(area->pos, playerPos) < area->radius)
+            if (glm::distance(area->pos, playerPos) < area->radius)
                 playerModes.insert(area->mode);
     }
 
     // Physics
     // Bullet uses fixed timestep and interpolates
     // -> probably should put this in render as well to get the interpolation
-    //move character
+    // move character
     {
         auto maxSpeed = 3;
         auto forceLength = 5;
-
-
-        //handle slowdown
-        if(playerModes.count(test))
+        // handle slowdown
+        if (playerModes.count(test))
             maxSpeed = 1;
 
         bool jumpPressed = isKeyPressed(GLFW_KEY_SPACE);
@@ -293,81 +295,97 @@ void Game::update(float elapsedSeconds)
             // reldir = dir without camera
             glm::vec3 relDir;
             if (isKeyPressed(GLFW_KEY_LEFT))
-                relDir.x -=1;
+                relDir.x -= 1;
             if (isKeyPressed(GLFW_KEY_RIGHT))
                 relDir.x += 1;
             if (isKeyPressed(GLFW_KEY_UP))
-                relDir.z -= 1;
-            if (isKeyPressed(GLFW_KEY_DOWN))
                 relDir.z += 1;
+            if (isKeyPressed(GLFW_KEY_DOWN))
+                relDir.z -= 1;
 
-            if(glm::length(relDir) > .1f)
+            if (glm::length(relDir) > .1f)
                 glm::normalize(relDir);
 
-            //use camera
-              auto forward =  mCamera->getForwardVector();
-            forward.y = 0;
+            // movement relative to camera
+            glm::vec3 camForward;
+            glm::vec3 camRight;
+            {
+                camForward = mCamera->getForwardVector();
+                camForward.y = 0;
+                camForward = glm::normalize(camForward);
+                camRight = mCamera->getRightVector();
+                camRight.y = 0;
+                camRight = glm::normalize(camRight);
+            }
 
-            force = btcast(relDir * forceLength);
+            force = btcast((relDir.x * camRight + relDir.z * camForward) * forceLength);
         }
-
-
-
         bulPlayer->applyCentralForce(force);
+
+
+        // slow down
+        // TODO ice!
+        bulPlayer->setDamping(0.7, 0);//damps y...
+        
 
 
         auto btSpeed = bulPlayer->getLinearVelocity();
         auto ySpeed = btSpeed.y();
         btSpeed.setY(0);
-        //but what about the forces?
-        if(btSpeed.length() > maxSpeed)
+        // but what about the forces?
+        if (btSpeed.length() > maxSpeed)
             btSpeed = btSpeed.normalize() * maxSpeed;
         btSpeed.setY(ySpeed);
         bulPlayer->setLinearVelocity(btSpeed);
 
-        //close to ground?
+        // close to ground?
         bool closeToGround = false;
         float ground = 0; // valid if closeToGround
         float closeToGroundBorder = 0.3;
         float floatingHeight = 0.25;
         {
-            auto from = bulPos - btVector3(0,colPlayer->getHalfHeight(),0);
+            auto from = bulPos - btVector3(0, colPlayer->getHalfHeight(), 0);
 
-            auto to = from - btVector3(0,closeToGroundBorder,0);
+            auto to = from - btVector3(0, closeToGroundBorder, 0);
             auto closest = btCollisionWorld::ClosestRayResultCallback(from, to);
-            dynamicsWorld->rayTest(from, to , closest);
-            if(closest.hasHit()){
+            dynamicsWorld->rayTest(from, to, closest);
+            if (closest.hasHit())
+            {
                 closeToGround = true;
                 ground = closest.m_hitPointWorld.y();
             }
         }
 
-        //jumping
-        if(closeToGround){
-            //fall + standing
-            if(bulPlayer->getLinearVelocity().y() <= 0 && !jumpPressed)
+        // jumping
+        if (closeToGround)
+        {
+            // falling + standing
+            if (bulPlayer->getLinearVelocity().y() <= 0.01 /*&& !jumpPressed*/)
             {
-                 mJumps = false;
-                 //reset y-velocity
-                 auto v = bulPlayer->getLinearVelocity();
-                 v.setY(0);
-                 bulPlayer->setLinearVelocity(v);
-                 //reset y-position
-                 auto t = bulPlayer->getWorldTransform();
-                 auto o = t.getOrigin();
-                 o.setY(ground + floatingHeight);
-                 t.setOrigin(o);
-                 bulPlayer->setWorldTransform(t);
-                 //no y anymore!
-                 bulPlayer->setLinearFactor(btVector3(1,0,1));
+                mJumps = false;
+                // reset y-velocity
+                auto v = bulPlayer->getLinearVelocity();
+                v.setY(0);
+                bulPlayer->setLinearVelocity(v);
+                // reset y-position
+                auto t = bulPlayer->getWorldTransform();
+                auto o = t.getOrigin();
+                o.setY(ground + floatingHeight + colPlayer->getHalfHeight());
+                t.setOrigin(o);
+                bulPlayer->setWorldTransform(t);
+                // no y-movement anymore!
+                bulPlayer->setLinearFactor(btVector3(1, 0, 1));
             }
-            //jump
-            if(!mJumps && closeToGround && jumpPressed){
+            // jump
+            if (!mJumps && jumpPressed)
+            {
                 mJumps = true;
-                bulPlayer->setLinearFactor(btVector3(1,1,1));
-                bulPlayer->applyCentralForce(btVector3(0,100,0));
+                bulPlayer->setLinearFactor(btVector3(1, 1, 1));
+                bulPlayer->applyCentralForce(btVector3(0, 300, 0));
             }
         }
+        else
+            bulPlayer->setLinearFactor(btVector3(1, 1, 1));
     }
 
 
@@ -375,7 +393,7 @@ void Game::update(float elapsedSeconds)
 }
 
 //*************************************
-//todo: safe normals from one frame and use those for light for some time -> similar to afterimage
+// todo: safe normals from one frame and use those for light for some time -> similar to afterimage
 
 void Game::render(float elapsedSeconds)
 {
@@ -397,8 +415,8 @@ void Game::render(float elapsedSeconds)
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
         drawCubes(mShaderCubePrepass->use());
-        if(mDrawMech)
-          drawMech(mShaderMech->use(), elapsedSeconds);
+        if (mDrawMech)
+            drawMech(mShaderMech->use(), elapsedSeconds);
 
         if (mDebugBullet)
         {
@@ -421,14 +439,14 @@ void Game::render(float elapsedSeconds)
         glClear(GL_COLOR_BUFFER_BIT | GL_STENCIL_BUFFER_BIT);
 
         drawCubes(mShaderCube->use());
-        if(mDrawMech)
-          drawMech(mShaderMech->use(), elapsedSeconds);
+        if (mDrawMech)
+            drawMech(mShaderMech->use(), elapsedSeconds);
 
         // Render Bullet Debug
         if (mDebugBullet)
         {
             GLOW_SCOPED(disable, GL_DEPTH_TEST);
-            //dynamicsWorld->debugDrawWorld();
+            // dynamicsWorld->debugDrawWorld();
             bulletDebugger->draw(proj * view);
         }
     }
@@ -514,9 +532,9 @@ void Game::drawMech(glow::UsedProgram shader, float elapsedSeconds)
     auto proj = mCamera->getProjectionMatrix();
     auto view = mCamera->getViewMatrix();
 
-    glm::mat4 modelMech;//glm::translate(mSpherePosition) * glm::scale(glm::vec3(mSphereSize));
+    glm::mat4 modelMech; // glm::translate(mSpherePosition) * glm::scale(glm::vec3(mSphereSize));
     modelMech = glm::rotate(modelMech, glm::radians(90.f), glm::vec3(1, 0, 0)); // unity?
-    //modelMech = glm::mat4();
+    // modelMech = glm::mat4();
     shader.setUniform("uProj", proj);
     shader.setUniform("uView", view);
     shader.setUniform("uModel", modelMech);
@@ -531,7 +549,7 @@ void Game::drawMech(glow::UsedProgram shader, float elapsedSeconds)
     // mechModel->draw(shader, timer, true, "WalkInPlace");
     mechModel->draw(shader, debugTime, true, "WalkInPlace");
     // skeleton
-    mechModel->debugRenderer.render(proj*view*glm::scale(glm::vec3(0.01)));
+    mechModel->debugRenderer.render(proj * view * glm::scale(glm::vec3(0.01)));
 }
 
 void Game::drawCubes(glow::UsedProgram shader)
@@ -591,6 +609,7 @@ void Game::onGui()
             ImGui::Checkbox("Show Wireframe", &mShowWireframe);
             ImGui::Checkbox("Debug Bullet", &mDebugBullet);
             ImGui::Checkbox("Show Mech", &mDrawMech);
+            ImGui::Checkbox("free Camera", &mFreeCamera);
             ImGui::ColorEdit3("Background Color", &mBackgroundColor.r);
             ImGui::Unindent();
         }
@@ -627,24 +646,32 @@ void Game::updateCamera(float elapsedSeconds)
 {
     auto const speed = elapsedSeconds * 3;
 
-    // WASD camera move
     glm::vec3 rel_move;
-    if (isKeyPressed(GLFW_KEY_A)) // left
-        rel_move.x -= speed;
-    if (isKeyPressed(GLFW_KEY_D)) // right
-        rel_move.x += speed;
-    if (isKeyPressed(GLFW_KEY_W)) // forward
-        rel_move.z -= speed;
-    if (isKeyPressed(GLFW_KEY_S)) // backward
-        rel_move.z += speed;
-    if (isKeyPressed(GLFW_KEY_Q)) // down
-        rel_move.y -= speed;
-    if (isKeyPressed(GLFW_KEY_E)) // up
-        rel_move.y += speed;
+    if (mFreeCamera)
+    {
+        // WASD camera move
+        if (isKeyPressed(GLFW_KEY_A)) // left
+            rel_move.x -= speed;
+        if (isKeyPressed(GLFW_KEY_D)) // right
+            rel_move.x += speed;
+        if (isKeyPressed(GLFW_KEY_W)) // forward
+            rel_move.z -= speed;
+        if (isKeyPressed(GLFW_KEY_S)) // backward
+            rel_move.z += speed;
+        if (isKeyPressed(GLFW_KEY_Q)) // down
+            rel_move.y -= speed;
+        if (isKeyPressed(GLFW_KEY_E)) // up
+            rel_move.y += speed;
 
-    // left shift -> more speed
-    if (isKeyPressed(GLFW_KEY_LEFT_SHIFT))
-        rel_move *= 5.0f;
+        // left shift -> more speed
+        if (isKeyPressed(GLFW_KEY_LEFT_SHIFT))
+            rel_move *= 5.0f;
+    }
+    else
+    {
+        mCamera->handle.setTarget(glcast(bulPlayer->getWorldTransform().getOrigin()));
+    }
+
 
     // Look around
     bool leftMB = isMouseButtonPressed(GLFW_MOUSE_BUTTON_LEFT);
