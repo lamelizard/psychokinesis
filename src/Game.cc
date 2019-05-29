@@ -13,6 +13,9 @@
 #include <glow/objects/Texture2D.hh>
 #include <glow/objects/TextureRectangle.hh>
 #include <glow/objects/VertexArray.hh>
+#include <glow/objects/TextureCubeMap.hh>
+
+#include <glow/data/TextureData.hh>
 
 // extra functionality of glow
 #include <glow-extras/geometry/Quad.hh>
@@ -128,10 +131,25 @@ void Game::init() {
 
   // load gfx resources
   {
+    const string texPath = "../data/textures/";
     // color textures are usually sRGB and data textures Linear
-    mTexCubeAlbedo = glow::Texture2D::createFromFile("../data/textures/cube.albedo.png", glow::ColorSpace::sRGB);
-    mTexCubeNormal = glow::Texture2D::createFromFile("../data/textures/cube.normal.png", glow::ColorSpace::Linear);
-    mTexDefNormal = glow::Texture2D::createFromFile("../data/textures/normal.png", glow::ColorSpace::Linear);
+    mTexCubeAlbedo = glow::Texture2D::createFromFile(texPath + "cube.albedo.png", glow::ColorSpace::sRGB);
+    mTexCubeNormal = glow::Texture2D::createFromFile(texPath + "cube.normal.png", glow::ColorSpace::Linear);
+    mTexDefNormal = glow::Texture2D::createFromFile(texPath + "normal.png", glow::ColorSpace::Linear);
+    //bg
+    {
+      //from rtglive
+      const string bgPath = texPath + "galaxy/";
+      mSkybox = glow::TextureCubeMap::createFromData( //
+          //todo check order
+          glow::TextureData::createFromFileCube(bgPath + "right.png",  //
+                                                bgPath + "left.png",   //
+                                                bgPath + "top.png",    //
+                                                bgPath + "bottom.png", //
+                                                bgPath + "front.png",  //
+                                                bgPath + "back.png",   //
+                                                glow::ColorSpace::sRGB));
+    }
 
     // simple procedural quad with vec2 aPosition
     mMeshQuad = glow::geometry::make_quad();
@@ -497,6 +515,10 @@ void Game::render(float elapsedSeconds) {
     shader.setTexture("uTexNormal", mGBufferNormal);
     shader.setTexture("uTexDepth", mGBufferDepth);
     shader.setTexture("uTexMode", mBufferMode);
+    //sky
+    shader.setTexture("uSkybox", mSkybox);
+    shader.setUniform("uInvProj", glm::inverse(proj));
+    shader.setUniform("uInvView", inverse(view));
 
     // let light rotate around the objects
     // put higher

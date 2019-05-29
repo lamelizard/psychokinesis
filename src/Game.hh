@@ -68,6 +68,7 @@ private:
   glow::SharedTexture2D mTexCubeAlbedo;
   glow::SharedTexture2D mTexCubeNormal;
   glow::SharedTexture2D mTexDefNormal;
+  glow::SharedTextureCubeMap mSkybox;
 
   // depth pre-pass
   glow::SharedTextureRectangle mGBufferDepth;
