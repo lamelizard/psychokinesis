@@ -1,56 +1,68 @@
-# Style file for clang-format ( http://clang.llvm.org/docs/ClangFormatStyleOptions.html )
-
-# Style is based on google's c++ coding style.
-# see http://google-styleguide.googlecode.com/svn/trunk/cppguide.xml
-BasedOnStyle: Google
-#Language: Cpp
-Standard: Cpp11
-
-
-# 80 columns guideline
-ColumnLimit: 150
-PenaltyExcessCharacter: 1
-PenaltyBreakString: 50
-
-
-# Indentation and Braces
-IndentWidth: 4
+#too new are the ones with custom enumerations->
+#activate them later
+AccessModifierOffset: -2
+#AlignAfterOpenBracket: BAS_Align
+#AlignConsecutiveAssignments: true #has problems with loops
+#AlignConsecutiveDeclarations: true #has problems with loops
+AlignEscapedNewlinesLeft: true
+AlignOperands: true
+AlignTrailingComments: true #do I want this?
+AllowShortCaseLabelsOnASingleLine: true #to be thought over
+#AllowShortFunctionsOnASingleLine: SFS_All
 AllowShortIfStatementsOnASingleLine: false
 AllowShortLoopsOnASingleLine: false
-AllowShortFunctionsOnASingleLine: Inline
-AlwaysBreakBeforeMultilineStrings: false
+#AlwaysBreakAfterReturnType: RTBS_None
+#AlwaysBreakBeforeMultilineStrings#I don't know
 AlwaysBreakTemplateDeclarations: true
-#BraceBreakingStyle: ???
-BreakBeforeBinaryOperators: true
+#BinPackArguments: false#what if there are a lot of smal ones?
+#BinPackParameters:false
+
+#BreakBeforeBraces: BS_Custom
+#BraceWrapping{
+#  AfterClass:false
+#  AfterControlStatement: false
+#  AfterEnum: false
+#  AfterFunction: false
+#  AfterNamespace: false
+#  AfterStruct: false
+#  AfterUnion: false
+#  BeforeCatch: false
+#  BeforeElse: false
+#  IndentBraces: false
+#}
+
+#BreakBeforeBinaryOperators: BOS_NonAssignment
+#BreakBeforeInheritanceComma: true #? #too new...
 BreakBeforeTernaryOperators: true
-BreakConstructorInitializersBeforeComma: false
-BreakBeforeBraces: Allman
-BinPackParameters: false
-ConstructorInitializerAllOnOneLineOrOnePerLine: true
-Cpp11BracedListStyle: true
+#BreakConstructorInitializersBeforeComma: true ?
+#BreakStringLiterals: false #safety #too new...
+ColumnLimit: 0
+#CommentPragmas
+ConstructorInitializerAllOnOneLineOrOnePerLine: true #?
+#ConstructorInitializerIndentWidth: #?
+#ContinuationIndentWidth #?
+#FixNamespaceComments: true #too new...
 IndentCaseLabels: false
-
-
-# Spaces
-DerivePointerAlignment: false
-PointerAlignment: Left
-DerivePointerBinding: true
-MaxEmptyLinesToKeep: 2
-SpaceAfterControlStatementKeyword: true
+IndentWidth: 2
+#IndentPPDirectives: true #too new...
+#IndentWrappedFunctionNames ?
+KeepEmptyLinesAtTheStartOfBlocks: false
+#Language: LK_Cpp
+MaxEmptyLinesToKeep: 5
+#NamespaceIndentation: NI_All
+#penalties missing
+#PointerAlignment: PAS_Middle
+ReflowComments: false
+SortIncludes: false #safety
+SpaceAfterCStyleCast: false
 SpaceBeforeAssignmentOperators: true
+#SpaceBeforeParens: SBPO_Never
 SpaceInEmptyParentheses: false
 SpacesBeforeTrailingComments: 1
 SpacesInAngles: false
 SpacesInCStyleCastParentheses: false
-SpacesInCStyleCastParentheses: false
+SpacesInContainerLiterals: false
 SpacesInParentheses: false
-#SpacesInSquareBrackets: false
-UseTab: Never
-ConstructorInitializerIndentWidth: 2
-AccessModifierOffset: -4
-
-
-# Comments
-FixNamespaceComments: false
-AlignTrailingComments: true
-CommentPragmas: '!Api.*'
+SpacesInSquareBrackets: false
+#Standard: LS_Cpp11
+#UseTab: UT_Never

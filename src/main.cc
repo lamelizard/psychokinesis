@@ -1,10 +1,9 @@
 #include "Game.hh"
 
-int main()
-{
-    Game game;
+int main() {
+  Game game;
 
-    game.run();
+  game.run();
 
-    return 0;
+  return 0;
 }
