@@ -18,7 +18,9 @@ class Game : public glow::glfw::GlfwApp {
 private:
   bool mJumps = false;
   bool mJumpWasPressed = false; // last frame
-  float mCubeSize = 1.0f;
+  int HP = 5;
+
+
 
   //glm::vec3 mSpherePosition = {2, 0, 0};
   //float mSphereSize = 1.0f;

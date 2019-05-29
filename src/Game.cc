@@ -48,7 +48,8 @@ struct Health {
 
 enum Mode {
   normal = 0,
-  test = 1
+  drawn = 1,
+  renme = 2 // rename me
 };
 
 struct ModeArea {
@@ -71,6 +72,7 @@ btTransform bttransform(const glm::vec3 &offset) {
 glm::vec3 getWorldPos(const btTransform &t) {
   return glcast(t.getOrigin());
 }
+glm::vec3 translation(const glm::mat4 &m) { return glm::vec3(m[3]); }
 
 Game::Game() : GlfwApp(Gui::ImGui) {}
 
@@ -184,7 +186,7 @@ void Game::init() {
     ground->setWorldTransform(bttransform(glm::vec3(0, -5, 0)));
     dynamicsWorld->addRigidBody(ground);
 
-    colBox = make_unique<btBoxShape>(btVector3(mCubeSize / 2, mCubeSize / 2, mCubeSize / 2)); // half extend
+    colBox = make_unique<btBoxShape>(btVector3(0.5, 0.5, 0.5)); // half extend
   }
 
   // player
@@ -226,7 +228,7 @@ void Game::init() {
   // test mode area
   {
     auto entity = ex.entities.create();
-    entity.assign<ModeArea>(ModeArea{test, {10, 0, 10}, 5});
+    entity.assign<ModeArea>(ModeArea{drawn, {10, 0, 10}, 5});
   }
 }
 
@@ -271,7 +273,7 @@ void Game::update(float elapsedSeconds) {
     auto maxSpeed = 3;
     auto forceLength = 5;
     // handle slowdown
-    if (playerModes.count(test))
+    if (playerModes.count(drawn))
       maxSpeed = 1;
 
     bool jumpPressed = isKeyPressed(GLFW_KEY_SPACE);
@@ -544,14 +546,36 @@ void Game::drawCubes(glow::UsedProgram shader) {
   models.reserve(3000);
   auto cubeHandle = entityx::ComponentHandle<Cube>();
   auto cubeEntities = ex.entities.entities_with_components(cubeHandle);
+
+  vector<ModeArea> scaleAreas;
+  {
+    auto area = entityx::ComponentHandle<ModeArea>();
+    for (auto entity : ex.entities.entities_with_components(area))
+      if (area->mode == drawn)
+        scaleAreas.push_back(*area.get());
+  }
+
+
   for (entityx::Entity entity : cubeEntities) {
-    auto motionState = *entity.component<defMotionState>().get();
-    btTransform trans;
-    motionState->getWorldTransform(trans);
     glm::mat4x4 modelCube;
-    static_assert(sizeof(AttMat) == sizeof(glm::mat4x4), "bwah");
-    trans.getOpenGLMatrix(glm::value_ptr(modelCube));
-    modelCube *= glm::scale(glm::vec3(mCubeSize / 2)); // cube.obj has size 2
+    {
+      auto motionState = *entity.component<defMotionState>().get();
+      btTransform trans;
+      motionState->getWorldTransform(trans);
+      static_assert(sizeof(AttMat) == sizeof(glm::mat4x4), "bwah");
+      trans.getOpenGLMatrix(glm::value_ptr(modelCube));
+    }
+    modelCube *= glm::scale(glm::vec3(0.5)); // cube.obj has size 2
+    //scale down in an mode
+    //TODO change mode
+    {
+      auto trans = translation(modelCube);
+      for (const auto &area : scaleAreas) {
+        auto distanceFactor = (glm::distance(area.pos, trans) / area.radius);
+        if (distanceFactor < 1)
+          modelCube *= glm::scale(glm::vec3((1 - distanceFactor) * 0.05 + 0.95));
+      }
+    }
     models.push_back(modelCube);
   }
 
@@ -565,18 +589,7 @@ void Game::drawCubes(glow::UsedProgram shader) {
 // Update the GUI
 void Game::onGui() {
   if (ImGui::Begin("GameDev Project SS19")) {
-    ImGui::Text("Objects :");
-    {
-      ImGui::Indent();
-      ImGui::SliderFloat("Cube Size", &mCubeSize, 0.0f, 10.0f);
-      ImGui::Unindent();
-    }
-
-    ImGui::Spacing();
-    ImGui::Separator();
-    ImGui::Spacing();
-
-    ImGui::Text("Graphics Settings:");
+    ImGui::Text("Settings:");
     {
       ImGui::Indent();
       ImGui::Checkbox("Show Wireframe", &mShowWireframe);

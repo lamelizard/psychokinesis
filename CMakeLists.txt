@@ -89,6 +89,9 @@ option(BUILD_BULLET3 "" OFF)
 include_directories(extern/bullet/src)
 add_subdirectory(extern/bullet/src)
 
+# Add SoLoud
+add_subdirectory(extern/soloud)
+
 # Add Assimp
 option(ASSIMP_BUILD_ZLIB "" ON)
 option(ASSIMP_BUILD_ASSIMP_TOOLS "" OFF)
@@ -116,6 +119,7 @@ foreach(TARGET_NAME
     BulletSoftBody
     LinearMath
     assimp
+	soloud
     IrrXML
     zlibstatic
     )
