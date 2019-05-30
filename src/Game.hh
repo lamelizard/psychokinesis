@@ -12,6 +12,7 @@
 
 #include "assimpModel.hh"
 
+#include <soloud.h>
 
 class Game : public glow::glfw::GlfwApp {
   // logic
@@ -89,6 +90,12 @@ private:
   glow::SharedFramebuffer mFramebufferLight;
 
   std::vector<glow::SharedTextureRectangle> mTargets;
+
+
+  // Sound
+private:
+  std::unique_ptr<SoLoud::Soloud, void (*)(SoLoud::Soloud *)> soloud = //
+      std::unique_ptr<SoLoud::Soloud, void (*)(SoLoud::Soloud *)>(nullptr, [](SoLoud::Soloud *) {});
 
   // EntityX
 private:

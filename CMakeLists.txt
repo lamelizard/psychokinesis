@@ -91,6 +91,7 @@ add_subdirectory(extern/bullet/src)
 
 # Add SoLoud
 add_subdirectory(extern/soloud)
+include_directories(extern/soloud/src/include)
 
 # Add Assimp
 option(ASSIMP_BUILD_ZLIB "" ON)
@@ -155,6 +156,7 @@ target_link_libraries(${PROJECT_NAME} PUBLIC
     BulletCollision
     LinearMath
     assimp
+	soloud
 )
 
 # Compile flags

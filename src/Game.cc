@@ -31,6 +31,8 @@
 
 #include "load_mesh.hh" // helper function for loading .obj into VertexArrays
 
+#include <soloud_speech.h>
+
 GLOW_SHARED(class, btRigidBody);
 GLOW_SHARED(class, btMotionState);
 using defMotionState = std::shared_ptr<btDefaultMotionState>;
@@ -184,6 +186,24 @@ void Game::init() {
 
     // mTexBeholderAlbedo = glow::Texture2D::createFromFile("../data/textures/beholder.png", glow::ColorSpace::sRGB);
     // beholderModel = AssimpModel::load("../data/models/beholder/beholder.gltf");
+  }
+
+  // Sound
+  {
+    soloud = unique_ptr<SoLoud::Soloud, void (*)(SoLoud::Soloud *)>(
+        ([]() -> SoLoud::Soloud * {
+          auto s = new SoLoud::Soloud;
+          if (s->init() == SoLoud::SO_NO_ERROR)
+            return s;
+          glow::log(glow::LogLevel::Error) << "could not init sound subsystem";
+          if (s->init(SoLoud::Soloud::CLIP_ROUNDOFF, SoLoud::Soloud::NULLDRIVER, 44100, 16384, 2) == SoLoud::SO_NO_ERROR)
+            return s;
+          throw std::exception("big problems in sound subsystem");
+        })(),
+        [](SoLoud::Soloud *s) { s->deinit(); delete s; });
+    assert(soloud);
+    if (soloud->getBackendString())
+      glow::log() << "audio backend: " << soloud->getBackendString();
   }
 
   // initialize Bullet
@@ -641,6 +661,7 @@ bool Game::onKey(int key, int scancode, int action, int mods) {
   glow::glfw::GlfwApp::onKey(key, scancode, action, mods);
 
   // fullscreen = Alt + Enter
+  //TODO seems like vsync is of in fullscreen
   if (action == GLFW_PRESS && key == GLFW_KEY_ENTER)
     if (isKeyPressed(GLFW_KEY_LEFT_ALT) || isKeyPressed(GLFW_KEY_RIGHT_ALT))
       toggleFullscreen();
