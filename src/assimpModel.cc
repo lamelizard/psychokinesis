@@ -27,12 +27,12 @@ static glm::vec4 aiCast(aiColor4D const &v) {
 }
 
 static glm::mat4 aiCast(aiMatrix4x4 const &v) {
-  return glm::mat4(           //
+  return glm::transpose(glm::mat4(           //
       v.a1, v.a2, v.a3, v.a4, //
       v.b1, v.b2, v.b3, v.b4, //
       v.c1, v.c2, v.c3, v.c4, //
       v.d1, v.d2, v.d3, v.d4  //
-  );
+  ));
 }
 
 // mostly from glow-extras:
@@ -88,20 +88,28 @@ void AssimpModel::draw(const glow::UsedProgram &shader, double t, bool loop, con
     else
       transform = parent * thisNode->mTransformation; // node not animated
 
-    // debug
-    if (thisNode != scene->mRootNode) {
+    // debug, draw skeleton
+    /*if (thisNode != scene->mRootNode) {
       aiVector3D parentPos, pos, scal;
       aiQuaternion rot;
       parent.Decompose(scal, rot, parentPos);
       transform.Decompose(scal, rot, pos);
       debugRenderer.renderLine(aiCast(parentPos), aiCast(pos));
-    }
+    }*/
 
     // test
     //auto test = aiMatrix4x4(1, 0, 0, 0, 0, 0, 1, 0, 0, -1, 0, 0, 0, 0, 0, 1);
 
-    if (boneIDOfNode.count(thisNode) == 1) // the node's a bone
-      boneArray[boneIDOfNode[thisNode]] = aiCast(globalInverse * /*aiMatrix4x4::RotationX(-90, aiMatrix4x4()) **/ transform * offsetOfNode[thisNode]);
+
+    if (boneIDOfNode.count(thisNode) == 1) { // the node's a bone
+      glm::mat4 boneMat = aiCast(globalInverse * /*aiMatrix4x4::RotationX(-90, aiMatrix4x4()) **/ transform * offsetOfNode[thisNode]);
+      //boneMat = glm::transpose(boneMat); 
+           for (int i = 0; i < 3; i++)// test
+        boneMat[3][i] /= 100;
+      boneArray[boneIDOfNode[thisNode]] = boneMat;
+
+    } 
+      
 
     for (auto i = 0u; i < thisNode->mNumChildren; i++)
       fillArray(thisNode->mChildren[i], transform, fillArray);

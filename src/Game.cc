@@ -138,7 +138,7 @@ void Game::init() {
     // color textures are usually sRGB and data textures Linear
     mTexCubeAlbedo = glow::Texture2D::createFromFile(texPath + "cube.albedo.png", glow::ColorSpace::sRGB);
     mTexCubeNormal = glow::Texture2D::createFromFile(texPath + "cube.normal.png", glow::ColorSpace::Linear);
-    mTexDefNormal = glow::Texture2D::createFromFile(texPath + "normal.png", glow::ColorSpace::Linear);
+    //mTexDefNormal = glow::Texture2D::createFromFile(texPath + "normal.png", glow::ColorSpace::Linear);
     //bg
     {
       //from rtglive
@@ -181,8 +181,8 @@ void Game::init() {
 
     // Models
     mShaderMech = glow::Program::createFromFile("../data/shaders/mech");
-    // mTexMechAlbedo = glow::Texture2D::createFromFile("../data/textures/mech.albedo.png", glow::ColorSpace::sRGB);
-    // mTexMechNormal = glow::Texture2D::createFromFile("../data/textures/mech.normal.png", glow::ColorSpace::Linear);
+    mTexMechAlbedo = glow::Texture2D::createFromFile("../data/textures/mech.albedo.png", glow::ColorSpace::sRGB);
+    mTexMechNormal = glow::Texture2D::createFromFile("../data/textures/mech.normal.png", glow::ColorSpace::Linear);
     mechModel = AssimpModel::load("../data/models/mech/mech.fbx");
 
     // mTexBeholderAlbedo = glow::Texture2D::createFromFile("../data/textures/beholder.png", glow::ColorSpace::sRGB);
@@ -344,13 +344,13 @@ void Game::update(float elapsedSeconds) {
     {
       // reldir = dir without camera
       glm::vec3 relDir;
-      if (isKeyPressed(GLFW_KEY_LEFT))
+      if (isKeyPressed(GLFW_KEY_LEFT) || (isKeyPressed(GLFW_KEY_A) && !mFreeCamera))
         relDir.x -= 1;
-      if (isKeyPressed(GLFW_KEY_RIGHT))
+      if (isKeyPressed(GLFW_KEY_RIGHT) || (isKeyPressed(GLFW_KEY_D) && !mFreeCamera))
         relDir.x += 1;
-      if (isKeyPressed(GLFW_KEY_UP))
+      if (isKeyPressed(GLFW_KEY_UP) || (isKeyPressed(GLFW_KEY_W) && !mFreeCamera))
         relDir.z += 1;
-      if (isKeyPressed(GLFW_KEY_DOWN))
+      if (isKeyPressed(GLFW_KEY_DOWN) || (isKeyPressed(GLFW_KEY_S) && !mFreeCamera))
         relDir.z -= 1;
 
       if (glm::length(relDir) > .1f)
@@ -459,8 +459,8 @@ void Game::render(float elapsedSeconds) {
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
     drawCubes(mShaderCubePrepass->use());
-    if (mDrawMech)
-      drawMech(mShaderMech->use(), elapsedSeconds);
+
+    drawMech(mShaderMech->use(), elapsedSeconds);
 
     if (mDebugBullet) {
       GLOW_SCOPED(disable, GL_DEPTH_TEST);
@@ -482,8 +482,8 @@ void Game::render(float elapsedSeconds) {
     glClear(GL_COLOR_BUFFER_BIT | GL_STENCIL_BUFFER_BIT);
 
     drawCubes(mShaderCube->use());
-    if (mDrawMech)
-      drawMech(mShaderMech->use(), elapsedSeconds);
+
+    drawMech(mShaderMech->use(), elapsedSeconds);
 
     // Render Bullet Debug
     if (mDebugBullet) {
@@ -578,20 +578,20 @@ void Game::drawMech(glow::UsedProgram shader, float elapsedSeconds) {
 
   glm::mat4 modelMech;                                                        // glm::translate(mSpherePosition) * glm::scale(glm::vec3(mSphereSize));
   modelMech = glm::rotate(modelMech, glm::radians(90.f), glm::vec3(1, 0, 0)); // unity?
-  // modelMech = glm::mat4();
+  modelMech = glm::mat4();
   shader.setUniform("uProj", proj);
   shader.setUniform("uView", view);
   shader.setUniform("uModel", modelMech);
 
-  // shader.setTexture("uTexAlbedo", mTexMechAlbedo);
-  // shader.setTexture("uTexNormal", mTexMechNormal);
-  shader.setTexture("uTexAlbedo", mTexDefNormal);
-  shader.setTexture("uTexNormal", mTexDefNormal);
+  shader.setTexture("uTexAlbedo", mTexMechAlbedo);
+  shader.setTexture("uTexNormal", mTexMechNormal);
+  //shader.setTexture("uTexAlbedo", mTexDefNormal);
+  //shader.setTexture("uTexNormal", mTexDefNormal);
 
   static auto timer = 0;
   timer += elapsedSeconds;
   // mechModel->draw(shader, timer, true, "WalkInPlace");
-  mechModel->draw(shader, debugTime, true, "WalkInPlace");
+  mechModel->draw(shader, debugTime, true, "Hit"); //"WalkInPlace");
   // skeleton
   mechModel->debugRenderer.render(proj * view * glm::scale(glm::vec3(0.01)));
 }
@@ -660,12 +660,12 @@ void Game::onGui() {
       ImGui::Indent();
       ImGui::Checkbox("Show Wireframe", &mShowWireframe);
       ImGui::Checkbox("Debug Bullet", &mDebugBullet);
-      ImGui::Checkbox("Show Mech", &mDrawMech);
+      //ImGui::Checkbox("Show Mech", &mDrawMech);
       ImGui::Checkbox("free Camera", &mFreeCamera);
       ImGui::ColorEdit3("Background Color", &mBackgroundColor.r);
       ImGui::Unindent();
     }
-    ImGui::SliderFloat("mechtime", &debugTime, 0.0, 2.0);
+    ImGui::SliderFloat("mechtime", &debugTime, 0.0, 5.0);
   }
   ImGui::End();
 #endif
@@ -751,7 +751,7 @@ void Game::updateCamera(float elapsedSeconds) {
       auto mouse_delta = input().getLastMouseDelta() / 100.0f;
       if (mouse_delta.x < 1000) // ???
         mCamera->handle.orbit(mouse_delta.x, mouse_delta.y);
-     
+
       auto pos = mCamera->handle.getPosition();
       //pos.y = std::max(0.1f, pos.y);
       //mCamera->handle.setPosition(pos);

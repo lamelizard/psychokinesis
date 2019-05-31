@@ -19,8 +19,11 @@ void main()
 {
 
     vec4 iPosition = vec4(aPosition, 1);
-    iPosition.z = aPosition.y;
-    iPosition.y = -aPosition.z;
+    //unity fix
+    iPosition.z = -aPosition.y;
+    iPosition.y = aPosition.z;
+    
+
     vec4 pos = (uBones[aBoneIDs.x] * iPosition) * aBoneWeights.x   //
                + (uBones[aBoneIDs.y] * iPosition) * aBoneWeights.y //
                + (uBones[aBoneIDs.z] * iPosition) * aBoneWeights.z //
