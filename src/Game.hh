@@ -13,6 +13,7 @@
 #include "assimpModel.hh"
 
 #include <soloud.h>
+#include <soloud_wavstream.h>
 
 class Game : public glow::glfw::GlfwApp {
   // logic
@@ -94,8 +95,10 @@ private:
 
   // Sound
 private:
-  std::unique_ptr<SoLoud::Soloud, void (*)(SoLoud::Soloud *)> soloud = //
+    std::unique_ptr<SoLoud::Soloud, void (*)(SoLoud::Soloud *)> soloud = //
       std::unique_ptr<SoLoud::Soloud, void (*)(SoLoud::Soloud *)>(nullptr, [](SoLoud::Soloud *) {});
+  SoLoud::WavStream music;
+  SoLoud::handle musicHandle;
 
   // EntityX
 private:

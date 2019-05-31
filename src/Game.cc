@@ -1,6 +1,7 @@
 #include "Game.hh"
 
 #include <set>
+#include <algorithm>
 
 #include <glm/ext.hpp>
 
@@ -204,6 +205,13 @@ void Game::init() {
     assert(soloud);
     if (soloud->getBackendString())
       glow::log() << "audio backend: " << soloud->getBackendString();
+    //bg music
+    {
+      music.load("../data/sounds/heroic_demise_loop.ogg");
+      music.setLooping(true);
+      musicHandle = soloud->playBackground(music, 0);
+      soloud->fadeVolume(musicHandle, 1, 30);
+    }
   }
 
   // initialize Bullet
@@ -268,6 +276,8 @@ void Game::init() {
     auto entity = ex.entities.create();
     entity.assign<ModeArea>(ModeArea{drawn, {10, 0, 10}, 5});
   }
+
+  dynamicsWorld->stepSimulation(1. / 60);
 }
 
 entityx::Entity Game::createCube(const glm::ivec3 &pos) {
@@ -311,8 +321,21 @@ void Game::update(float elapsedSeconds) {
     auto maxSpeed = 3;
     auto forceLength = 5;
     // handle slowdown
-    if (playerModes.count(drawn))
-      maxSpeed = 1;
+    {
+      static bool musicSlow = true;
+      if (playerModes.count(drawn)) {
+        maxSpeed = 1;
+        if (!musicSlow) {
+          musicSlow = true;
+          soloud->fadeRelativePlaySpeed(musicHandle, 0.7, 2);
+        }
+      } else if (musicSlow) {
+        musicSlow = false;
+        soloud->fadeRelativePlaySpeed(musicHandle, 1, 2);
+      }
+    }
+
+
 
     bool jumpPressed = isKeyPressed(GLFW_KEY_SPACE);
 
@@ -630,6 +653,7 @@ void Game::drawCubes(glow::UsedProgram shader) {
 
 // Update the GUI
 void Game::onGui() {
+#ifndef NDEBUG
   if (ImGui::Begin("GameDev Project SS19")) {
     ImGui::Text("Settings:");
     {
@@ -644,6 +668,7 @@ void Game::onGui() {
     ImGui::SliderFloat("mechtime", &debugTime, 0.0, 2.0);
   }
   ImGui::End();
+#endif
 }
 
 // Called when window is resized
@@ -691,32 +716,48 @@ void Game::updateCamera(float elapsedSeconds) {
     // left shift -> more speed
     if (isKeyPressed(GLFW_KEY_LEFT_SHIFT))
       rel_move *= 5.0f;
+
+    // Look around
+    bool leftMB = isMouseButtonPressed(GLFW_MOUSE_BUTTON_LEFT);
+    bool rightMB = isMouseButtonPressed(GLFW_MOUSE_BUTTON_RIGHT);
+
+    if ((leftMB || rightMB) && !ImGui::GetIO().WantCaptureMouse) {
+      // hide mouse
+      setCursorMode(glow::glfw::CursorMode::Disabled);
+
+      auto mouse_delta = input().getLastMouseDelta() / 100.0f;
+
+      if (leftMB && rightMB)
+        rel_move += glm::vec3(mouse_delta.x, 0, mouse_delta.y);
+      else if (leftMB)
+        mCamera->handle.orbit(mouse_delta.x, mouse_delta.y);
+      else if (rightMB)
+        mCamera->handle.lookAround(mouse_delta.x, mouse_delta.y);
+    } else
+      setCursorMode(glow::glfw::CursorMode::Normal);
+
+    // move camera handle (position), accepts relative moves
+    mCamera->handle.move(rel_move);
   } else {
-    mCamera->handle.setTarget(glcast(bulPlayer->getWorldTransform().getOrigin()));
-  }
-
-
-  // Look around
-  bool leftMB = isMouseButtonPressed(GLFW_MOUSE_BUTTON_LEFT);
-  bool rightMB = isMouseButtonPressed(GLFW_MOUSE_BUTTON_RIGHT);
-
-  if ((leftMB || rightMB) && !ImGui::GetIO().WantCaptureMouse) {
-    // hide mouse
+#ifdef NDEBUG
     setCursorMode(glow::glfw::CursorMode::Disabled);
+#endif
+    glm::vec3 target = glcast(bulPlayer->getWorldTransform().getOrigin());
+    mCamera->handle.setTarget(target);
+    mCamera->handle.setTargetDistance(5);
 
-    auto mouse_delta = input().getLastMouseDelta() / 100.0f;
 
-    if (leftMB && rightMB)
-      rel_move += glm::vec3(mouse_delta.x, 0, mouse_delta.y);
-    else if (leftMB)
-      mCamera->handle.orbit(mouse_delta.x, mouse_delta.y);
-    else if (rightMB)
-      mCamera->handle.lookAround(mouse_delta.x, mouse_delta.y);
-  } else
-    setCursorMode(glow::glfw::CursorMode::Normal);
-
-  // move camera handle (position), accepts relative moves
-  mCamera->handle.move(rel_move);
+    if (!ImGui::GetIO().WantCaptureMouse) {
+      auto mouse_delta = input().getLastMouseDelta() / 100.0f;
+      if (mouse_delta.x < 1000) // ???
+        mCamera->handle.orbit(mouse_delta.x, mouse_delta.y);
+     
+      auto pos = mCamera->handle.getPosition();
+      //pos.y = std::max(0.1f, pos.y);
+      //mCamera->handle.setPosition(pos);
+      mCamera->handle.move(glm::vec3(0, std::max(.0, 0.1 - pos.y), 0));
+    }
+  }
 
   // Camera is smoothed
   mCamera->update(elapsedSeconds);
