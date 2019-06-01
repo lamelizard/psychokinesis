@@ -13,6 +13,7 @@
 #include <glow/objects/Framebuffer.hh>
 #include <glow/objects/Program.hh>
 #include <glow/objects/Texture2D.hh>
+#include <glow/objects/Texture2DArray.hh>
 #include <glow/objects/TextureRectangle.hh>
 #include <glow/objects/VertexArray.hh>
 #include <glow/objects/TextureCubeMap.hh>
@@ -30,10 +31,12 @@
 #include <glm/glm.hpp> // math library
 
 #include <assimp/DefaultLogger.hpp>
+#include "assimpModel.hh"
 
 #include "load_mesh.hh" // helper function for loading .obj into VertexArrays
-
 #include <soloud_speech.h>
+
+#include "conversion.hh"
 
 GLOW_SHARED(class, btRigidBody);
 GLOW_SHARED(class, btMotionState);
@@ -49,10 +52,6 @@ struct Cube {
   glm::ivec3 pos;
 };
 
-struct Health {
-  int amount = 10;
-};
-
 enum Mode {
   normal = 0,
   drawn = 1,
@@ -65,22 +64,6 @@ struct ModeArea {
   float radius;
 };
 
-glm::vec3 glcast(const btVector3 &v) {
-  return glm::vec3(v.x(), v.y(), v.z());
-}
-btVector3 btcast(const glm::vec3 &v) {
-  return btVector3(v.x, v.y, v.z);
-}
-btTransform bttransform(const glm::vec3 &offset) {
-  auto identity = btMatrix3x3();
-  identity.setIdentity();
-  return btTransform(identity, btcast(offset));
-}
-glm::vec3 getWorldPos(const btTransform &t) {
-  return glcast(t.getOrigin());
-}
-glm::vec3 translation(const glm::mat4 &m) { return glm::vec3(m[3]); }
-
 Game::Game() : GlfwApp(Gui::ImGui) {}
 
 void Game::init() {
@@ -91,7 +74,7 @@ void Game::init() {
   // IMPORTANT: call to base class
   GlfwApp::init();
 
-  setTitle("Game Development 2019");
+  setTitle("Game Development 2019 TODO change ME");
 
   // start assimp logging
   Assimp::DefaultLogger::create();
@@ -146,24 +129,29 @@ void Game::init() {
       const string mechAlbedoFN = texPath + "mech.albedo.png";
       const string mechNormalFN = texPath + "mech.normal.png";
       const string mechModelFN = "../data/models/mech/mech.fbx";
+      const string healthBarFn = texPath + "ui/Health bar";
 
       //loading async
-      const auto policy = std::launch::deferred; // TODO, why does this break with async
+      const auto policy = launch::deferred; // TODO, why does this break with async
       //todo glow::TextureData::createFromFile creates warnings?
 
-      auto cubeAlbedoData = std::async(policy, glow::TextureData::createFromFile, cubeAlbedoFN, glow::ColorSpace::sRGB);
-      auto cubeNormalData = std::async(policy, glow::TextureData::createFromFile, cubeNormalFN, glow::ColorSpace::Linear);
-      auto bgData = std::async(policy, glow::TextureData::createFromFileCube, //
-                               bgPath + "right.png",                          //
-                               bgPath + "left.png",                           //
-                               bgPath + "top.png",                            //
-                               bgPath + "bottom.png",                         //
-                               bgPath + "front.png",                          //
-                               bgPath + "back.png",                           //
-                               glow::ColorSpace::sRGB);
-      auto mechAlbedoData = std::async(policy, glow::TextureData::createFromFile, mechAlbedoFN, glow::ColorSpace::sRGB);
-      auto mechNormalData = std::async(policy, glow::TextureData::createFromFile, mechNormalFN, glow::ColorSpace::Linear);
-      auto mechModelData = std::async(policy, AssimpModel::load, mechModelFN);
+      auto cubeAlbedoData = async(policy, glow::TextureData::createFromFile, cubeAlbedoFN, glow::ColorSpace::sRGB);
+      auto cubeNormalData = async(policy, glow::TextureData::createFromFile, cubeNormalFN, glow::ColorSpace::Linear);
+      auto bgData = async(policy, glow::TextureData::createFromFileCube, //
+                          bgPath + "right.png",                          //
+                          bgPath + "left.png",                           //
+                          bgPath + "top.png",                            //
+                          bgPath + "bottom.png",                         //
+                          bgPath + "front.png",                          //
+                          bgPath + "back.png",                           //
+                          glow::ColorSpace::sRGB);
+      auto mechAlbedoData = async(policy, glow::TextureData::createFromFile, mechAlbedoFN, glow::ColorSpace::sRGB);
+      auto mechNormalData = async(policy, glow::TextureData::createFromFile, mechNormalFN, glow::ColorSpace::Linear);
+      auto mechModelData = async(policy, AssimpModel::load, mechModelFN);
+      future<glow::SharedTextureData> healthBarData[MAX_HEALTH + 1];
+      for (int i = 0; i <= MAX_HEALTH; i++)
+        healthBarData[i] = std::async(policy, glow::TextureData::createFromFile, healthBarFn + to_string(i) + ".png", glow::ColorSpace::sRGB);
+
 
       //into GL
       mTexCubeAlbedo = glow::Texture2D::createFromData(cubeAlbedoData.get());
@@ -172,12 +160,23 @@ void Game::init() {
       mTexCubeNormal->setObjectLabel(cubeNormalFN);
       mSkybox = glow::TextureCubeMap::createFromData(bgData.get());
       mSkybox->setObjectLabel(bgPath);
-      mTexMechAlbedo = glow::Texture2D::createFromData(mechAlbedoData.get());
-      mTexMechAlbedo->setObjectLabel(mechAlbedoFN);
-      mTexMechNormal = glow::Texture2D::createFromData(mechNormalData.get());
-      mTexMechNormal->setObjectLabel(mechNormalFN);
+      mechPlayer.texAlbedo = glow::Texture2D::createFromData(mechAlbedoData.get());
+      mechPlayer.texAlbedo->setObjectLabel(mechAlbedoFN);
+      mechPlayer.texNormal = glow::Texture2D::createFromData(mechNormalData.get());
+      mechPlayer.texNormal->setObjectLabel(mechNormalFN);
+      //temp, TODO
+      mechSmall.texAlbedo = mechPlayer.texAlbedo;
+      mechSmall.texNormal = mechPlayer.texNormal;
+      mechBig.texAlbedo = mechPlayer.texAlbedo;
+      mechBig.texNormal = mechPlayer.texNormal;
+
+      for (int i = 0; i <= MAX_HEALTH; i++) {
+        mHealthBar[i] = glow::Texture2D::createFromData(healthBarData[i].get());
+        mHealthBar[i]->setObjectLabel(healthBarFn);
+      }
+
       //not into GL yet, could change
-      mechModel = mechModelData.get();
+      Mech::mesh = mechModelData.get();
 
       //mTexDefNormal = glow::Texture2D::createFromFile(texPath + "normal.png", glow::ColorSpace::Linear);
     }
@@ -243,50 +242,86 @@ void Game::init() {
     dynamicsWorld->setDebugDrawer(bulletDebugger.get());
 
     // ground
-    btCollisionShape *groundShape = new btBoxShape(btVector3(btScalar(50.), btScalar(2.), btScalar(50.))); // lost memory
-    btRigidBody::btRigidBodyConstructionInfo rbInfo(0., nullptr, groundShape, btVector3(0, 0, 0));
-    auto ground = new btRigidBody(rbInfo);
+    /*btCollisionShape *groundShape = new btBoxShape(btVector3(btScalar(50.), btScalar(2.), btScalar(50.))); // lost memory
+    btRigidBody::btRigidBodyConstructionInfo rbInfo(0., nullptr, groundShape);
+    auto ground = new btGhostObject(rbInfo);
     ground->setWorldTransform(bttransform(glm::vec3(0, -5, 0)));
     dynamicsWorld->addRigidBody(ground);
+    */
 
-    colBox = make_unique<btBoxShape>(btVector3(0.5, 0.5, 0.5)); // half extend
+    // mechs
+    {
+      //player
+      mechPlayer.type = Mech::player;
+      mechPlayer.moveDir = glm::vec3(0, 0, 1);
+      mechPlayer.viewDir = glm::vec3(0, 0, 1);
+      mechPlayer.scale = .2;
+      //TODO change y offset if capsule floats again
+      mechPlayer.meshOffset = glm::vec3(0, -0.5, -0.3); // starting to hardcode everything, assuming that I don't ever need to change stuff
+      mechPlayer.collision = make_shared<btCapsuleShape>(0.4, 1);
+      mechPlayer.motionState = make_shared<btDefaultMotionState>(bttransform(glm::vec3(0, 7, -10))); // fall down in an epic way
+      mechPlayer.rigid = make_shared<btRigidBody>(btRigidBody::btRigidBodyConstructionInfo(1.f, mechPlayer.motionState.get(), mechPlayer.collision.get()));
+      mechPlayer.rigid->setAngularFactor(0);
+      mechPlayer.rigid->setCustomDebugColor(btVector3(255, 1, 1));
+      dynamicsWorld->addRigidBody(mechPlayer.rigid.get());
+      //small
+      mechSmall.type = Mech::small;
+      mechSmall.moveDir = glm::vec3(0, 0, -1);
+      mechSmall.viewDir = glm::vec3(0, 0, -1);
+      mechSmall.scale = 1;
+      mechSmall.meshOffset = glm::vec3(0, -2.5, -1.5);
+      mechSmall.collision = make_shared<btCapsuleShape>(2, 5);
+      mechSmall.motionState = make_shared<btDefaultMotionState>(bttransform(glm::vec3(0, 2, 20))); //?
+      mechSmall.rigid = make_shared<btRigidBody>(btRigidBody::btRigidBodyConstructionInfo(0, mechSmall.motionState.get(), mechSmall.collision.get()));
+      mechSmall.rigid->setAngularFactor(0);
+      mechSmall.rigid->setCustomDebugColor(btVector3(255, 1, 1));
+      mechSmall.rigid->setCollisionFlags(mechSmall.rigid->getCollisionFlags() | btCollisionObject::CF_KINEMATIC_OBJECT);
+      dynamicsWorld->addRigidBody(mechSmall.rigid.get());
+      //big
+      mechBig.type = Mech::big;
+      mechBig.moveDir = glm::vec3(0, 0, -1);
+      mechBig.viewDir = glm::vec3(0, 0, -1);
+      mechBig.scale = 30;
+      mechBig.collision = make_shared<btCapsuleShape>(1, 4); //no collisions
+      mechBig.motionState = make_shared<btDefaultMotionState>(bttransform(glm::vec3(0, -500, 0)));
+      mechBig.rigid = make_shared<btRigidBody>(btRigidBody::btRigidBodyConstructionInfo(0, mechBig.motionState.get(), mechBig.collision.get()));
+      mechBig.rigid->setAngularFactor(0);
+      mechBig.rigid->setCustomDebugColor(btVector3(255, 1, 1));
+      mechBig.rigid->setCollisionFlags(mechBig.rigid->getCollisionFlags() | btCollisionObject::CF_KINEMATIC_OBJECT);
+      dynamicsWorld->addRigidBody(mechBig.rigid.get());
+    }
+
+    //boxes
+    {
+      colBox = make_shared<btBoxShape>(btVector3(0.5, 0.5, 0.5)); // half extend
+      // create world
+      // floor
+      {
+        auto y = -colBox->getHalfExtentsWithMargin().getY(); // floor is y = 0
+        for (auto x = 0; x < CUBES_TOTAL; x++)
+          for (auto z = 0; z < CUBES_TOTAL; z++)
+            ground[x][z] = createCube(glm::vec3(x + CUBES_MIN, y, z + CUBES_MIN));
+      }
+
+      // pillars
+      {
+         int i = 0;
+        for (auto x = CUBES_MIN + 15; x <= CUBES_MAX - 10; x += 20)
+          for (auto z = CUBES_MIN + 15; z <= CUBES_MAX - 10; z += 20) {
+            for (auto yBottom = 0; yBottom <= 5; yBottom++) {
+              auto y = yBottom + colBox->getHalfExtentsWithMargin().getY();
+              pillars[i].push_back(createCube(glm::vec3(x, y, z)));
+              pillars[i].push_back(createCube(glm::vec3(x + 1, y, z)));
+              pillars[i].push_back(createCube(glm::vec3(x, y, z + 1)));
+              pillars[i].push_back(createCube(glm::vec3(x + 1, y, z + 1)));
+            }
+            i++; // new pillar
+          }
+      }
+    }
   }
 
-  // player
-  {
-    auto entity = ex.entities.create();
-    colPlayer = make_unique<btCapsuleShape>(0.25, 1);
-    playerMotionState = make_shared<btDefaultMotionState>(bttransform(glm::vec3(0, 5, 0)));
-    bulPlayer = make_shared<btRigidBody>(btRigidBody::btRigidBodyConstructionInfo(1.f, playerMotionState.get(), colPlayer.get(), btVector3(0, 0, 0)));
-    bulPlayer->setAngularFactor(0);
-    bulPlayer->setCustomDebugColor(btVector3(255, 1, 1));
-    dynamicsWorld->addRigidBody(bulPlayer.get());
-    entity.assign<SharedbtRigidBody>(bulPlayer);
-    entity.assign<defMotionState>(playerMotionState);
-    entity.assign<Health>();
-  }
 
-  // create world
-  // floor
-  {
-    auto y = -colBox->getHalfExtentsWithMargin().getY(); // floor is y = 0
-    for (auto x = cubesWorldMin; x <= cubesWorldMax; x++)
-      for (auto z = cubesWorldMin; z <= cubesWorldMax; z++)
-        createCube(glm::vec3(x, y, z));
-  }
-
-  // pillars
-  {
-    for (auto x = cubesWorldMin + 15; x <= cubesWorldMax - 10; x += 20)
-      for (auto z = cubesWorldMin + 15; z <= cubesWorldMax - 10; z += 20)
-        for (auto yBottom = 0; yBottom <= 5; yBottom++) {
-          auto y = yBottom + colBox->getHalfExtentsWithMargin().getY();
-          createCube(glm::vec3(x, y, z));
-          createCube(glm::vec3(x + 1, y, z));
-          createCube(glm::vec3(x, y, z + 1));
-          createCube(glm::vec3(x + 1, y, z + 1));
-        }
-  }
 
   // test mode area
   {
@@ -294,7 +329,7 @@ void Game::init() {
     entity.assign<ModeArea>(ModeArea{drawn, {10, 0, 10}, 5});
   }
 
-  dynamicsWorld->stepSimulation(1. / 60);
+  //dynamicsWorld->stepSimulation(1. / 60);
 }
 
 entityx::Entity Game::createCube(const glm::ivec3 &pos) {
@@ -315,9 +350,12 @@ void Game::update(float elapsedSeconds) {
   if (elapsedSeconds > 1)
     elapsedSeconds = 1;
 
+  //activate to be sure
+  mechPlayer.rigid->activate();
+  mechSmall.rigid->activate();
+  mechBig.rigid->activate();
 
-  bulPlayer->activate();
-  const auto playerPos = getWorldPos(bulPlayer->getWorldTransform());
+  const auto playerPos = getWorldPos(mechPlayer.rigid->getWorldTransform());
   const auto bulPos = btcast(playerPos);
 
   // modes of player, they change the logic
@@ -335,13 +373,13 @@ void Game::update(float elapsedSeconds) {
   // -> probably should put this in render as well to get the interpolation
   // move character
   {
-    auto maxSpeed = 3;
+    auto maxSpeed = 5;
     auto forceLength = 5;
     // handle slowdown
     {
       static bool musicSlow = true;
       if (playerModes.count(drawn)) {
-        maxSpeed = 1;
+        maxSpeed = 3;
         if (!musicSlow) {
           musicSlow = true;
           soloud->fadeRelativePlaySpeed(musicHandle, 0.7, 2);
@@ -357,7 +395,7 @@ void Game::update(float elapsedSeconds) {
     bool jumpPressed = isKeyPressed(GLFW_KEY_SPACE);
 
 
-    btVector3 force;
+    //movement force
     {
       // reldir = dir without camera
       glm::vec3 relDir;
@@ -385,25 +423,28 @@ void Game::update(float elapsedSeconds) {
         camRight = glm::normalize(camRight);
       }
 
-      force = btcast((relDir.x * camRight + relDir.z * camForward) * forceLength);
+      mechPlayer.viewDir = camForward;
+      auto force = (relDir.x * camRight + relDir.z * camForward) * forceLength;
+      mechPlayer.moveDir = glm::normalize(force);
+      mechPlayer.rigid->applyCentralForce(btcast(force));
     }
-    bulPlayer->applyCentralForce(force);
+    
 
 
     // slow down
     // TODO ice!
-    bulPlayer->setDamping(0.7, 0); //damps y...
+    mechPlayer.rigid->setDamping(0.7, 0); //damps y...
 
 
 
-    auto btSpeed = bulPlayer->getLinearVelocity();
+    auto btSpeed = mechPlayer.rigid->getLinearVelocity();
     auto ySpeed = btSpeed.y();
     btSpeed.setY(0);
     // but what about the forces?
     if (btSpeed.length() > maxSpeed)
       btSpeed = btSpeed.normalize() * maxSpeed;
     btSpeed.setY(ySpeed);
-    bulPlayer->setLinearVelocity(btSpeed);
+    mechPlayer.rigid->setLinearVelocity(btSpeed);
 
     // close to ground?
     bool closeToGround = false;
@@ -411,7 +452,7 @@ void Game::update(float elapsedSeconds) {
     float closeToGroundBorder = 0.3;
     float floatingHeight = 0.25;
     {
-      auto from = bulPos - btVector3(0, colPlayer->getHalfHeight(), 0);
+      auto from = bulPos - btVector3(0, mechPlayer.collision->getHalfHeight(), 0);
 
       auto to = from - btVector3(0, closeToGroundBorder, 0);
       auto closest = btCollisionWorld::ClosestRayResultCallback(from, to);
@@ -425,32 +466,32 @@ void Game::update(float elapsedSeconds) {
     // jumping
     if (closeToGround) {
       // falling + standing
-      if (bulPlayer->getLinearVelocity().y() <= 0.01 /*&& !jumpPressed*/) {
+      if (mechPlayer.rigid->getLinearVelocity().y() <= 0.01 /*&& !jumpPressed*/) {
         mJumps = false;
         // reset y-velocity
-        auto v = bulPlayer->getLinearVelocity();
+        auto v = mechPlayer.rigid->getLinearVelocity();
         v.setY(0);
-        bulPlayer->setLinearVelocity(v);
+        mechPlayer.rigid->setLinearVelocity(v);
         // reset y-position
-        auto t = bulPlayer->getWorldTransform();
+        auto t = mechPlayer.rigid->getWorldTransform();
         auto o = t.getOrigin();
-        o.setY(ground + floatingHeight + colPlayer->getHalfHeight());
+        o.setY(ground + floatingHeight + mechPlayer.collision->getHalfHeight());
         t.setOrigin(o);
-        bulPlayer->setWorldTransform(t);
+        mechPlayer.rigid->setWorldTransform(t);
         // no y-movement anymore!
-        bulPlayer->setLinearFactor(btVector3(1, 0, 1));
+        mechPlayer.rigid->setLinearFactor(btVector3(1, 0, 1));
       }
       // jump
       if (!mJumps && jumpPressed) {
         mJumps = true;
-        bulPlayer->setLinearFactor(btVector3(1, 1, 1));
-        bulPlayer->applyCentralForce(btVector3(0, 300, 0));
+        mechPlayer.rigid->setLinearFactor(btVector3(1, 1, 1));
+        mechPlayer.rigid->applyCentralForce(btVector3(0, 500, 0));
       }
     } else
-      bulPlayer->setLinearFactor(btVector3(1, 1, 1));
+      mechPlayer.rigid->setLinearFactor(btVector3(1, 1, 1));
   }
 
-
+  //update physics
   dynamicsWorld->stepSimulation(elapsedSeconds, 10);
 }
 
@@ -467,6 +508,13 @@ void Game::render(float elapsedSeconds) {
   auto proj = mCamera->getProjectionMatrix();
   auto view = mCamera->getViewMatrix();
 
+  //update animations
+  {
+    mechPlayer.updateTime(elapsedSeconds);
+    mechSmall.updateTime(elapsedSeconds);
+    mechBig.updateTime(elapsedSeconds);
+  }
+
   // Depth
   {
     auto fb = mFramebufferMode->bind();
@@ -477,7 +525,7 @@ void Game::render(float elapsedSeconds) {
 
     drawCubes(mShaderCubePrepass->use());
 
-    drawMech(mShaderMech->use(), elapsedSeconds);
+    drawMech(mShaderMech->use());
 
     if (mDebugBullet) {
       GLOW_SCOPED(disable, GL_DEPTH_TEST);
@@ -500,7 +548,7 @@ void Game::render(float elapsedSeconds) {
 
     drawCubes(mShaderCube->use());
 
-    drawMech(mShaderMech->use(), elapsedSeconds);
+    drawMech(mShaderMech->use());
 
     // Render Bullet Debug
     if (mDebugBullet) {
@@ -589,28 +637,12 @@ void Game::render(float elapsedSeconds) {
   }
 }
 
-void Game::drawMech(glow::UsedProgram shader, float elapsedSeconds) {
-  auto proj = mCamera->getProjectionMatrix();
-  auto view = mCamera->getViewMatrix();
-
-  glm::mat4 modelMech;                                                        // glm::translate(mSpherePosition) * glm::scale(glm::vec3(mSphereSize));
-  modelMech = glm::rotate(modelMech, glm::radians(90.f), glm::vec3(1, 0, 0)); // unity?
-  modelMech = glm::mat4();
-  shader.setUniform("uProj", proj);
-  shader.setUniform("uView", view);
-  shader.setUniform("uModel", modelMech);
-
-  shader.setTexture("uTexAlbedo", mTexMechAlbedo);
-  shader.setTexture("uTexNormal", mTexMechNormal);
-  //shader.setTexture("uTexAlbedo", mTexDefNormal);
-  //shader.setTexture("uTexNormal", mTexDefNormal);
-
-  static auto timer = 0;
-  timer += elapsedSeconds;
-  // mechModel->draw(shader, timer, true, "WalkInPlace");
-  mechModel->draw(shader, debugTime, true, "Hit"); //"WalkInPlace");
-  // skeleton
-  mechModel->debugRenderer.render(proj * view * glm::scale(glm::vec3(0.01)));
+void Game::drawMech(glow::UsedProgram shader) {
+  shader.setUniform("uProj", mCamera->getProjectionMatrix());
+  shader.setUniform("uView", mCamera->getViewMatrix());
+  mechPlayer.draw(shader);
+  mechSmall.draw(shader);
+  mechBig.draw(shader);
 }
 
 void Game::drawCubes(glow::UsedProgram shader) {
@@ -713,7 +745,7 @@ bool Game::onKey(int key, int scancode, int action, int mods) {
 
 void Game::updateCamera(float elapsedSeconds) {
   auto const speed = elapsedSeconds * 3;
-
+  //todo move closer to char when looking up
   glm::vec3 rel_move;
   if (mFreeCamera) {
     // WASD camera move
@@ -759,7 +791,7 @@ void Game::updateCamera(float elapsedSeconds) {
 #ifdef NDEBUG
     setCursorMode(glow::glfw::CursorMode::Disabled);
 #endif
-    glm::vec3 target = glcast(bulPlayer->getWorldTransform().getOrigin());
+    glm::vec3 target = glcast(mechPlayer.rigid->getWorldTransform().getOrigin());
     mCamera->handle.setTarget(target);
     mCamera->handle.setTargetDistance(5);
 

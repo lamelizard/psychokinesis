@@ -10,26 +10,30 @@
 #include <btBulletDynamicsCommon.h>
 #include "BulletDebugger.hh"
 
-#include "assimpModel.hh"
-
 #include <soloud.h>
 #include <soloud_wavstream.h>
+
+#include "Mech.hh"
+
+
+#define MAX_HEALTH 15
+#define CUBES_MIN -24
+#define CUBES_MAX  25
+#define CUBES_TOTAL 50 //(CUBES_MAX - CUBES_MIN + 1)
 
 class Game : public glow::glfw::GlfwApp {
   // logic
 private:
   bool mJumps = false;
   bool mJumpWasPressed = false; // last frame
-  int HP = 5;
+  int HP = MAX_HEALTH;
 
 
 
   //glm::vec3 mSpherePosition = {2, 0, 0};
   //float mSphereSize = 1.0f;
 
-  // for the cubes
-  int cubesWorldMin = -24;
-  int cubesWorldMax = 25;
+
 
 
   // gfx settings
@@ -57,9 +61,10 @@ private:
 
   // mech
   glow::SharedProgram mShaderMech;
-  glow::SharedTexture2D mTexMechAlbedo;
-  glow::SharedTexture2D mTexMechNormal;
-  SharedAssimpModel mechModel;
+  Mech mechPlayer;
+  Mech mechSmall;
+  Mech mechBig;
+
   // beholder
   glow::SharedTexture2D mTexBeholderAlbedo;
   SharedAssimpModel beholderModel;
@@ -70,6 +75,7 @@ private:
   glow::SharedTexture2D mTexCubeNormal;
   glow::SharedTexture2D mTexDefNormal;
   glow::SharedTextureCubeMap mSkybox;
+  glow::SharedTexture2D mHealthBar[MAX_HEALTH + 1];
 
   // depth pre-pass
   glow::SharedTextureRectangle mGBufferDepth;
@@ -102,6 +108,8 @@ private:
   // EntityX
 private:
   entityx::EntityX ex;
+  entityx::Entity ground[CUBES_TOTAL][CUBES_TOTAL]; // x, z
+  std::vector<entityx::Entity> pillars[4];
 
   // Bullet
 private:
@@ -110,10 +118,8 @@ private:
 //#else
   //bool mDebugBullet = true;
 //#endif
-  std::unique_ptr<btBoxShape> colBox;
-  std::unique_ptr<btCapsuleShape> colPlayer;
-  std::shared_ptr<btDefaultMotionState> playerMotionState;
-  std::shared_ptr<btRigidBody> bulPlayer;
+  std::shared_ptr<btBoxShape> colBox;
+
   entityx::Entity createCube(const glm::ivec3 &pos);
 
   // main
@@ -138,7 +144,7 @@ public:
   void init() override;                       // called once after OpenGL is set up
   void update(float elapsedSeconds) override; // called in 60 Hz fixed timestep
   void render(float elapsedSeconds) override; // called once per frame (variable timestep)
-  void drawMech(glow::UsedProgram shader, float elapsedSeconds);
+  void drawMech(glow::UsedProgram shader);
   void drawCubes(glow::UsedProgram shader);
   void onGui() override;                                            // called once per frame to set up UI
   void onResize(int w, int h) override;                             // called when window is resized
