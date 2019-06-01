@@ -2,6 +2,7 @@
 
 #include <set>
 #include <algorithm>
+#include <future>
 
 #include <glm/ext.hpp>
 
@@ -86,6 +87,7 @@ void Game::init() {
   // enable VSync
   setVSync(true);
 
+
   // IMPORTANT: call to base class
   GlfwApp::init();
 
@@ -134,32 +136,55 @@ void Game::init() {
 
   // load gfx resources
   {
-    const string texPath = "../data/textures/";
-    // color textures are usually sRGB and data textures Linear
-    mTexCubeAlbedo = glow::Texture2D::createFromFile(texPath + "cube.albedo.png", glow::ColorSpace::sRGB);
-    mTexCubeNormal = glow::Texture2D::createFromFile(texPath + "cube.normal.png", glow::ColorSpace::Linear);
-    //mTexDefNormal = glow::Texture2D::createFromFile(texPath + "normal.png", glow::ColorSpace::Linear);
-    //bg
+    //load data async (PNG is slow!)
     {
-      //from rtglive
+      //filenames
+      const string texPath = "../data/textures/";
+      const string cubeAlbedoFN = texPath + "cube.albedo.png";
+      const string cubeNormalFN = texPath + "cube.normal.png";
       const string bgPath = texPath + "galaxy/";
-      mSkybox = glow::TextureCubeMap::createFromData( //
-          //todo check order
-          glow::TextureData::createFromFileCube(bgPath + "right.png",  //
-                                                bgPath + "left.png",   //
-                                                bgPath + "top.png",    //
-                                                bgPath + "bottom.png", //
-                                                bgPath + "front.png",  //
-                                                bgPath + "back.png",   //
-                                                glow::ColorSpace::sRGB));
+      const string mechAlbedoFN = texPath + "mech.albedo.png";
+      const string mechNormalFN = texPath + "mech.normal.png";
+      const string mechModelFN = "../data/models/mech/mech.fbx";
+
+      //loading async
+      const auto policy = std::launch::deferred; // TODO, why does this break with async
+      //todo glow::TextureData::createFromFile creates warnings?
+
+      auto cubeAlbedoData = std::async(policy, glow::TextureData::createFromFile, cubeAlbedoFN, glow::ColorSpace::sRGB);
+      auto cubeNormalData = std::async(policy, glow::TextureData::createFromFile, cubeNormalFN, glow::ColorSpace::Linear);
+      auto bgData = std::async(policy, glow::TextureData::createFromFileCube, //
+                               bgPath + "right.png",                          //
+                               bgPath + "left.png",                           //
+                               bgPath + "top.png",                            //
+                               bgPath + "bottom.png",                         //
+                               bgPath + "front.png",                          //
+                               bgPath + "back.png",                           //
+                               glow::ColorSpace::sRGB);
+      auto mechAlbedoData = std::async(policy, glow::TextureData::createFromFile, mechAlbedoFN, glow::ColorSpace::sRGB);
+      auto mechNormalData = std::async(policy, glow::TextureData::createFromFile, mechNormalFN, glow::ColorSpace::Linear);
+      auto mechModelData = std::async(policy, AssimpModel::load, mechModelFN);
+
+      //into GL
+      mTexCubeAlbedo = glow::Texture2D::createFromData(cubeAlbedoData.get());
+      mTexCubeAlbedo->setObjectLabel(cubeAlbedoFN);
+      mTexCubeNormal = glow::Texture2D::createFromData(cubeNormalData.get());
+      mTexCubeNormal->setObjectLabel(cubeNormalFN);
+      mSkybox = glow::TextureCubeMap::createFromData(bgData.get());
+      mSkybox->setObjectLabel(bgPath);
+      mTexMechAlbedo = glow::Texture2D::createFromData(mechAlbedoData.get());
+      mTexMechAlbedo->setObjectLabel(mechAlbedoFN);
+      mTexMechNormal = glow::Texture2D::createFromData(mechNormalData.get());
+      mTexMechNormal->setObjectLabel(mechNormalFN);
+      //not into GL yet, could change
+      mechModel = mechModelData.get();
+
+      //mTexDefNormal = glow::Texture2D::createFromFile(texPath + "normal.png", glow::ColorSpace::Linear);
     }
 
-    // simple procedural quad with vec2 aPosition
-    mMeshQuad = glow::geometry::make_quad();
-
-    // UV sphere
+    //basic shapes
+    mMeshQuad = glow::geometry::make_quad(); // simple procedural quad with vec2 aPosition
     mMeshSphere = glow::geometry::UVSphere<>(glow::geometry::UVSphere<>::attributesOf(nullptr), 64, 32).generate();
-
     // cube.obj contains a cube with normals, tangents, and texture coordinates
     mMeshCube = load_mesh_from_obj("../data/meshes/cube.obj", false /* do not interpolate tangents for cubes */);
     auto modelMatrices = glow::ArrayBuffer::create();
@@ -173,20 +198,12 @@ void Game::init() {
     });
     mMeshCube->bind().attach(modelMatrices);
 
-    // automatically takes .fsh and .vsh shaders and combines them into a program
+    //shader
     mShaderCube = glow::Program::createFromFile("../data/shaders/cube");
     mShaderCubePrepass = glow::Program::createFromFile("../data/shaders/cube.pre");
     mShaderOutput = glow::Program::createFromFile("../data/shaders/output");
     mShaderMode = glow::Program::createFromFile("../data/shaders/mode");
-
-    // Models
     mShaderMech = glow::Program::createFromFile("../data/shaders/mech");
-    mTexMechAlbedo = glow::Texture2D::createFromFile("../data/textures/mech.albedo.png", glow::ColorSpace::sRGB);
-    mTexMechNormal = glow::Texture2D::createFromFile("../data/textures/mech.normal.png", glow::ColorSpace::Linear);
-    mechModel = AssimpModel::load("../data/models/mech/mech.fbx");
-
-    // mTexBeholderAlbedo = glow::Texture2D::createFromFile("../data/textures/beholder.png", glow::ColorSpace::sRGB);
-    // beholderModel = AssimpModel::load("../data/models/beholder/beholder.gltf");
   }
 
   // Sound
