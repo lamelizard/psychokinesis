@@ -22,9 +22,7 @@ void Mech::updateTime(double delta) {
 
 void Mech::draw(glow::UsedProgram &shader) {
   glm::mat4 model;
-  btTransform transform;
-  motionState->getWorldTransform(transform);
-  model = glm::translate(model, getWorldPos(transform));
+  model = glm::translate(model, getPos());
   model = glm::rotate(model, acos(glm::dot(moveDir, glm::vec3(0, 0, 1))), glm::normalize(glm::cross(glm::vec3(0, 0, 1), moveDir)));
   model = glm::translate(model, meshOffset);
   model = glm::scale(model, glm::vec3(scale));
@@ -39,4 +37,10 @@ void Mech::draw(glow::UsedProgram &shader) {
   //mechModel->draw(shader, debugTime, true, "Hit"); //"WalkInPlace");
   // skeleton
   // mechModel->debugRenderer.render(proj * view * glm::scale(glm::vec3(0.01)));
+}
+
+glm::vec3 Mech::getPos() {
+  btTransform transform;
+  motionState->getWorldTransform(transform);
+  return getWorldPos(transform);
 }

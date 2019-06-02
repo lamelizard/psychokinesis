@@ -37,6 +37,7 @@ struct Mech {
   glm::vec3 moveDir;
   glm::vec3 viewDir;
   glm::vec3 meshOffset;
+  double floatOffset; // from bottom
   double scale = 1;
 
 
@@ -55,4 +56,5 @@ struct Mech {
 
   void Mech::updateTime(double delta);
   void draw(glow::UsedProgram &shader);
+  glm::vec3 getPos();
 };

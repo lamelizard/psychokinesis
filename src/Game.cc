@@ -3,6 +3,7 @@
 #include <set>
 #include <algorithm>
 #include <future>
+#include <functional>
 
 #include <glm/ext.hpp>
 
@@ -64,6 +65,8 @@ struct ModeArea {
   float radius;
 };
 
+typedef function<bool()> action;
+
 Game::Game() : GlfwApp(Gui::ImGui) {}
 
 void Game::init() {
@@ -122,14 +125,21 @@ void Game::init() {
     //load data async (PNG is slow!)
     {
       //filenames
-      const string texPath = "../data/textures/";
-      const string cubeAlbedoFN = texPath + "cube.albedo.png";
-      const string cubeNormalFN = texPath + "cube.normal.png";
-      const string bgPath = texPath + "galaxy/";
-      const string mechAlbedoFN = texPath + "mech.albedo.png";
-      const string mechNormalFN = texPath + "mech.normal.png";
-      const string mechModelFN = "../data/models/mech/mech.fbx";
-      const string healthBarFn = texPath + "ui/Health bar";
+      string texPath = "../data/textures/";
+      string cubeAlbedoFN = texPath + "cube.albedo.png";
+      string cubeNormalFN = texPath + "cube.normal.png";
+      string smallFN = texPath + "normal.png";
+      string bgPath = texPath + "galaxy/";
+      string mechAlbedoFN = texPath + "mech.albedo.png";
+      string mechNormalFN = texPath + "mech.normal.png";
+      string mechModelFN = "../data/models/mech/mech.fbx";
+      string healthBarFn = texPath + "ui/Health bar";
+
+
+#ifndef NDEBUG // faster loading
+      mechAlbedoFN = smallFN;
+      mechNormalFN = smallFN;
+#endif
 
       //loading async
       const auto policy = launch::deferred; // TODO, why does this break with async
@@ -252,43 +262,57 @@ void Game::init() {
     // mechs
     {
       //player
-      mechPlayer.type = Mech::player;
-      mechPlayer.moveDir = glm::vec3(0, 0, 1);
-      mechPlayer.viewDir = glm::vec3(0, 0, 1);
-      mechPlayer.scale = .2;
-      //TODO change y offset if capsule floats again
-      mechPlayer.meshOffset = glm::vec3(0, -0.5, -0.3); // starting to hardcode everything, assuming that I don't ever need to change stuff
-      mechPlayer.collision = make_shared<btCapsuleShape>(0.4, 1);
-      mechPlayer.motionState = make_shared<btDefaultMotionState>(bttransform(glm::vec3(0, 7, -10))); // fall down in an epic way
-      mechPlayer.rigid = make_shared<btRigidBody>(btRigidBody::btRigidBodyConstructionInfo(1.f, mechPlayer.motionState.get(), mechPlayer.collision.get()));
-      mechPlayer.rigid->setAngularFactor(0);
-      mechPlayer.rigid->setCustomDebugColor(btVector3(255, 1, 1));
-      dynamicsWorld->addRigidBody(mechPlayer.rigid.get());
+      // starting to hardcode everything, assuming that I don't ever need to change stuff
+      {
+        Mech &m = mechPlayer;
+        m.type = Mech::player;
+        m.moveDir = glm::vec3(0, 0, 1);
+        m.viewDir = glm::vec3(0, 0, 1);
+        m.scale = .2;
+        m.floatOffset = 0.25;
+        m.collision = make_shared<btCapsuleShape>(0.4, 0.5);
+        m.meshOffset = glm::vec3(0, -(m.collision->getHalfHeight() + m.collision->getRadius() + m.floatOffset), -0.3);
+        m.motionState = make_shared<btDefaultMotionState>(bttransform(glm::vec3(0, 7, -10))); // fall down in an epic way
+        m.rigid = make_shared<btRigidBody>(btRigidBody::btRigidBodyConstructionInfo(1.f, m.motionState.get(), m.collision.get()));
+        m.rigid->setAngularFactor(0);
+        m.rigid->setCustomDebugColor(btVector3(255, 1, 1));
+        dynamicsWorld->addRigidBody(m.rigid.get());
+      }
+
       //small
-      mechSmall.type = Mech::small;
-      mechSmall.moveDir = glm::vec3(0, 0, -1);
-      mechSmall.viewDir = glm::vec3(0, 0, -1);
-      mechSmall.scale = 1;
-      mechSmall.meshOffset = glm::vec3(0, -2.5, -1.5);
-      mechSmall.collision = make_shared<btCapsuleShape>(2, 5);
-      mechSmall.motionState = make_shared<btDefaultMotionState>(bttransform(glm::vec3(0, 2, 20))); //?
-      mechSmall.rigid = make_shared<btRigidBody>(btRigidBody::btRigidBodyConstructionInfo(0, mechSmall.motionState.get(), mechSmall.collision.get()));
-      mechSmall.rigid->setAngularFactor(0);
-      mechSmall.rigid->setCustomDebugColor(btVector3(255, 1, 1));
-      mechSmall.rigid->setCollisionFlags(mechSmall.rigid->getCollisionFlags() | btCollisionObject::CF_KINEMATIC_OBJECT);
-      dynamicsWorld->addRigidBody(mechSmall.rigid.get());
+      {
+        Mech &m = mechSmall;
+        m.type = Mech::small;
+        m.moveDir = glm::vec3(0, 0, -1);
+        m.viewDir = glm::vec3(0, 0, -1);
+        m.scale = 1;
+        m.floatOffset = 0.01;
+        m.collision = make_shared<btCapsuleShape>(2, 2.5);
+        m.meshOffset = glm::vec3(0, -(m.collision->getHalfHeight() + m.collision->getRadius() + m.floatOffset), -1.5);
+        m.motionState = make_shared<btDefaultMotionState>(bttransform(glm::vec3(0, 2, 20)));
+        m.rigid = make_shared<btRigidBody>(btRigidBody::btRigidBodyConstructionInfo(0, m.motionState.get(), m.collision.get()));
+        m.rigid->setAngularFactor(0);
+        m.rigid->setCustomDebugColor(btVector3(255, 1, 1));
+        m.rigid->setCollisionFlags(m.rigid->getCollisionFlags() | btCollisionObject::CF_KINEMATIC_OBJECT);
+        dynamicsWorld->addRigidBody(m.rigid.get());
+      }
       //big
-      mechBig.type = Mech::big;
-      mechBig.moveDir = glm::vec3(0, 0, -1);
-      mechBig.viewDir = glm::vec3(0, 0, -1);
-      mechBig.scale = 30;
-      mechBig.collision = make_shared<btCapsuleShape>(1, 4); //no collisions
-      mechBig.motionState = make_shared<btDefaultMotionState>(bttransform(glm::vec3(0, -500, 0)));
-      mechBig.rigid = make_shared<btRigidBody>(btRigidBody::btRigidBodyConstructionInfo(0, mechBig.motionState.get(), mechBig.collision.get()));
-      mechBig.rigid->setAngularFactor(0);
-      mechBig.rigid->setCustomDebugColor(btVector3(255, 1, 1));
-      mechBig.rigid->setCollisionFlags(mechBig.rigid->getCollisionFlags() | btCollisionObject::CF_KINEMATIC_OBJECT);
-      dynamicsWorld->addRigidBody(mechBig.rigid.get());
+      {
+        Mech &m = mechBig;
+        m.type = Mech::small;
+        m.moveDir = glm::vec3(0, 0, -1);
+        m.viewDir = glm::vec3(0, 0, -1);
+        m.scale = 30;
+        m.floatOffset = 0.01;
+        m.collision = make_shared<btCapsuleShape>(0.1, 0.1);//no collisions
+        m.meshOffset = glm::vec3(0);
+        m.motionState = make_shared<btDefaultMotionState>(bttransform(glm::vec3(0, -500, 0))); 
+        m.rigid = make_shared<btRigidBody>(btRigidBody::btRigidBodyConstructionInfo(0, m.motionState.get(), m.collision.get()));
+        m.rigid->setAngularFactor(0);
+        m.rigid->setCustomDebugColor(btVector3(255, 1, 1));
+        m.rigid->setCollisionFlags(m.rigid->getCollisionFlags() | btCollisionObject::CF_KINEMATIC_OBJECT);
+        dynamicsWorld->addRigidBody(m.rigid.get());
+      }
     }
 
     //boxes
@@ -305,7 +329,7 @@ void Game::init() {
 
       // pillars
       {
-         int i = 0;
+        int i = 0;
         for (auto x = CUBES_MIN + 15; x <= CUBES_MAX - 10; x += 20)
           for (auto z = CUBES_MIN + 15; z <= CUBES_MAX - 10; z += 20) {
             for (auto yBottom = 0; yBottom <= 5; yBottom++) {
@@ -332,6 +356,8 @@ void Game::init() {
   //dynamicsWorld->stepSimulation(1. / 60);
 }
 
+inline double limitAxis(double a) { return a < 0.1 ? 0 : a; }
+
 entityx::Entity Game::createCube(const glm::ivec3 &pos) {
   auto motionState = make_shared<btDefaultMotionState>(bttransform(glm::vec3(pos.x, (float)pos.y - colBox->getHalfExtentsWithMargin().getY(), pos.z))); // y = 0 is floor
   auto rbCube = make_shared<btRigidBody>(btRigidBody::btRigidBodyConstructionInfo(0., motionState.get(), colBox.get(), btVector3(0, 0, 0)));
@@ -355,7 +381,7 @@ void Game::update(float elapsedSeconds) {
   mechSmall.rigid->activate();
   mechBig.rigid->activate();
 
-  const auto playerPos = getWorldPos(mechPlayer.rigid->getWorldTransform());
+  const auto playerPos = mechPlayer.getPos(); //getWorldPos(mechPlayer.rigid->getWorldTransform());
   const auto bulPos = btcast(playerPos);
 
   // modes of player, they change the logic
@@ -391,25 +417,43 @@ void Game::update(float elapsedSeconds) {
     }
 
 
+    // damping
+    // TODO ice!
+    mechPlayer.rigid->setDamping(0.7, 0); //damps y...
 
-    bool jumpPressed = isKeyPressed(GLFW_KEY_SPACE);
 
-
-    //movement force
+    //movement
     {
+      GLFWgamepadstate gamepadState;
+      bool hasController = glfwJoystickIsGamepad(GLFW_JOYSTICK_1) && glfwGetGamepadState(GLFW_JOYSTICK_1, &gamepadState);
+
+
+      //jump
+      bool jumpPressed = isKeyPressed(GLFW_KEY_SPACE) ||                                      //
+                         (hasController && (                                                  //
+                                               gamepadState.buttons[GLFW_GAMEPAD_BUTTON_A] || //
+                                               gamepadState.buttons[GLFW_GAMEPAD_BUTTON_B] || //
+                                               gamepadState.buttons[GLFW_GAMEPAD_BUTTON_X] || //
+                                               gamepadState.buttons[GLFW_GAMEPAD_BUTTON_Y]));
+
       // reldir = dir without camera
       glm::vec3 relDir;
-      if (isKeyPressed(GLFW_KEY_LEFT) || (isKeyPressed(GLFW_KEY_A) && !mFreeCamera))
-        relDir.x -= 1;
-      if (isKeyPressed(GLFW_KEY_RIGHT) || (isKeyPressed(GLFW_KEY_D) && !mFreeCamera))
-        relDir.x += 1;
-      if (isKeyPressed(GLFW_KEY_UP) || (isKeyPressed(GLFW_KEY_W) && !mFreeCamera))
-        relDir.z += 1;
-      if (isKeyPressed(GLFW_KEY_DOWN) || (isKeyPressed(GLFW_KEY_S) && !mFreeCamera))
-        relDir.z -= 1;
+      {
+        if (isKeyPressed(GLFW_KEY_LEFT) || (isKeyPressed(GLFW_KEY_A) && !mFreeCamera))
+          relDir.x -= 1;
+        if (isKeyPressed(GLFW_KEY_RIGHT) || (isKeyPressed(GLFW_KEY_D) && !mFreeCamera))
+          relDir.x += 1;
+        if (isKeyPressed(GLFW_KEY_UP) || (isKeyPressed(GLFW_KEY_W) && !mFreeCamera))
+          relDir.z += 1;
+        if (isKeyPressed(GLFW_KEY_DOWN) || (isKeyPressed(GLFW_KEY_S) && !mFreeCamera))
+          relDir.z -= 1;
 
-      if (glm::length(relDir) > .1f)
-        glm::normalize(relDir);
+        if (glm::length(relDir) > .1f)
+          glm::normalize(relDir);
+        else if (glm::length(relDir) < 0.1 && hasController) // a.k.a. 0
+          relDir = glm::normalize(glm::vec3(limitAxis(gamepadState.axes[GLFW_GAMEPAD_AXIS_LEFT_X]), 0, limitAxis(gamepadState.axes[GLFW_GAMEPAD_AXIS_LEFT_Y])));
+      }
+
 
       // movement relative to camera
       glm::vec3 camForward;
@@ -425,70 +469,68 @@ void Game::update(float elapsedSeconds) {
 
       mechPlayer.viewDir = camForward;
       auto force = (relDir.x * camRight + relDir.z * camForward) * forceLength;
-      mechPlayer.moveDir = glm::normalize(force);
-      mechPlayer.rigid->applyCentralForce(btcast(force));
-    }
-    
-
-
-    // slow down
-    // TODO ice!
-    mechPlayer.rigid->setDamping(0.7, 0); //damps y...
-
-
-
-    auto btSpeed = mechPlayer.rigid->getLinearVelocity();
-    auto ySpeed = btSpeed.y();
-    btSpeed.setY(0);
-    // but what about the forces?
-    if (btSpeed.length() > maxSpeed)
-      btSpeed = btSpeed.normalize() * maxSpeed;
-    btSpeed.setY(ySpeed);
-    mechPlayer.rigid->setLinearVelocity(btSpeed);
-
-    // close to ground?
-    bool closeToGround = false;
-    float ground = 0; // valid if closeToGround
-    float closeToGroundBorder = 0.3;
-    float floatingHeight = 0.25;
-    {
-      auto from = bulPos - btVector3(0, mechPlayer.collision->getHalfHeight(), 0);
-
-      auto to = from - btVector3(0, closeToGroundBorder, 0);
-      auto closest = btCollisionWorld::ClosestRayResultCallback(from, to);
-      dynamicsWorld->rayTest(from, to, closest);
-      if (closest.hasHit()) {
-        closeToGround = true;
-        ground = closest.m_hitPointWorld.y();
+      if (glm::length(force) > 0.001) {
+        mechPlayer.moveDir = glm::normalize(force);
+        mechPlayer.rigid->applyCentralForce(btcast(force));
       }
-    }
 
-    // jumping
-    if (closeToGround) {
-      // falling + standing
-      if (mechPlayer.rigid->getLinearVelocity().y() <= 0.01 /*&& !jumpPressed*/) {
-        mJumps = false;
-        // reset y-velocity
-        auto v = mechPlayer.rigid->getLinearVelocity();
-        v.setY(0);
-        mechPlayer.rigid->setLinearVelocity(v);
-        // reset y-position
-        auto t = mechPlayer.rigid->getWorldTransform();
-        auto o = t.getOrigin();
-        o.setY(ground + floatingHeight + mechPlayer.collision->getHalfHeight());
-        t.setOrigin(o);
-        mechPlayer.rigid->setWorldTransform(t);
-        // no y-movement anymore!
-        mechPlayer.rigid->setLinearFactor(btVector3(1, 0, 1));
+
+      auto btSpeed = mechPlayer.rigid->getLinearVelocity();
+      auto ySpeed = btSpeed.y();
+      btSpeed.setY(0);
+      // but what about the forces?
+      if (btSpeed.length() > maxSpeed)
+        btSpeed = btSpeed.normalize() * maxSpeed;
+      btSpeed.setY(ySpeed);
+      mechPlayer.rigid->setLinearVelocity(btSpeed);
+
+      // close to ground?
+      bool closeToGround = false;
+      float ground = 0; // valid if closeToGround
+      float closeToGroundBorder = mechPlayer.floatOffset * 1.2;
+      {
+        auto from = bulPos - btVector3(0, mechPlayer.collision->getHalfHeight() + mechPlayer.collision->getRadius(), 0); //heigth is notthe height...
+
+        auto to = from - btVector3(0, closeToGroundBorder, 0);
+        dynamicsWorld->getDebugDrawer()->drawLine(from, to, btVector4(1, 0, 0, 1));
+        auto closest = btCollisionWorld::ClosestRayResultCallback(from, to);
+        dynamicsWorld->rayTest(from, to, closest);
+        if (closest.hasHit()) {
+          closeToGround = true;
+          ground = closest.m_hitPointWorld.y();
+        }
       }
-      // jump
-      if (!mJumps && jumpPressed) {
-        mJumps = true;
+
+
+
+
+      // jumping
+      if (closeToGround) {
+        // falling + standing
+        if (mechPlayer.rigid->getLinearVelocity().y() <= 0.01 /*&& !jumpPressed*/) {
+          mJumps = false;
+          // reset y-velocity
+          auto v = mechPlayer.rigid->getLinearVelocity();
+          v.setY(0);
+          mechPlayer.rigid->setLinearVelocity(v);
+          // reset y-position
+          auto t = mechPlayer.rigid->getWorldTransform();
+          auto o = t.getOrigin();
+          o.setY(ground + mechPlayer.floatOffset + mechPlayer.collision->getHalfHeight() + mechPlayer.collision->getRadius());
+          t.setOrigin(o);
+          mechPlayer.rigid->setWorldTransform(t);
+          // no y-movement anymore!
+          mechPlayer.rigid->setLinearFactor(btVector3(1, 0, 1));
+        }
+        // jump
+        if (!mJumps && jumpPressed) {
+          mJumps = true;
+          mechPlayer.rigid->setLinearFactor(btVector3(1, 1, 1));
+          mechPlayer.rigid->applyCentralForce(btVector3(0, 500, 0));
+        }
+      } else
         mechPlayer.rigid->setLinearFactor(btVector3(1, 1, 1));
-        mechPlayer.rigid->applyCentralForce(btVector3(0, 500, 0));
-      }
-    } else
-      mechPlayer.rigid->setLinearFactor(btVector3(1, 1, 1));
+    }
   }
 
   //update physics
