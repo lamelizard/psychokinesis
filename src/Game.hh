@@ -20,6 +20,14 @@
 #define CUBES_MIN -24
 #define CUBES_MAX 25
 #define CUBES_TOTAL 50 //(CUBES_MAX - CUBES_MIN + 1)
+#define NUM_ROCKET_TYPES 1
+
+//rockettype
+enum class rtype { 
+    forward = 0,
+    homing = 1,
+    falling = 2
+};
 
 class Game : public glow::glfw::GlfwApp {
   // bad
@@ -34,7 +42,6 @@ private:
 private:
   glm::vec3 mBackgroundColor = {.10f, .46f, .83f};
   bool mShowWireframe = false;
-  bool mShowPostProcess = false;
   bool mShowMenu = false;
   bool mFreeCamera = false;
 
@@ -52,15 +59,11 @@ private:
   glow::SharedVertexArray mMeshQuad;
   glow::SharedVertexArray mMeshCube;
   glow::SharedVertexArray mMeshSphere;
+  glow::SharedVertexArray mMeshRocket[NUM_ROCKET_TYPES];
 
   // mech
   glow::SharedProgram mShaderMech;
   Mech mechs[3];
-
-  // beholder
-  glow::SharedTexture2D mTexBeholderAlbedo;
-  SharedAssimpModel beholderModel;
-  float debugTime = 0;
 
   // textures
   glow::SharedTexture2D mTexCubeAlbedo;
@@ -68,6 +71,8 @@ private:
   glow::SharedTexture2D mTexDefNormal;
   glow::SharedTextureCubeMap mSkybox;
   glow::SharedTexture2D mHealthBar[MAX_HEALTH + 1];
+  glow::SharedTexture2D mTexRocketAlbedo[NUM_ROCKET_TYPES];
+  glow::SharedTexture2D mTexRocketNormal[NUM_ROCKET_TYPES];
 
   // depth pre-pass
   glow::SharedTextureRectangle mGBufferDepth;
@@ -111,8 +116,11 @@ private:
   //bool mDebugBullet = true;
   //#endif
   std::shared_ptr<btBoxShape> colBox;
+  std::shared_ptr<btSphereShape> colPoint;
 
   entityx::Entity createCube(const glm::ivec3 &pos);
+  entityx::Entity createRocket(const glm::vec3 &pos, const glm::vec3 &vel, rtype type);
+
 
   // main
   std::unique_ptr<BulletDebugger> bulletDebugger; // draws lines for debugging
@@ -122,6 +130,12 @@ private:
   std::unique_ptr<btSequentialImpulseConstraintSolver> solver;
   std::unique_ptr<btDiscreteDynamicsWorld> dynamicsWorld;
 
+
+  //draw
+private: 
+  void drawMech(glow::UsedProgram shader);
+  void drawCubes(glow::UsedProgram shader);
+  void Game::drawRockets(glow::UsedProgram shader); 
 
   // test
   //btDefaultMotionState* boxMotionState = nullptr;
@@ -136,8 +150,6 @@ public:
   void init() override;                       // called once after OpenGL is set up
   void update(float elapsedSeconds) override; // called in 60 Hz fixed timestep
   void render(float elapsedSeconds) override; // called once per frame (variable timestep)
-  void drawMech(glow::UsedProgram shader);
-  void drawCubes(glow::UsedProgram shader);
   void onGui() override;                                            // called once per frame to set up UI
   void onResize(int w, int h) override;                             // called when window is resized
   bool onKey(int key, int scancode, int action, int mods) override; // called when a key is pressed

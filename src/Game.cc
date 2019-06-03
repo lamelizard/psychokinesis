@@ -53,6 +53,11 @@ struct Cube {
   glm::ivec3 pos;
 };
 
+struct Rocket {
+  rtype type;
+  bool real = true;
+};
+
 enum Mode {
   normal = 0,
   drawn = 1,
@@ -136,6 +141,8 @@ void Game::init() {
       string mechNormalFN = texPath + "mech.normal.png";
       string mechModelFN = "../data/models/mech/mech.fbx";
       string healthBarFn = texPath + "ui/Health bar";
+      string rocketAlbedoFN = texPath + "rocket.albedo.";
+      string rocketNormalFN = texPath + "rocket.normal.";
 
 
 #ifndef NDEBUG // faster loading
@@ -163,6 +170,12 @@ void Game::init() {
       future<glow::SharedTextureData> healthBarData[MAX_HEALTH + 1];
       for (int i = 0; i <= MAX_HEALTH; i++)
         healthBarData[i] = std::async(policy, glow::TextureData::createFromFile, healthBarFn + to_string(i) + ".png", glow::ColorSpace::sRGB);
+      future<glow::SharedTextureData> rocketAlbedoData[NUM_ROCKET_TYPES];
+      future<glow::SharedTextureData> rocketNormalData[NUM_ROCKET_TYPES];
+      for (int i = 0; i < NUM_ROCKET_TYPES; i++) {
+        rocketAlbedoData[i] = async(policy, glow::TextureData::createFromFile, rocketAlbedoFN + to_string(i) + ".png", glow::ColorSpace::sRGB);
+        rocketNormalData[i] = async(policy, glow::TextureData::createFromFile, rocketNormalFN + to_string(i) + ".png", glow::ColorSpace::sRGB);
+      }
 
 
       //into GL
@@ -186,6 +199,12 @@ void Game::init() {
         mHealthBar[i] = glow::Texture2D::createFromData(healthBarData[i].get());
         mHealthBar[i]->setObjectLabel(healthBarFn);
       }
+      for (int i = 0; i < NUM_ROCKET_TYPES; i++) {
+        mTexRocketAlbedo[i] = glow::Texture2D::createFromData(rocketAlbedoData[i].get());
+        mTexRocketAlbedo[i]->setObjectLabel(rocketAlbedoFN);
+        mTexRocketNormal[i] = glow::Texture2D::createFromData(rocketNormalData[i].get());
+        mTexRocketNormal[i]->setObjectLabel(rocketNormalFN);
+      }
 
       //not into GL yet, could change
       Mech::mesh = mechModelData.get();
@@ -208,6 +227,21 @@ void Game::init() {
         glow::ArrayBufferAttribute(&AttMat::d, "aModeld", glow::AttributeMode::Float, 1)  //
     });
     mMeshCube->bind().attach(modelMatrices);
+    //other meshes
+    for (int i = 0; i < NUM_ROCKET_TYPES; i++) {
+      mMeshRocket[i] = load_mesh_from_obj("../data/meshes/rocket" + to_string(i) + ".obj", true);
+      auto modelMatrices = glow::ArrayBuffer::create();
+      // could be done better with offset I guess
+      modelMatrices->defineAttributes({
+          // mat4, divisor = 1 so each instance new matrix
+          glow::ArrayBufferAttribute(&AttMat::a, "aModel", glow::AttributeMode::Float, 1),  //
+          glow::ArrayBufferAttribute(&AttMat::b, "aModelb", glow::AttributeMode::Float, 1), //
+          glow::ArrayBufferAttribute(&AttMat::c, "aModelc", glow::AttributeMode::Float, 1), //
+          glow::ArrayBufferAttribute(&AttMat::d, "aModeld", glow::AttributeMode::Float, 1)  //
+      });
+      mMeshRocket[i]->bind().attach(modelMatrices);
+    }
+
 
     //shader
     mShaderCube = glow::Program::createFromFile("../data/shaders/cube");
@@ -253,112 +287,109 @@ void Game::init() {
     bulletDebugger = make_unique<BulletDebugger>();
     dynamicsWorld->setDebugDrawer(bulletDebugger.get());
 
-    // ground
-    /*btCollisionShape *groundShape = new btBoxShape(btVector3(btScalar(50.), btScalar(2.), btScalar(50.))); // lost memory
-    btRigidBody::btRigidBodyConstructionInfo rbInfo(0., nullptr, groundShape);
-    auto ground = new btGhostObject(rbInfo);
-    ground->setWorldTransform(bttransform(glm::vec3(0, -5, 0)));
-    dynamicsWorld->addRigidBody(ground);
-    */
+    // "point"
+    colPoint = make_shared<btSphereShape>(0.1);
+
 
     // mechs
     {
-      //player
-      // starting to hardcode everything, assuming that I don't ever need to change stuff
-      {
-        Mech &m = mechs[player];
-        m.type = player;
-        m.HP = MAX_HEALTH;
-        m.moveDir = glm::vec3(0, 0, 1);
-        m.viewDir = glm::vec3(0, 0, 1);
-        m.scale = .2;
-        m.floatOffset = 0.25;
-        m.collision = make_shared<btCapsuleShape>(0.4, 0.5);
-        m.meshOffset = glm::vec3(0, -(m.collision->getHalfHeight() + m.collision->getRadius() + m.floatOffset), -0.3);
-        m.motionState = make_shared<btDefaultMotionState>(bttransform(glm::vec3(0, 7, -10))); // fall down in an epic way
-        m.rigid = make_shared<btRigidBody>(btRigidBody::btRigidBodyConstructionInfo(1.f, m.motionState.get(), m.collision.get()));
-        m.rigid->setAngularFactor(0);
-        m.rigid->setCustomDebugColor(btVector3(255, 1, 1));
-        dynamicsWorld->addRigidBody(m.rigid.get());
-      }
-
-      //small
-      {
-        Mech &m = mechs[small];
-        m.type = small;
-        m.HP = 5;
-        m.moveDir = glm::vec3(0, 0, -1);
-        m.viewDir = glm::vec3(0, 0, -1);
-        m.scale = 1;
-        m.floatOffset = 0.01;
-        m.collision = make_shared<btCapsuleShape>(2, 2.5);
-        m.meshOffset = glm::vec3(0, -(m.collision->getHalfHeight() + m.collision->getRadius() + m.floatOffset), -1.5);
-        m.motionState = make_shared<btDefaultMotionState>(bttransform(glm::vec3(0, 2, 20)));
-        m.rigid = make_shared<btRigidBody>(btRigidBody::btRigidBodyConstructionInfo(0, m.motionState.get(), m.collision.get()));
-        m.rigid->setAngularFactor(0);
-        m.rigid->setCustomDebugColor(btVector3(255, 1, 1));
-        m.rigid->setCollisionFlags(m.rigid->getCollisionFlags() | btCollisionObject::CF_KINEMATIC_OBJECT);
-        dynamicsWorld->addRigidBody(m.rigid.get());
-      }
-      //big
-      {
-        Mech &m = mechs[big];
-        m.type = big;
-        m.HP = 5;
-        m.moveDir = glm::vec3(0, 0, -1);
-        m.viewDir = glm::vec3(0, 0, -1);
-        m.scale = 30;
-        m.floatOffset = 0.01;
-        m.collision = make_shared<btCapsuleShape>(0.1, 0.1); //no collisions
-        m.meshOffset = glm::vec3(0);
-        m.motionState = make_shared<btDefaultMotionState>(bttransform(glm::vec3(0, -500, 0)));
-        m.rigid = make_shared<btRigidBody>(btRigidBody::btRigidBodyConstructionInfo(0, m.motionState.get(), m.collision.get()));
-        m.rigid->setAngularFactor(0);
-        m.rigid->setCustomDebugColor(btVector3(255, 1, 1));
-        m.rigid->setCollisionFlags(m.rigid->getCollisionFlags() | btCollisionObject::CF_KINEMATIC_OBJECT);
-        dynamicsWorld->addRigidBody(m.rigid.get());
-      }
-    }
-
-    //boxes
-    {
-      colBox = make_shared<btBoxShape>(btVector3(0.5, 0.5, 0.5)); // half extend
-      // create world
-      // floor
-      {
-        auto y = -colBox->getHalfExtentsWithMargin().getY(); // floor is y = 0
-        for (auto x = 0; x < CUBES_TOTAL; x++)
-          for (auto z = 0; z < CUBES_TOTAL; z++)
-            ground[x][z] = createCube(glm::vec3(x + CUBES_MIN, y, z + CUBES_MIN));
-      }
-
-      // pillars
-      {
-        int i = 0;
-        for (auto x = CUBES_MIN + 15; x <= CUBES_MAX - 10; x += 20)
-          for (auto z = CUBES_MIN + 15; z <= CUBES_MAX - 10; z += 20) {
-            for (auto yBottom = 0; yBottom <= 5; yBottom++) {
-              auto y = yBottom + colBox->getHalfExtentsWithMargin().getY();
-              pillars[i].push_back(createCube(glm::vec3(x, y, z)));
-              pillars[i].push_back(createCube(glm::vec3(x + 1, y, z)));
-              pillars[i].push_back(createCube(glm::vec3(x, y, z + 1)));
-              pillars[i].push_back(createCube(glm::vec3(x + 1, y, z + 1)));
-            }
-            i++; // new pillar
-          }
-      }
-    }
+        //player
+        // starting to hardcode everything, assuming that I don't ever need to change stuff
+        {
+            Mech &m = mechs[player];
+    m.type = player;
+    m.HP = MAX_HEALTH;
+    m.moveDir = glm::vec3(0, 0, 1);
+    m.viewDir = glm::vec3(0, 0, 1);
+    m.scale = .2;
+    m.floatOffset = 0.25;
+    m.collision = make_shared<btCapsuleShape>(0.4, 0.5);
+    m.meshOffset = glm::vec3(0, -(m.collision->getHalfHeight() + m.collision->getRadius() + m.floatOffset), -0.3);
+    m.motionState = make_shared<btDefaultMotionState>(bttransform(glm::vec3(0, 7, -10))); // fall down in an epic way
+    m.rigid = make_shared<btRigidBody>(btRigidBody::btRigidBodyConstructionInfo(1.f, m.motionState.get(), m.collision.get()));
+    m.rigid->setAngularFactor(0);
+    m.rigid->setCustomDebugColor(btVector3(255, 1, 1));
+    dynamicsWorld->addRigidBody(m.rigid.get());
   }
 
-
-
-  // test mode area
+  //small
   {
-    auto entity = ex.entities.create();
-    entity.assign<ModeArea>(ModeArea{drawn, {10, 0, 10}, 5});
+    Mech &m = mechs[small];
+    m.type = small;
+    m.HP = 5;
+    m.moveDir = glm::vec3(0, 0, -1);
+    m.viewDir = glm::vec3(0, 0, -1);
+    m.scale = 1;
+    m.floatOffset = 0.01;
+    m.collision = make_shared<btCapsuleShape>(2, 2.5);
+    m.meshOffset = glm::vec3(0, -(m.collision->getHalfHeight() + m.collision->getRadius() + m.floatOffset), -1.5);
+    m.motionState = make_shared<btDefaultMotionState>(bttransform(glm::vec3(0, 2, 20)));
+    m.rigid = make_shared<btRigidBody>(btRigidBody::btRigidBodyConstructionInfo(0, m.motionState.get(), m.collision.get()));
+    m.rigid->setAngularFactor(0);
+    m.rigid->setCustomDebugColor(btVector3(255, 1, 1));
+    m.rigid->setCollisionFlags(m.rigid->getCollisionFlags() | btCollisionObject::CF_KINEMATIC_OBJECT);
+    dynamicsWorld->addRigidBody(m.rigid.get());
+  }
+  //big
+  {
+    Mech &m = mechs[big];
+    m.type = big;
+    m.HP = 5;
+    m.moveDir = glm::vec3(0, 0, -1);
+    m.viewDir = glm::vec3(0, 0, -1);
+    m.scale = 30;
+    m.floatOffset = 0.01;
+    m.collision = make_shared<btCapsuleShape>(0.1, 0.1); //no collisions
+    m.meshOffset = glm::vec3(0);
+    m.motionState = make_shared<btDefaultMotionState>(bttransform(glm::vec3(0, -500, 0)));
+    m.rigid = make_shared<btRigidBody>(btRigidBody::btRigidBodyConstructionInfo(0, m.motionState.get(), m.collision.get()));
+    m.rigid->setAngularFactor(0);
+    m.rigid->setCustomDebugColor(btVector3(255, 1, 1));
+    m.rigid->setCollisionFlags(m.rigid->getCollisionFlags() | btCollisionObject::CF_KINEMATIC_OBJECT);
+    dynamicsWorld->addRigidBody(m.rigid.get());
+  }
+}
+
+//boxes
+{
+  colBox = make_shared<btBoxShape>(btVector3(0.5, 0.5, 0.5)); // half extend
+  // create world
+  // floor
+  {
+    auto y = -colBox->getHalfExtentsWithMargin().getY(); // floor is y = 0
+    for (auto x = 0; x < CUBES_TOTAL; x++)
+      for (auto z = 0; z < CUBES_TOTAL; z++)
+        ground[x][z] = createCube(glm::vec3(x + CUBES_MIN, y, z + CUBES_MIN));
   }
 
-  //dynamicsWorld->stepSimulation(1. / 60);
+  // pillars
+  {
+    int i = 0;
+    for (auto x = CUBES_MIN + 15; x <= CUBES_MAX - 10; x += 20)
+      for (auto z = CUBES_MIN + 15; z <= CUBES_MAX - 10; z += 20) {
+        for (auto yBottom = 0; yBottom <= 5; yBottom++) {
+          auto y = yBottom + colBox->getHalfExtentsWithMargin().getY();
+          pillars[i].push_back(createCube(glm::vec3(x, y, z)));
+          pillars[i].push_back(createCube(glm::vec3(x + 1, y, z)));
+          pillars[i].push_back(createCube(glm::vec3(x, y, z + 1)));
+          pillars[i].push_back(createCube(glm::vec3(x + 1, y, z + 1)));
+        }
+        i++; // new pillar
+      }
+  }
+}
+
+// test
+createRocket(glm::vec3(0, 3, 0), glm::vec3(0.001, 0, 0), rtype::forward);
+}
+
+
+
+// test mode area
+{
+  auto entity = ex.entities.create();
+  entity.assign<ModeArea>(ModeArea{drawn, {10, 0, 10}, 5});
+}
 }
 
 inline double limitAxis(double a) { return a < 0.1 ? 0 : a; }
@@ -372,6 +403,23 @@ entityx::Entity Game::createCube(const glm::ivec3 &pos) {
   entity.assign<SharedbtRigidBody>(rbCube);
   entity.assign<defMotionState>(motionState);
   entity.assign<Cube>(Cube{pos});
+  return entity;
+}
+
+entityx::Entity Game::createRocket(const glm::vec3 &pos, const glm::vec3 &vel, rtype type) {
+  auto motionState = make_shared<btDefaultMotionState>(bttransform(pos));
+  auto rbRocket = make_shared<btRigidBody>(btRigidBody::btRigidBodyConstructionInfo(1., motionState.get(), colPoint.get()));
+  
+  rbRocket->setLinearVelocity(btcast(vel));
+  dynamicsWorld->addRigidBody(rbRocket.get());
+  rbRocket->setGravity(btVector3(0, 0, 0)); // after adding to world!
+
+  auto entity = ex.entities.create();
+  entity.assign<SharedbtRigidBody>(rbRocket);
+  entity.assign<defMotionState>(motionState);
+  entity.assign<Rocket>(Rocket{type, true});
+  if (type == rtype::falling)
+    rbRocket->setAngularVelocity(btVector3(0, 1, 0)); // test
   return entity;
 }
 
@@ -567,7 +615,7 @@ void Game::render(float elapsedSeconds) {
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
     drawCubes(mShaderCubePrepass->use());
-
+    drawRockets(mShaderCubePrepass->use());
     drawMech(mShaderMech->use());
 
     if (mDebugBullet) {
@@ -590,7 +638,7 @@ void Game::render(float elapsedSeconds) {
     glClear(GL_COLOR_BUFFER_BIT | GL_STENCIL_BUFFER_BIT);
 
     drawCubes(mShaderCube->use());
-
+    drawRockets(mShaderCube->use());
     drawMech(mShaderMech->use());
 
     // Render Bullet Debug
@@ -675,7 +723,6 @@ void Game::render(float elapsedSeconds) {
     // put higher
     auto lightDir = glm::vec3(glm::cos(getCurrentTime()), 0, glm::sin(getCurrentTime()));
     shader.setUniform("uLightDir", lightDir);
-    shader.setUniform("uShowPostProcess", mShowPostProcess);
     mMeshQuad->bind().draw();
   }
 }
@@ -741,6 +788,44 @@ void Game::drawCubes(glow::UsedProgram shader) {
   mMeshCube->bind().draw(models.size());
 }
 
+void Game::drawRockets(glow::UsedProgram shader) {
+  auto proj = mCamera->getProjectionMatrix();
+  auto view = mCamera->getViewMatrix();
+
+  shader.setUniform("uProj", proj);
+  shader.setUniform("uView", view);
+
+  // model matrices
+  vector<glm::mat4> models[NUM_ROCKET_TYPES];
+  for (int i = 0; i < NUM_ROCKET_TYPES; i++)
+    models[i].reserve(1000);
+
+  auto RocketHandle = entityx::ComponentHandle<Rocket>();
+  auto Entities = ex.entities.entities_with_components(RocketHandle);
+
+  for (entityx::Entity entity : Entities) {
+    glm::mat4x4 model;
+    {
+      auto motionState = *entity.component<defMotionState>().get();
+      btTransform trans;
+      motionState->getWorldTransform(trans);
+      trans.getOpenGLMatrix(glm::value_ptr(model));
+    }
+    //scale here
+
+    models[(int)(RocketHandle->type)].push_back(model);
+  }
+
+  for (int i = 0; i < NUM_ROCKET_TYPES; i++) {
+    shader.setTexture("uTexAlbedo", mTexRocketAlbedo[i]);
+    shader.setTexture("uTexNormal", mTexRocketNormal[i]);
+
+    auto abModels = mMeshRocket[i]->getAttributeBuffer("aModel");
+    assert(abModels);
+    abModels->bind().setData(models[i]);
+    mMeshRocket[i]->bind().draw(models[i].size());
+  }
+}
 
 // Update the GUI
 void Game::onGui() {
@@ -753,10 +838,8 @@ void Game::onGui() {
       ImGui::Checkbox("Debug Bullet", &mDebugBullet);
       //ImGui::Checkbox("Show Mech", &mDrawMech);
       ImGui::Checkbox("free Camera", &mFreeCamera);
-      ImGui::ColorEdit3("Background Color", &mBackgroundColor.r);
       ImGui::Unindent();
     }
-    ImGui::SliderFloat("mechtime", &debugTime, 0.0, 5.0);
   }
   ImGui::End();
 #endif
