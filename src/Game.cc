@@ -112,12 +112,11 @@ void Game::init() {
       mTargets.push_back(mGBufferAlbedo = glow::TextureRectangle::create(1, 1, GL_RGB16F));
       mTargets.push_back(mGBufferMaterial = glow::TextureRectangle::create(1, 1, GL_RG16F));
       mTargets.push_back(mGBufferNormal = glow::TextureRectangle::create(1, 1, GL_RGB16F));
-      mFramebufferGBuffer = glow::Framebuffer::create();
-      auto fbuffer = mFramebufferGBuffer->bind();
-      fbuffer.attachDepth(mGBufferDepth);
-      fbuffer.attachColor("fAlbedo", mGBufferAlbedo);
-      fbuffer.attachColor("fMaterial", mGBufferMaterial);
-      fbuffer.attachColor("fNormal", mGBufferNormal);
+      mFramebufferGBuffer = glow::Framebuffer::create(
+          {{"fAlbedo", mGBufferAlbedo},
+           {"fNormal", mGBufferNormal},
+           {"fMaterial", mGBufferMaterial}},
+          mGBufferDepth);
     }
 
     // Light
@@ -409,7 +408,7 @@ entityx::Entity Game::createCube(const glm::ivec3 &pos) {
 entityx::Entity Game::createRocket(const glm::vec3 &pos, const glm::vec3 &vel, rtype type) {
   auto motionState = make_shared<btDefaultMotionState>(bttransform(pos));
   auto rbRocket = make_shared<btRigidBody>(btRigidBody::btRigidBodyConstructionInfo(1., motionState.get(), colPoint.get()));
-  
+
   rbRocket->setLinearVelocity(btcast(vel));
   dynamicsWorld->addRigidBody(rbRocket.get());
   rbRocket->setGravity(btVector3(0, 0, 0)); // after adding to world!
