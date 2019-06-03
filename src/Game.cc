@@ -308,6 +308,8 @@ void Game::init() {
     m.rigid = make_shared<btRigidBody>(btRigidBody::btRigidBodyConstructionInfo(1.f, m.motionState.get(), m.collision.get()));
     m.rigid->setAngularFactor(0);
     m.rigid->setCustomDebugColor(btVector3(255, 1, 1));
+    m.rigid->setUserIndex(BID_PLAYER);
+    m.rigid->setUserPointer(&mechs[player]);
     dynamicsWorld->addRigidBody(m.rigid.get());
   }
 
@@ -327,6 +329,8 @@ void Game::init() {
     m.rigid->setAngularFactor(0);
     m.rigid->setCustomDebugColor(btVector3(255, 1, 1));
     m.rigid->setCollisionFlags(m.rigid->getCollisionFlags() | btCollisionObject::CF_KINEMATIC_OBJECT);
+    m.rigid->setUserIndex(BID_SMALL);
+    m.rigid->setUserPointer(&mechs[small]);
     dynamicsWorld->addRigidBody(m.rigid.get());
   }
   //big
@@ -345,6 +349,8 @@ void Game::init() {
     m.rigid->setAngularFactor(0);
     m.rigid->setCustomDebugColor(btVector3(255, 1, 1));
     m.rigid->setCollisionFlags(m.rigid->getCollisionFlags() | btCollisionObject::CF_KINEMATIC_OBJECT);
+    m.rigid->setUserIndex(BID_BIG);
+    m.rigid->setUserPointer(&mechs[big]);
     dynamicsWorld->addRigidBody(m.rigid.get());
   }
 }
@@ -402,6 +408,10 @@ entityx::Entity Game::createCube(const glm::ivec3 &pos) {
   entity.assign<SharedbtRigidBody>(rbCube);
   entity.assign<defMotionState>(motionState);
   entity.assign<Cube>(Cube{pos});
+  rbCube->setUserIndex(BID_CUBE);
+  static_assert(sizeof(void *) == sizeof(uint64_t), "oh...");
+  rbCube->setUserPointer((void *)entity.id().id()); // lost any sense of what I learned 'bout good code
+
   return entity;
 }
 
@@ -419,6 +429,8 @@ entityx::Entity Game::createRocket(const glm::vec3 &pos, const glm::vec3 &vel, r
   entity.assign<Rocket>(Rocket{type, true});
   if (type == rtype::falling)
     rbRocket->setAngularVelocity(btVector3(0, 1, 0)); // test
+  rbRocket->setUserIndex(BID_ROCKET);
+  rbRocket->setUserPointer((void *)entity.id().id());
   return entity;
 }
 
@@ -775,7 +787,7 @@ void Game::drawCubes(glow::UsedProgram shader) {
       for (const auto &area : scaleAreas) {
         auto distanceFactor = (glm::distance(area.pos, trans) / area.radius);
         if (distanceFactor < 1)
-          modelCube *= glm::scale(glm::vec3((1 - distanceFactor) * 0.05 + 0.95));
+          modelCube *= glm::scale(glm::vec3((1 - distanceFactor) * 0.15 + 0.85));
       }
     }
     models.push_back(modelCube);

@@ -22,11 +22,22 @@
 #define CUBES_TOTAL 50 //(CUBES_MAX - CUBES_MIN + 1)
 #define NUM_ROCKET_TYPES 1
 
+
+//bullet User index:
+#define BID_NONE 
+#define BID_PLAYER (1 << 0)
+#define BID_SMALL (1 << 1)
+#define BID_BIG (1 << 2)
+#define BID_ROCKET (1 << 3)
+#define BID_CUBE (1 << 4)
+
+
+
 //rockettype
-enum class rtype { 
-    forward = 0,
-    homing = 1,
-    falling = 2
+enum class rtype {
+  forward = 0,
+  homing = 1,
+  falling = 2
 };
 
 class Game : public glow::glfw::GlfwApp {
@@ -132,10 +143,10 @@ private:
 
 
   //draw
-private: 
+private:
   void drawMech(glow::UsedProgram shader);
   void drawCubes(glow::UsedProgram shader);
-  void Game::drawRockets(glow::UsedProgram shader); 
+  void Game::drawRockets(glow::UsedProgram shader);
 
   // test
   //btDefaultMotionState* boxMotionState = nullptr;
@@ -147,9 +158,9 @@ public:
 
   // events
 public:
-  void init() override;                       // called once after OpenGL is set up
-  void update(float elapsedSeconds) override; // called in 60 Hz fixed timestep
-  void render(float elapsedSeconds) override; // called once per frame (variable timestep)
+  void init() override;                                             // called once after OpenGL is set up
+  void update(float elapsedSeconds) override;                       // called in 60 Hz fixed timestep
+  void render(float elapsedSeconds) override;                       // called once per frame (variable timestep)
   void onGui() override;                                            // called once per frame to set up UI
   void onResize(int w, int h) override;                             // called when window is resized
   bool onKey(int key, int scancode, int action, int mods) override; // called when a key is pressed
