@@ -65,11 +65,13 @@ struct ModeArea {
   float radius;
 };
 
-typedef function<bool()> action;
+Game *Game::instance = nullptr;
 
 Game::Game() : GlfwApp(Gui::ImGui) {}
 
 void Game::init() {
+  instance = this;
+
   // enable VSync
   setVSync(true);
 
@@ -170,15 +172,15 @@ void Game::init() {
       mTexCubeNormal->setObjectLabel(cubeNormalFN);
       mSkybox = glow::TextureCubeMap::createFromData(bgData.get());
       mSkybox->setObjectLabel(bgPath);
-      mechPlayer.texAlbedo = glow::Texture2D::createFromData(mechAlbedoData.get());
-      mechPlayer.texAlbedo->setObjectLabel(mechAlbedoFN);
-      mechPlayer.texNormal = glow::Texture2D::createFromData(mechNormalData.get());
-      mechPlayer.texNormal->setObjectLabel(mechNormalFN);
+      mechs[player].texAlbedo = glow::Texture2D::createFromData(mechAlbedoData.get());
+      mechs[player].texAlbedo->setObjectLabel(mechAlbedoFN);
+      mechs[player].texNormal = glow::Texture2D::createFromData(mechNormalData.get());
+      mechs[player].texNormal->setObjectLabel(mechNormalFN);
       //temp, TODO
-      mechSmall.texAlbedo = mechPlayer.texAlbedo;
-      mechSmall.texNormal = mechPlayer.texNormal;
-      mechBig.texAlbedo = mechPlayer.texAlbedo;
-      mechBig.texNormal = mechPlayer.texNormal;
+      mechs[small].texAlbedo = mechs[player].texAlbedo;
+      mechs[small].texNormal = mechs[player].texNormal;
+      mechs[big].texAlbedo = mechs[player].texAlbedo;
+      mechs[big].texNormal = mechs[player].texNormal;
 
       for (int i = 0; i <= MAX_HEALTH; i++) {
         mHealthBar[i] = glow::Texture2D::createFromData(healthBarData[i].get());
@@ -264,8 +266,9 @@ void Game::init() {
       //player
       // starting to hardcode everything, assuming that I don't ever need to change stuff
       {
-        Mech &m = mechPlayer;
-        m.type = Mech::player;
+        Mech &m = mechs[player];
+        m.type = player;
+        m.HP = MAX_HEALTH;
         m.moveDir = glm::vec3(0, 0, 1);
         m.viewDir = glm::vec3(0, 0, 1);
         m.scale = .2;
@@ -281,8 +284,9 @@ void Game::init() {
 
       //small
       {
-        Mech &m = mechSmall;
-        m.type = Mech::small;
+        Mech &m = mechs[small];
+        m.type = small;
+        m.HP = 5;
         m.moveDir = glm::vec3(0, 0, -1);
         m.viewDir = glm::vec3(0, 0, -1);
         m.scale = 1;
@@ -298,15 +302,16 @@ void Game::init() {
       }
       //big
       {
-        Mech &m = mechBig;
-        m.type = Mech::small;
+        Mech &m = mechs[big];
+        m.type = big;
+        m.HP = 5;
         m.moveDir = glm::vec3(0, 0, -1);
         m.viewDir = glm::vec3(0, 0, -1);
         m.scale = 30;
         m.floatOffset = 0.01;
-        m.collision = make_shared<btCapsuleShape>(0.1, 0.1);//no collisions
+        m.collision = make_shared<btCapsuleShape>(0.1, 0.1); //no collisions
         m.meshOffset = glm::vec3(0);
-        m.motionState = make_shared<btDefaultMotionState>(bttransform(glm::vec3(0, -500, 0))); 
+        m.motionState = make_shared<btDefaultMotionState>(bttransform(glm::vec3(0, -500, 0)));
         m.rigid = make_shared<btRigidBody>(btRigidBody::btRigidBodyConstructionInfo(0, m.motionState.get(), m.collision.get()));
         m.rigid->setAngularFactor(0);
         m.rigid->setCustomDebugColor(btVector3(255, 1, 1));
@@ -377,11 +382,10 @@ void Game::update(float elapsedSeconds) {
     elapsedSeconds = 1;
 
   //activate to be sure
-  mechPlayer.rigid->activate();
-  mechSmall.rigid->activate();
-  mechBig.rigid->activate();
+  for (const auto &m : mechs)
+    m.rigid->activate();
 
-  const auto playerPos = mechPlayer.getPos(); //getWorldPos(mechPlayer.rigid->getWorldTransform());
+  const auto playerPos = mechs[player].getPos(); //getWorldPos(mechPlayer.rigid->getWorldTransform());
   const auto bulPos = btcast(playerPos);
 
   // modes of player, they change the logic
@@ -419,7 +423,7 @@ void Game::update(float elapsedSeconds) {
 
     // damping
     // TODO ice!
-    mechPlayer.rigid->setDamping(0.7, 0); //damps y...
+    mechs[player].rigid->setDamping(0.7, 0); //damps y...
 
 
     //movement
@@ -467,29 +471,29 @@ void Game::update(float elapsedSeconds) {
         camRight = glm::normalize(camRight);
       }
 
-      mechPlayer.viewDir = camForward;
+      mechs[player].viewDir = camForward;
       auto force = (relDir.x * camRight + relDir.z * camForward) * forceLength;
       if (glm::length(force) > 0.001) {
-        mechPlayer.moveDir = glm::normalize(force);
-        mechPlayer.rigid->applyCentralForce(btcast(force));
+        mechs[player].moveDir = glm::normalize(force);
+        mechs[player].rigid->applyCentralForce(btcast(force));
       }
 
 
-      auto btSpeed = mechPlayer.rigid->getLinearVelocity();
+      auto btSpeed = mechs[player].rigid->getLinearVelocity();
       auto ySpeed = btSpeed.y();
       btSpeed.setY(0);
       // but what about the forces?
       if (btSpeed.length() > maxSpeed)
         btSpeed = btSpeed.normalize() * maxSpeed;
       btSpeed.setY(ySpeed);
-      mechPlayer.rigid->setLinearVelocity(btSpeed);
+      mechs[player].rigid->setLinearVelocity(btSpeed);
 
       // close to ground?
       bool closeToGround = false;
       float ground = 0; // valid if closeToGround
-      float closeToGroundBorder = mechPlayer.floatOffset * 1.2;
+      float closeToGroundBorder = mechs[player].floatOffset * 1.2;
       {
-        auto from = bulPos - btVector3(0, mechPlayer.collision->getHalfHeight() + mechPlayer.collision->getRadius(), 0); //heigth is notthe height...
+        auto from = bulPos - btVector3(0, mechs[player].collision->getHalfHeight() + mechs[player].collision->getRadius(), 0); //heigth is notthe height...
 
         auto to = from - btVector3(0, closeToGroundBorder, 0);
         dynamicsWorld->getDebugDrawer()->drawLine(from, to, btVector4(1, 0, 0, 1));
@@ -507,29 +511,29 @@ void Game::update(float elapsedSeconds) {
       // jumping
       if (closeToGround) {
         // falling + standing
-        if (mechPlayer.rigid->getLinearVelocity().y() <= 0.01 /*&& !jumpPressed*/) {
+        if (mechs[player].rigid->getLinearVelocity().y() <= 0.01 /*&& !jumpPressed*/) {
           mJumps = false;
           // reset y-velocity
-          auto v = mechPlayer.rigid->getLinearVelocity();
+          auto v = mechs[player].rigid->getLinearVelocity();
           v.setY(0);
-          mechPlayer.rigid->setLinearVelocity(v);
+          mechs[player].rigid->setLinearVelocity(v);
           // reset y-position
-          auto t = mechPlayer.rigid->getWorldTransform();
+          auto t = mechs[player].rigid->getWorldTransform();
           auto o = t.getOrigin();
-          o.setY(ground + mechPlayer.floatOffset + mechPlayer.collision->getHalfHeight() + mechPlayer.collision->getRadius());
+          o.setY(ground + mechs[player].floatOffset + mechs[player].collision->getHalfHeight() + mechs[player].collision->getRadius());
           t.setOrigin(o);
-          mechPlayer.rigid->setWorldTransform(t);
+          mechs[player].rigid->setWorldTransform(t);
           // no y-movement anymore!
-          mechPlayer.rigid->setLinearFactor(btVector3(1, 0, 1));
+          mechs[player].rigid->setLinearFactor(btVector3(1, 0, 1));
         }
         // jump
         if (!mJumps && jumpPressed) {
           mJumps = true;
-          mechPlayer.rigid->setLinearFactor(btVector3(1, 1, 1));
-          mechPlayer.rigid->applyCentralForce(btVector3(0, 500, 0));
+          mechs[player].rigid->setLinearFactor(btVector3(1, 1, 1));
+          mechs[player].rigid->applyCentralForce(btVector3(0, 500, 0));
         }
       } else
-        mechPlayer.rigid->setLinearFactor(btVector3(1, 1, 1));
+        mechs[player].rigid->setLinearFactor(btVector3(1, 1, 1));
     }
   }
 
@@ -551,11 +555,8 @@ void Game::render(float elapsedSeconds) {
   auto view = mCamera->getViewMatrix();
 
   //update animations
-  {
-    mechPlayer.updateTime(elapsedSeconds);
-    mechSmall.updateTime(elapsedSeconds);
-    mechBig.updateTime(elapsedSeconds);
-  }
+  for (auto &m : mechs)
+    m.updateTime(elapsedSeconds);
 
   // Depth
   {
@@ -682,9 +683,8 @@ void Game::render(float elapsedSeconds) {
 void Game::drawMech(glow::UsedProgram shader) {
   shader.setUniform("uProj", mCamera->getProjectionMatrix());
   shader.setUniform("uView", mCamera->getViewMatrix());
-  mechPlayer.draw(shader);
-  mechSmall.draw(shader);
-  mechBig.draw(shader);
+  for (auto &m : mechs)
+    m.draw(shader);
 }
 
 void Game::drawCubes(glow::UsedProgram shader) {
@@ -833,7 +833,7 @@ void Game::updateCamera(float elapsedSeconds) {
 #ifdef NDEBUG
     setCursorMode(glow::glfw::CursorMode::Disabled);
 #endif
-    glm::vec3 target = glcast(mechPlayer.rigid->getWorldTransform().getOrigin());
+    glm::vec3 target = glcast(mechs[player].rigid->getWorldTransform().getOrigin());
     mCamera->handle.setTarget(target);
     mCamera->handle.setTargetDistance(5);
 

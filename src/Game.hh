@@ -18,23 +18,17 @@
 
 #define MAX_HEALTH 15
 #define CUBES_MIN -24
-#define CUBES_MAX  25
+#define CUBES_MAX 25
 #define CUBES_TOTAL 50 //(CUBES_MAX - CUBES_MIN + 1)
 
 class Game : public glow::glfw::GlfwApp {
+  // bad
+public:
+  static Game *instance;
   // logic
 private:
   bool mJumps = false;
   bool mJumpWasPressed = false; // last frame
-  int HP = MAX_HEALTH;
-
-
-
-  //glm::vec3 mSpherePosition = {2, 0, 0};
-  //float mSphereSize = 1.0f;
-
-
-
 
   // gfx settings
 private:
@@ -61,9 +55,7 @@ private:
 
   // mech
   glow::SharedProgram mShaderMech;
-  Mech mechPlayer;
-  Mech mechSmall;
-  Mech mechBig;
+  Mech mechs[3];
 
   // beholder
   glow::SharedTexture2D mTexBeholderAlbedo;
@@ -100,7 +92,7 @@ private:
 
   // Sound
 private:
-    std::unique_ptr<SoLoud::Soloud, void (*)(SoLoud::Soloud *)> soloud = //
+  std::unique_ptr<SoLoud::Soloud, void (*)(SoLoud::Soloud *)> soloud = //
       std::unique_ptr<SoLoud::Soloud, void (*)(SoLoud::Soloud *)>(nullptr, [](SoLoud::Soloud *) {});
   SoLoud::WavStream music;
   SoLoud::handle musicHandle;
@@ -113,11 +105,11 @@ private:
 
   // Bullet
 private:
-//#ifdef NDEBUG
+  //#ifdef NDEBUG
   bool mDebugBullet = false;
-//#else
+  //#else
   //bool mDebugBullet = true;
-//#endif
+  //#endif
   std::shared_ptr<btBoxShape> colBox;
 
   entityx::Entity createCube(const glm::ivec3 &pos);

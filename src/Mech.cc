@@ -9,9 +9,14 @@
 
 #include "conversion.hh"
 
+#include "Game.hh" 
+
 using namespace glow;
 
 SharedAssimpModel Mech::mesh;
+
+void Mech::updateLogic() {
+}
 
 void Mech::updateTime(double delta) {
   animationTime[bottom][0] += delta;
