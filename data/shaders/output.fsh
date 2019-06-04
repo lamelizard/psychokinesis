@@ -29,12 +29,13 @@ void main()
         }
         else if (mode == 1){
            //Gameboy
-           vec3 GB[5] = {   vec3(0.06, 0.22, 0.06),
+           vec3 GB[5] = vec3[5](   
+                            vec3(0.06, 0.22, 0.06),
                             vec3(0.19, 0.39, 0.19),
                             vec3(0.55, 0.67, 0.06),
                             vec3(0.61, 0.74, 0.06),
                             vec3(0.61, 0.74, 0.06)//color = 1 -> int = 4?
-                           };
+                           );
            //vec2 coord = floor(gl_FragCoord.xy * 100) / 99;
            //vec3 N = texture(uTexNormal, coord).rgb;
            //color  = texture(uTexColor, coord).rgb * max(0.1, dot(normalize(uLightDir), N));

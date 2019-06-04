@@ -75,7 +75,12 @@ struct ModeArea {
 
 Game *Game::instance = nullptr;
 
+#ifndef NDEBUG
 Game::Game() : GlfwApp(Gui::ImGui) {}
+#else
+Game::Game() : GlfwApp(Gui::None) {}
+#endif
+
 
 void Game::init() {
   instance = this;
@@ -428,15 +433,15 @@ inline double limitAxis(double a) { return a < 0.1 ? 0 : a; }
 
 void Game::bulletCallback(btDynamicsWorld *, btScalar){
     int numManifolds = dynamicsWorld->getDispatcher()->getNumManifolds();
-    auto eRockets = ex.entities.
     for (int i = 0; i < numManifolds; i++) {
         btPersistentManifold *contactManifold = dynamicsWorld->getDispatcher()->getManifoldByIndexInternal(i);
         auto *a = contactManifold->getBody0();
         auto *b = contactManifold->getBody1();
         for(auto o : {a,b}){
-            if(o->getUserIndex() == BID_ROCKET)
-                o->get
-                o->setUserIndex2(1); //explode
+            if(o->getUserIndex() == BID_ROCKET){
+               auto r = (btRigidBody*) o;
+               r->setUserIndex2(1); // explode
+            }
         }
     }
 }
@@ -472,7 +477,7 @@ entityx::Entity Game::createRocket(const glm::vec3 &pos, const glm::vec3 &vel, r
   if (type == rtype::falling)
     rbRocket->setAngularVelocity(btVector3(0, 1, 0)); // test
   rbRocket->setUserIndex(BID_ROCKET);
-  rbRocket->setUserIndex2(0);//explode
+  rbRocket->setUserIndex2(0);//not yet explode
   //rbRocket->setUserPointer((void *)entity.id().id()); // doesn't work...
   return entity;
 }
@@ -643,43 +648,46 @@ void Game::update(float elapsedSeconds) {
   dynamicsWorld->stepSimulation(elapsedSeconds, 10);
 
   //explode Rockets
-  for(auto id : explodeMe)
+
   {
+      auto rocket = entityx::ComponentHandle<Rocket>();
+      for (auto eRocket : ex.entities.entities_with_components(rocket)){
+          auto rigid = eRocket.component<SharedbtRigidBody>()->get();
+          if(rigid->getUserIndex2() != 1)
+              continue;
+          auto motionState = eRocket.component<defMotionState>()->get();
+          btTransform trans;
+          motionState->getWorldTransform(trans);
+          auto pos = getWorldPos(trans);
+          if(rocket->real){
+              //Sound for not real inside mode? unlikely
+              soloud->play3d(sfx, pos.x,pos.y,pos.z); // change
+              //boom
+             /* for(const auto& point :spherePoints){
+                  auto from = btcast(pos);
+                  auto to = btcast(pos + (point * 1.5));//1.5m radius
+    #ifndef NDEBUG
+                  dynamicsWorld->getDebugDrawer()->drawLine(from, to, btVector4(1, 0, 0, 1));
+    #endif
+                  auto closest = btCollisionWorld::ClosestRayResultCallback(from, to);
+                  dynamicsWorld->rayTest(from, to, closest);
+                  if (closest.hasHit()) {
+                    auto obj = closest.m_collisionObject;
+                    if(! obj->isStaticObject() && ! obj->isKinematicObject() && obj->getInternalType() == btCollisionObject::CO_RIGID_BODY){
+                        auto rigidHit = (btRigidBody *)obj; // pray
+                        auto dir = glcast(closest.m_hitPointWorld) - pos;
+                        if(glm::length())
+                        rigidHit->applyForce()
+                    }
+                  }
+              }*/
 
-      assert()
-      auto eRocket = ex.entities.get(entityx::Entity::Id(id));
-      auto rocket = eRocket.component<Rocket>();
-      auto rigid = eRocket.component<SharedbtRigidBody>()->get();
-      auto motionState = eRocket.component<defMotionState>()->get();
-      btTransform trans;
-      motionState->getWorldTransform(trans);
-      auto pos = getWorldPos(trans);
-      if(rocket->real){
-          //Sound for not real inside mode? unlikely
-          soloud->play3d(sfx, pos.x,pos.y,pos.z); // change
-          //boom
-         /* for(const auto& point :spherePoints){
-              auto from = btcast(pos);
-              auto to = btcast(pos + (point * 1.5));//1.5m radius
-#ifndef NDEBUG
-              dynamicsWorld->getDebugDrawer()->drawLine(from, to, btVector4(1, 0, 0, 1));
-#endif
-              auto closest = btCollisionWorld::ClosestRayResultCallback(from, to);
-              dynamicsWorld->rayTest(from, to, closest);
-              if (closest.hasHit()) {
-                auto obj = closest.m_collisionObject;
-                if(! obj->isStaticObject() && ! obj->isKinematicObject() && obj->getInternalType() == btCollisionObject::CO_RIGID_BODY){
-                    auto rigidHit = (btRigidBody *)obj; // pray
-                    auto dir = glcast(closest.m_hitPointWorld) - pos;
-                    if(glm::length())
-                    rigidHit->applyForce()
-                }
-              }
-          }*/
-
+          }
+          dynamicsWorld->removeRigidBody(rigid);
+          eRocket.destroy();
       }
-      dynamicsWorld->removeRigidBody(rigid);
-      eRocket.destroy();
+
+
   }
 }
 
@@ -965,6 +973,12 @@ bool Game::onKey(int key, int scancode, int action, int mods) {
 void Game::updateCamera(float elapsedSeconds) {
   auto const speed = elapsedSeconds * 3;
   //todo move closer to char when looking up
+
+  bool ImGuiwantMouse = false;
+#ifndef NDEBUG
+  ImGuiwantMouse = ImGui::GetIO().WantCaptureMouse;
+#endif
+
   glm::vec3 rel_move;
   if (mFreeCamera) {
     // WASD camera move
@@ -989,7 +1003,7 @@ void Game::updateCamera(float elapsedSeconds) {
     bool leftMB = isMouseButtonPressed(GLFW_MOUSE_BUTTON_LEFT);
     bool rightMB = isMouseButtonPressed(GLFW_MOUSE_BUTTON_RIGHT);
 
-    if ((leftMB || rightMB) && !ImGui::GetIO().WantCaptureMouse) {
+    if ((leftMB || rightMB) && !ImGuiwantMouse) {
       // hide mouse
       setCursorMode(glow::glfw::CursorMode::Disabled);
 
@@ -1015,7 +1029,7 @@ void Game::updateCamera(float elapsedSeconds) {
     mCamera->handle.setTargetDistance(5);
 
 
-    if (!ImGui::GetIO().WantCaptureMouse) {
+    if (!ImGuiwantMouse) {
       auto mouse_delta = input().getLastMouseDelta() / 100.0f;
       if (mouse_delta.x < 1000) // ???
         mCamera->handle.orbit(mouse_delta.x, mouse_delta.y);
