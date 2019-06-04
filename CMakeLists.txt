@@ -101,6 +101,9 @@ add_subdirectory(extern/assimp EXCLUDE_FROM_ALL)
 include_directories(extern/assimp/include)
 include_directories(${CMAKE_CURRENT_BINARY_DIR}/extern/assimp/include)
 
+# Threads
+find_package(Threads)
+
 # Folder grouping
 foreach(TARGET_NAME
     glfw
@@ -156,7 +159,8 @@ target_link_libraries(${PROJECT_NAME} PUBLIC
     BulletCollision
     LinearMath
     assimp
-	soloud
+    soloud
+    ${CMAKE_THREAD_LIBS_INIT}
 )
 
 # Compile flags

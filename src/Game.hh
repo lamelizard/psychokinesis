@@ -1,5 +1,7 @@
 #pragma once
 
+#include <vector>
+
 #include <glow/fwd.hh>
 
 #include <glow-extras/camera/Camera.hh>
@@ -12,6 +14,7 @@
 
 #include <soloud.h>
 #include <soloud_wavstream.h>
+#include <soloud_speech.h>
 
 #include "Mech.hh"
 
@@ -48,6 +51,8 @@ public:
 private:
   bool mJumps = false;
   bool mJumpWasPressed = false; // last frame
+
+  std::vector<glm::vec3> spherePoints;
 
   // gfx settings
 private:
@@ -112,6 +117,7 @@ private:
       std::unique_ptr<SoLoud::Soloud, void (*)(SoLoud::Soloud *)>(nullptr, [](SoLoud::Soloud *) {});
   SoLoud::WavStream music;
   SoLoud::handle musicHandle;
+  SoLoud::Speech sfx;
 
   // EntityX
 private:
@@ -128,7 +134,8 @@ private:
   //#endif
   std::shared_ptr<btBoxShape> colBox;
   std::shared_ptr<btSphereShape> colPoint;
-
+  void bulletCallback(btDynamicsWorld*, btScalar);
+  static void bulletCallbackStatic(btDynamicsWorld* w, btScalar c){instance->bulletCallback(w,c);}
   entityx::Entity createCube(const glm::ivec3 &pos);
   entityx::Entity createRocket(const glm::vec3 &pos, const glm::vec3 &vel, rtype type);
 
@@ -146,7 +153,7 @@ private:
 private:
   void drawMech(glow::UsedProgram shader);
   void drawCubes(glow::UsedProgram shader);
-  void Game::drawRockets(glow::UsedProgram shader);
+  void drawRockets(glow::UsedProgram shader);
 
   // test
   //btDefaultMotionState* boxMotionState = nullptr;

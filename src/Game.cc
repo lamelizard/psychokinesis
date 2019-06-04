@@ -4,6 +4,8 @@
 #include <algorithm>
 #include <future>
 #include <functional>
+#include <exception>
+#include <random>
 
 #include <glm/ext.hpp>
 
@@ -54,8 +56,9 @@ struct Cube {
 };
 
 struct Rocket {
-  rtype type;
+  rtype type = rtype::forward;
   bool real = true;
+  bool explode = false;
 };
 
 enum Mode {
@@ -84,10 +87,28 @@ void Game::init() {
   // IMPORTANT: call to base class
   GlfwApp::init();
 
-  setTitle("Game Development 2019 TODO change ME");
+  setTitle("Game Development 2019 TODO change ME"); // TODO
 
   // start assimp logging
   Assimp::DefaultLogger::create();
+
+  // sphere
+  {
+      spherePoints.reserve(500);
+      if(spherePoints.empty()){
+          std::uniform_real_distribution<double> dist(0.0, 1.0);
+          std::mt19937 gen (87234587123648);//juts guessing
+          for(int i = 0; i < 500; i++){
+              double t =  6.28318530718 * dist(gen);
+              double p = acos(1 - 2 * dist(gen));
+              spherePoints.push_back({
+                                       sin(p)*cos(t), //
+                                       sin(p)*sin(t), //
+                                       cos(p)
+                                     });
+          }
+      }
+}
 
   // create gfx resources
   {
@@ -260,7 +281,7 @@ void Game::init() {
           glow::log(glow::LogLevel::Error) << "could not init sound subsystem";
           if (s->init(SoLoud::Soloud::CLIP_ROUNDOFF, SoLoud::Soloud::NULLDRIVER, 44100, 16384, 2) == SoLoud::SO_NO_ERROR)
             return s;
-          throw std::exception("big problems in sound subsystem");
+          throw exception();
         })(),
         [](SoLoud::Soloud *s) { s->deinit(); delete s; });
     assert(soloud);
@@ -272,6 +293,11 @@ void Game::init() {
       music.setLooping(true);
       musicHandle = soloud->playBackground(music, 0);
       soloud->fadeVolume(musicHandle, 1, 30);
+    }
+    // sfx
+    {
+        //placeholder
+        sfx.setText("boom");
     }
   }
 
@@ -285,6 +311,7 @@ void Game::init() {
     dynamicsWorld->setGravity(btVector3(0, -9.81, 0));
     bulletDebugger = make_unique<BulletDebugger>();
     dynamicsWorld->setDebugDrawer(bulletDebugger.get());
+    dynamicsWorld->setInternalTickCallback(bulletCallbackStatic);
 
     // "point"
     colPoint = make_shared<btSphereShape>(0.1);
@@ -399,6 +426,21 @@ createRocket(glm::vec3(0, 3, 0), glm::vec3(0.001, 0, 0), rtype::forward);
 
 inline double limitAxis(double a) { return a < 0.1 ? 0 : a; }
 
+void Game::bulletCallback(btDynamicsWorld *, btScalar){
+    int numManifolds = dynamicsWorld->getDispatcher()->getNumManifolds();
+    auto eRockets = ex.entities.
+    for (int i = 0; i < numManifolds; i++) {
+        btPersistentManifold *contactManifold = dynamicsWorld->getDispatcher()->getManifoldByIndexInternal(i);
+        auto *a = contactManifold->getBody0();
+        auto *b = contactManifold->getBody1();
+        for(auto o : {a,b}){
+            if(o->getUserIndex() == BID_ROCKET)
+                o->get
+                o->setUserIndex2(1); //explode
+        }
+    }
+}
+
 entityx::Entity Game::createCube(const glm::ivec3 &pos) {
   auto motionState = make_shared<btDefaultMotionState>(bttransform(glm::vec3(pos.x, (float)pos.y - colBox->getHalfExtentsWithMargin().getY(), pos.z))); // y = 0 is floor
   auto rbCube = make_shared<btRigidBody>(btRigidBody::btRigidBodyConstructionInfo(0., motionState.get(), colBox.get(), btVector3(0, 0, 0)));
@@ -430,7 +472,8 @@ entityx::Entity Game::createRocket(const glm::vec3 &pos, const glm::vec3 &vel, r
   if (type == rtype::falling)
     rbRocket->setAngularVelocity(btVector3(0, 1, 0)); // test
   rbRocket->setUserIndex(BID_ROCKET);
-  rbRocket->setUserPointer((void *)entity.id().id());
+  rbRocket->setUserIndex2(0);//explode
+  //rbRocket->setUserPointer((void *)entity.id().id()); // doesn't work...
   return entity;
 }
 
@@ -598,6 +641,46 @@ void Game::update(float elapsedSeconds) {
 
   //update physics
   dynamicsWorld->stepSimulation(elapsedSeconds, 10);
+
+  //explode Rockets
+  for(auto id : explodeMe)
+  {
+
+      assert()
+      auto eRocket = ex.entities.get(entityx::Entity::Id(id));
+      auto rocket = eRocket.component<Rocket>();
+      auto rigid = eRocket.component<SharedbtRigidBody>()->get();
+      auto motionState = eRocket.component<defMotionState>()->get();
+      btTransform trans;
+      motionState->getWorldTransform(trans);
+      auto pos = getWorldPos(trans);
+      if(rocket->real){
+          //Sound for not real inside mode? unlikely
+          soloud->play3d(sfx, pos.x,pos.y,pos.z); // change
+          //boom
+         /* for(const auto& point :spherePoints){
+              auto from = btcast(pos);
+              auto to = btcast(pos + (point * 1.5));//1.5m radius
+#ifndef NDEBUG
+              dynamicsWorld->getDebugDrawer()->drawLine(from, to, btVector4(1, 0, 0, 1));
+#endif
+              auto closest = btCollisionWorld::ClosestRayResultCallback(from, to);
+              dynamicsWorld->rayTest(from, to, closest);
+              if (closest.hasHit()) {
+                auto obj = closest.m_collisionObject;
+                if(! obj->isStaticObject() && ! obj->isKinematicObject() && obj->getInternalType() == btCollisionObject::CO_RIGID_BODY){
+                    auto rigidHit = (btRigidBody *)obj; // pray
+                    auto dir = glcast(closest.m_hitPointWorld) - pos;
+                    if(glm::length())
+                    rigidHit->applyForce()
+                }
+              }
+          }*/
+
+      }
+      dynamicsWorld->removeRigidBody(rigid);
+      eRocket.destroy();
+  }
 }
 
 //*************************************
