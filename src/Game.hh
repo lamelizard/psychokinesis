@@ -18,6 +18,24 @@
 
 #include "Mech.hh"
 
+enum Mode {
+  normal = 0,
+  drawn = 1,
+  renme = 2 // rename me
+};
+
+struct ModeArea {
+  Mode mode = normal;
+  glm::vec3 pos;
+  float radius;
+};
+
+//rockettype
+enum class rtype {
+  forward = 0,
+  homing = 1,
+  falling = 2
+};
 
 #define MAX_HEALTH 15
 #define CUBES_MIN -24
@@ -34,16 +52,10 @@
 #define BID_ROCKET (1 << 3)
 #define BID_CUBE (1 << 4)
 
-
-
-//rockettype
-enum class rtype {
-  forward = 0,
-  homing = 1,
-  falling = 2
-};
+inline double limitAxis(double a) { return a < 0.1 ? 0 : a; }
 
 class Game : public glow::glfw::GlfwApp {
+    friend class Mech;
   // bad
 public:
   static Game *instance;

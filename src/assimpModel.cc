@@ -72,7 +72,7 @@ void AssimpModel::draw(const glow::UsedProgram &shader, double t, bool loop, con
   if (loop)
     ticks = fmod(ticks, animation->mDuration);
   else
-    ticks = std::max(ticks, animation->mDuration);
+    ticks = std::min(ticks, animation->mDuration);
 
   glm::mat4 boneArray[MAX_BONES];
 
@@ -152,7 +152,7 @@ aiMatrix4x4 AssimpModel::getAnimMat(float ticks, aiNodeAnim *anim) {
 
       auto dt = anim->mPositionKeys[i + 1].mTime - anim->mPositionKeys[i].mTime;
       float alpha = (ticks - anim->mPositionKeys[i].mTime) / dt;
-      assert(!(alpha < 0 || alpha > 1));
+      assert(!(alpha < -.01 || alpha > 1.01));
       auto a = anim->mPositionKeys[i].mValue;
       auto b = anim->mPositionKeys[i + 1].mValue;
       position = a + alpha * (b - a);
@@ -170,7 +170,7 @@ aiMatrix4x4 AssimpModel::getAnimMat(float ticks, aiNodeAnim *anim) {
 
       auto dt = anim->mScalingKeys[i + 1].mTime - anim->mScalingKeys[i].mTime;
       float alpha = (ticks - anim->mScalingKeys[i].mTime) / dt;
-      assert(!(alpha < 0 || alpha > 1));
+      assert(!(alpha < -.01 || alpha > 1.01));
       auto a = anim->mScalingKeys[i].mValue;
       auto b = anim->mScalingKeys[i + 1].mValue;
       scaling = a + alpha * (b - a);
@@ -188,7 +188,7 @@ aiMatrix4x4 AssimpModel::getAnimMat(float ticks, aiNodeAnim *anim) {
 
       auto dt = anim->mRotationKeys[i + 1].mTime - anim->mRotationKeys[i].mTime;
       float alpha = (ticks - anim->mRotationKeys[i].mTime) / dt;
-      assert(!(alpha < 0 || alpha > 1));
+      assert(!(alpha < -.01 || alpha > 1.01));
       aiQuaternion::Interpolate(rotation, anim->mRotationKeys[i].mValue, anim->mRotationKeys[i + 1].mValue, alpha);
       // rotation = aiQuaternion(rotation.GetMatrix().Inverse());//why?
     }
@@ -410,7 +410,7 @@ AssimpModel::AssimpModel(const std::string &filename) : filename(filename) {
         nodeAnimations[animation][node] = animNode;
       }
     }
-
+   (void)0;
   // for (auto& w : vertexData->boneWeights)
   //  w = glm::normalize(w);
 }

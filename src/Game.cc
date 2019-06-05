@@ -61,18 +61,6 @@ struct Rocket {
   bool explode = false;
 };
 
-enum Mode {
-  normal = 0,
-  drawn = 1,
-  renme = 2 // rename me
-};
-
-struct ModeArea {
-  Mode mode = normal;
-  glm::vec3 pos;
-  float radius;
-};
-
 Game *Game::instance = nullptr;
 
 #ifndef NDEBUG
@@ -118,7 +106,7 @@ void Game::init() {
   // create gfx resources
   {
     mCamera = glow::camera::Camera::create();
-    mCamera->setLookAt({0, 2, 3}, {0, 0, 0});
+    mCamera->setLookAt({-5, 3, -10}, {0, 7, -10}); //90 degree
 
     // depth
     {
@@ -330,6 +318,7 @@ void Game::init() {
             Mech &m = mechs[player];
     m.type = player;
     m.HP = MAX_HEALTH;
+    m.setAction(Mech::controlPlayer);
     m.moveDir = glm::vec3(0, 0, 1);
     m.viewDir = glm::vec3(0, 0, 1);
     m.scale = .2;
@@ -350,13 +339,15 @@ void Game::init() {
     Mech &m = mechs[small];
     m.type = small;
     m.HP = 5;
+    m.setAction(Mech::startSmall);
     m.moveDir = glm::vec3(0, 0, -1);
     m.viewDir = glm::vec3(0, 0, -1);
     m.scale = 1;
     m.floatOffset = 0.01;
     m.collision = make_shared<btCapsuleShape>(2, 2.5);
-    m.meshOffset = glm::vec3(0, -(m.collision->getHalfHeight() + m.collision->getRadius() + m.floatOffset), -1.5);
-    m.motionState = make_shared<btDefaultMotionState>(bttransform(glm::vec3(0, 2, 20)));
+    auto groundOffset = m.collision->getHalfHeight() + m.collision->getRadius() + m.floatOffset;
+    m.meshOffset = glm::vec3(0, -groundOffset, -1.5);
+    m.motionState = make_shared<btDefaultMotionState>(bttransform(glm::vec3(0, groundOffset, 20)));
     m.rigid = make_shared<btRigidBody>(btRigidBody::btRigidBodyConstructionInfo(0, m.motionState.get(), m.collision.get()));
     m.rigid->setAngularFactor(0);
     m.rigid->setCustomDebugColor(btVector3(255, 1, 1));
@@ -370,6 +361,7 @@ void Game::init() {
     Mech &m = mechs[big];
     m.type = big;
     m.HP = 5;
+    m.setAction(Mech::emptyAction);
     m.moveDir = glm::vec3(0, 0, -1);
     m.viewDir = glm::vec3(0, 0, -1);
     m.scale = 30;
@@ -429,7 +421,7 @@ createRocket(glm::vec3(0, 3, 0), glm::vec3(0.001, 0, 0), rtype::forward);
 }
 }
 
-inline double limitAxis(double a) { return a < 0.1 ? 0 : a; }
+
 
 void Game::bulletCallback(btDynamicsWorld *, btScalar){
     int numManifolds = dynamicsWorld->getDispatcher()->getNumManifolds();
@@ -492,157 +484,11 @@ void Game::update(float elapsedSeconds) {
   for (const auto &m : mechs)
     m.rigid->activate();
 
-  const auto playerPos = mechs[player].getPos(); //getWorldPos(mechPlayer.rigid->getWorldTransform());
-  const auto bulPos = btcast(playerPos);
-
-  // modes of player, they change the logic
-  // could change mode for any entity!!!
-  set<Mode> playerModes;
-  {
-    auto area = entityx::ComponentHandle<ModeArea>();
-    for (auto entity : ex.entities.entities_with_components(area))
-      if (glm::distance(area->pos, playerPos) < area->radius)
-        playerModes.insert(area->mode);
-  }
-
-  // Physics
-  // Bullet uses fixed timestep and interpolates
-  // -> probably should put this in render as well to get the interpolation
-  // move character
-  {
-    auto maxSpeed = 5;
-    auto forceLength = 5;
-    // handle slowdown
-    {
-      static bool musicSlow = true;
-      if (playerModes.count(drawn)) {
-        maxSpeed = 3;
-        if (!musicSlow) {
-          musicSlow = true;
-          soloud->fadeRelativePlaySpeed(musicHandle, 0.7, 2);
-        }
-      } else if (musicSlow) {
-        musicSlow = false;
-        soloud->fadeRelativePlaySpeed(musicHandle, 1, 2);
-      }
-    }
 
 
-    // damping
-    // TODO ice!
-    mechs[player].rigid->setDamping(0.7, 0); //damps y...
+    for(auto& m : mechs)
+        m.tick();
 
-
-    //movement
-    {
-      GLFWgamepadstate gamepadState;
-      bool hasController = glfwJoystickIsGamepad(GLFW_JOYSTICK_1) && glfwGetGamepadState(GLFW_JOYSTICK_1, &gamepadState);
-
-
-      //jump
-      bool jumpPressed = isKeyPressed(GLFW_KEY_SPACE) ||                                      //
-                         (hasController && (                                                  //
-                                               gamepadState.buttons[GLFW_GAMEPAD_BUTTON_A] || //
-                                               gamepadState.buttons[GLFW_GAMEPAD_BUTTON_B] || //
-                                               gamepadState.buttons[GLFW_GAMEPAD_BUTTON_X] || //
-                                               gamepadState.buttons[GLFW_GAMEPAD_BUTTON_Y]));
-
-      // reldir = dir without camera
-      glm::vec3 relDir;
-      {
-        if (isKeyPressed(GLFW_KEY_LEFT) || (isKeyPressed(GLFW_KEY_A) && !mFreeCamera))
-          relDir.x -= 1;
-        if (isKeyPressed(GLFW_KEY_RIGHT) || (isKeyPressed(GLFW_KEY_D) && !mFreeCamera))
-          relDir.x += 1;
-        if (isKeyPressed(GLFW_KEY_UP) || (isKeyPressed(GLFW_KEY_W) && !mFreeCamera))
-          relDir.z += 1;
-        if (isKeyPressed(GLFW_KEY_DOWN) || (isKeyPressed(GLFW_KEY_S) && !mFreeCamera))
-          relDir.z -= 1;
-
-        if (glm::length(relDir) > .1f)
-          glm::normalize(relDir);
-        else if (glm::length(relDir) < 0.1 && hasController) // a.k.a. 0
-          relDir = glm::normalize(glm::vec3(limitAxis(gamepadState.axes[GLFW_GAMEPAD_AXIS_LEFT_X]), 0, limitAxis(gamepadState.axes[GLFW_GAMEPAD_AXIS_LEFT_Y])));
-      }
-
-
-      // movement relative to camera
-      glm::vec3 camForward;
-      glm::vec3 camRight;
-      {
-        camForward = mCamera->getForwardVector();
-        camForward.y = 0;
-        camForward = glm::normalize(camForward);
-        camRight = mCamera->getRightVector();
-        camRight.y = 0;
-        camRight = glm::normalize(camRight);
-      }
-
-      mechs[player].viewDir = camForward;
-      auto force = (relDir.x * camRight + relDir.z * camForward) * forceLength;
-      if (glm::length(force) > 0.001) {
-        mechs[player].moveDir = glm::normalize(force);
-        mechs[player].rigid->applyCentralForce(btcast(force));
-      }
-
-
-      auto btSpeed = mechs[player].rigid->getLinearVelocity();
-      auto ySpeed = btSpeed.y();
-      btSpeed.setY(0);
-      // but what about the forces?
-      if (btSpeed.length() > maxSpeed)
-        btSpeed = btSpeed.normalize() * maxSpeed;
-      btSpeed.setY(ySpeed);
-      mechs[player].rigid->setLinearVelocity(btSpeed);
-
-      // close to ground?
-      bool closeToGround = false;
-      float ground = 0; // valid if closeToGround
-      float closeToGroundBorder = mechs[player].floatOffset * 1.2;
-      {
-        auto from = bulPos - btVector3(0, mechs[player].collision->getHalfHeight() + mechs[player].collision->getRadius(), 0); //heigth is notthe height...
-
-        auto to = from - btVector3(0, closeToGroundBorder, 0);
-        dynamicsWorld->getDebugDrawer()->drawLine(from, to, btVector4(1, 0, 0, 1));
-        auto closest = btCollisionWorld::ClosestRayResultCallback(from, to);
-        dynamicsWorld->rayTest(from, to, closest);
-        if (closest.hasHit()) {
-          closeToGround = true;
-          ground = closest.m_hitPointWorld.y();
-        }
-      }
-
-
-
-
-      // jumping
-      if (closeToGround) {
-        // falling + standing
-        if (mechs[player].rigid->getLinearVelocity().y() <= 0.01 /*&& !jumpPressed*/) {
-          mJumps = false;
-          // reset y-velocity
-          auto v = mechs[player].rigid->getLinearVelocity();
-          v.setY(0);
-          mechs[player].rigid->setLinearVelocity(v);
-          // reset y-position
-          auto t = mechs[player].rigid->getWorldTransform();
-          auto o = t.getOrigin();
-          o.setY(ground + mechs[player].floatOffset + mechs[player].collision->getHalfHeight() + mechs[player].collision->getRadius());
-          t.setOrigin(o);
-          mechs[player].rigid->setWorldTransform(t);
-          // no y-movement anymore!
-          mechs[player].rigid->setLinearFactor(btVector3(1, 0, 1));
-        }
-        // jump
-        if (!mJumps && jumpPressed) {
-          mJumps = true;
-          mechs[player].rigid->setLinearFactor(btVector3(1, 1, 1));
-          mechs[player].rigid->applyCentralForce(btVector3(0, 500, 0));
-        }
-      } else
-        mechs[player].rigid->setLinearFactor(btVector3(1, 1, 1));
-    }
-  }
 
   //update physics
   dynamicsWorld->stepSimulation(elapsedSeconds, 10);
@@ -663,7 +509,7 @@ void Game::update(float elapsedSeconds) {
               //Sound for not real inside mode? unlikely
               soloud->play3d(sfx, pos.x,pos.y,pos.z); // change
               //boom
-             /* for(const auto& point :spherePoints){
+              for(const auto& point :spherePoints){
                   auto from = btcast(pos);
                   auto to = btcast(pos + (point * 1.5));//1.5m radius
     #ifndef NDEBUG
@@ -675,13 +521,13 @@ void Game::update(float elapsedSeconds) {
                     auto obj = closest.m_collisionObject;
                     if(! obj->isStaticObject() && ! obj->isKinematicObject() && obj->getInternalType() == btCollisionObject::CO_RIGID_BODY){
                         auto rigidHit = (btRigidBody *)obj; // pray
-                        auto dir = glcast(closest.m_hitPointWorld) - pos;
-                        if(glm::length())
-                        rigidHit->applyForce()
+                        auto dir = (to - from).normalize();
+                        auto strength = ((to - closest.m_hitPointWorld).length() / (to - from).length()) * 50; // 100-> get thrown through floor...
+                        rigidHit->applyForce(dir*strength, closest.m_hitPointWorld - rigidHit->getWorldTransform().getOrigin());
+                        //rigidHit->applyCentralForce(dir * strength);
                     }
                   }
-              }*/
-
+              }
           }
           dynamicsWorld->removeRigidBody(rigid);
           eRocket.destroy();
