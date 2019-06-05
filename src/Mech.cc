@@ -28,6 +28,7 @@ void Mech::setAnimation(Mech::animation ab, Mech::animation at, double bt, doubl
     animationAlpha = 1;
     animationsTime[0] = bt;
     animationTimeTop = tt;
+    animationsFaktor[0] = 1;
 }
 
   void Mech::setAnimation(Mech::animation aba, Mech::animation abb, Mech::animation at, float ba, double bta, double btb, double tt){
@@ -38,12 +39,14 @@ void Mech::setAnimation(Mech::animation ab, Mech::animation at, double bt, doubl
     animationsTime[0] = bta;
     animationsTime[1] = btb;
     animationTimeTop = tt;
+    animationsFaktor[0] = 1;
+    animationsFaktor[1] = 1;
 }
 
 void Mech::updateTime(double delta) {
-  animationsTime[0] += delta;
-  animationsTime[1] += delta;
-  animationTimeTop += delta;
+  animationsTime[0] += delta * animationsFaktor[0];
+  animationsTime[1] += delta * animationsFaktor[1];
+  animationTimeTop += delta * 1; // lame
 }
 
 void Mech::draw(glow::UsedProgram &shader) {
@@ -53,13 +56,15 @@ void Mech::draw(glow::UsedProgram &shader) {
   {
       auto angle = glm::angle(moveDir, glm::vec3(0, 0, 1));
       auto cross = glm::normalize(-glm::cross(moveDir, glm::vec3(0, 0, 1)));
-      if(isnan(glm::length(cross))){ // couldn't get cross product
-          cross = glm::vec3(moveDir.x, -moveDir.z, moveDir.y);
-        //if(!(angle < 0.1 || angle > -0.1)) // ca. 180?
-          //cross = -cross;
-      }
-      //up is allways up for mechs?
-      //auto cross = glm::vec3(0,1,0);
+      if(isnan(glm::length(cross))) // couldn't get cross product // still doesn'towrk...
+          //FIXME TODO -> mech vs unity fix...
+          //if(angle < 0.01 && angle > -0.01)
+               //cross = glm::vec3(0,1,0);
+          //else
+          if(abs(angle) < 3.15 && abs(angle) > 3.13){
+              cross = glm::vec3(0,1,0);
+              //model = glm::rotate(model, 3.141592f, glm::vec3(0, 0, 1)); // unity fix???
+          }
       model = glm::rotate(model, angle, cross);
   }
   model = glm::translate(model, meshOffset);
@@ -254,14 +259,122 @@ void Mech::startSmall(int t){
         g->soloud->play3d(g->sfx, pos.x, pos.y, pos.z);
     }
 
-    if(t > 4*60+68)//getup finished
-        m.setAction(emptyAction);
-
-
-
+    if(t > 4*60+68 + 60){//getup finished + 1s
+        m.setAnimation(walk, none);
+        m.setAction(runSmall);
+    }
 }
 
 void Mech::startBig(int)
 {
     assert(0);
+}
+
+void Mech::runSmall(int t)
+{
+    auto g = Game::instance;
+    auto &m = g->mechs[small];
+    if(m.rigid->getUserIndex2() == SMALL_GOTHIT){
+        m.HP--;
+        m.rigid->setUserIndex2(SMALL_NONE);
+    }
+
+    auto groundOffset = glm::vec3(0, m.collision->getHalfHeight() + m.collision->getRadius() + m.floatOffset, 0);
+    static int nextGoal = 1;
+    static int currentWay = 0;
+    static int timeNeeded = 10*60;
+    static int reachGoalInTicks = timeNeeded;// testme, 1.75 m/s
+    static glm::vec3 lastPosition  = glm::vec3(0.5, 0, 18.5) + groundOffset;
+    auto pos = m.getPos();
+
+    static const vector<glm::vec3> ways[4] = {{
+        {0.5, 0, 18.5},
+        {-17.5, 0, 18.5},
+        {-17.5, 0, 0.5},
+        {0.5, 0, 0.5},
+        {18.5, 0, 0.5},
+        {18.5, 0, -17.5},
+        {0.5, 0, -17.5},
+        {0.5, 0, 0.5}
+    }, {
+         {18.5, 0, 0.5},
+         {18.5, 0, 18.5},
+         {0.5, 0, 18.5},
+         {0.5, 0, 0.5},
+         {-17.5, 0, 0.5},
+         {-17.5, 0, -17.5},
+         {0.5, 0, -17.5},
+         {0.5, 0, 0.5}
+    }, {
+         {-17.5, 0, 0.5},
+         {-17.5, 0, 18.5},
+         {-17.5, 0, 0.5},
+         {-17.5, 0, -17.5},
+         {-17.5, 0, 0.5},
+         {0.5, 0, 0.5},
+         {18.5, 0, 0.5},
+         {0.5, 0, 0.5}
+    }, {
+         {0.5, 0, 18.5},
+         {-17.5, 0, 18.5},
+         {-17.5, 0, 0.5},
+         {-17.5, 0, -17.5},
+         {0.5, 0, -17.5},
+         {18.5, 0, -17.5},
+         {18.5, 0, 0.5},
+         {18.5, 0, 18.5},
+         {0.5, 0, 18.5},
+         {0.5, 0, 0.5}
+    }};
+
+    //rocket
+    if(t % (60 + ((m.HP) * 15)) == 0){
+        auto &p = g->mechs[player];
+        auto dir = glm::normalize(p.getPos() - pos);
+        g->createRocket(pos + (dir * 3), dir * 4, rtype::forward); // 4?
+    }
+
+    //walk
+    auto way = ways[currentWay];
+    auto futurePos = way[nextGoal] + groundOffset;
+
+    if(reachGoalInTicks == 0){
+        nextGoal++;
+        if(nextGoal == way.size())
+            nextGoal = 0;
+        if(futurePos == glm::vec3{0.5,0,0.5}  + groundOffset){
+            if(currentWay < 5 - m.HP)
+                currentWay++;
+            else {
+                //homing rocket
+                auto &p = g->mechs[player];
+                auto dir = glm::normalize(p.getPos() - pos);
+                auto entity = g->createRocket(pos - glm::vec3(0,1,0) + (dir * 2.5), dir * 4, rtype::homing); // y-1 since else likely to hit ground  //TODO higher acc? and constraints to limeit velocity -> better homing
+                if(m.HP > 3){ // wait to be easier
+                    //TODO need default animation...
+                    m.setAction([entity](int t){
+                        if(!entity.valid())
+                            Game::instance->mechs[small].setAction(runSmall);
+                    });
+                }
+            }
+        }
+        way = ways[currentWay];
+        futurePos = way[nextGoal];
+        reachGoalInTicks = timeNeeded;
+    }
+
+    auto nextStepPos = pos + ((futurePos - pos) * (1. / reachGoalInTicks));
+    m.moveDir = glm::normalize(futurePos - pos);
+    assert(m.rigid->isKinematicObject());
+    //https://pybullet.org/Bullet/phpBB3/viewtopic.php?t=11530
+    //m.motionState->m_graphicsWorldTrans.setOrigin(btcast(nextStepPos));
+    btTransform trans;
+    trans.setIdentity();
+    trans.setOrigin(btcast(nextStepPos));
+    //m.rigid->setWorldTransform(trans);
+    m.motionState->setWorldTransform(trans);
+    m.rigid->setActivationState(DISABLE_DEACTIVATION);
+    reachGoalInTicks--;
+
 }

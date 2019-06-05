@@ -106,7 +106,7 @@ void Game::init() {
   // create gfx resources
   {
     mCamera = glow::camera::Camera::create();
-    mCamera->setLookAt({-5, 3, -10}, {0, 7, -10}); //90 degree
+    mCamera->setLookAt({.5, 3, -15}, {.5, 7, -10});
 
     // depth
     {
@@ -315,12 +315,12 @@ void Game::init() {
         //player
         // starting to hardcode everything, assuming that I don't ever need to change stuff
         {
-            Mech &m = mechs[player];
+    Mech &m = mechs[player];
     m.type = player;
     m.HP = MAX_HEALTH;
     m.setAction(Mech::controlPlayer);
-    m.moveDir = glm::vec3(0, 0, 1);
-    m.viewDir = glm::vec3(0, 0, 1);
+    m.moveDir = glm::vec3(-.1, 0, 1.1);
+    m.viewDir = glm::vec3(0, 0, 1.1);
     m.scale = .2;
     m.floatOffset = 0.25;
     m.collision = make_shared<btCapsuleShape>(0.4, 0.5);
@@ -330,6 +330,7 @@ void Game::init() {
     m.rigid->setAngularFactor(0);
     m.rigid->setCustomDebugColor(btVector3(255, 1, 1));
     m.rigid->setUserIndex(BID_PLAYER);
+    m.rigid->setUserIndex2(0);
     m.rigid->setUserPointer(&mechs[player]);
     dynamicsWorld->addRigidBody(m.rigid.get());
   }
@@ -347,12 +348,13 @@ void Game::init() {
     m.collision = make_shared<btCapsuleShape>(2, 2.5);
     auto groundOffset = m.collision->getHalfHeight() + m.collision->getRadius() + m.floatOffset;
     m.meshOffset = glm::vec3(0, -groundOffset, -1.5);
-    m.motionState = make_shared<btDefaultMotionState>(bttransform(glm::vec3(0, groundOffset, 20)));
+    m.motionState = make_shared<btDefaultMotionState>(bttransform(glm::vec3(0, groundOffset, 18.5)));
     m.rigid = make_shared<btRigidBody>(btRigidBody::btRigidBodyConstructionInfo(0, m.motionState.get(), m.collision.get()));
     m.rigid->setAngularFactor(0);
     m.rigid->setCustomDebugColor(btVector3(255, 1, 1));
     m.rigid->setCollisionFlags(m.rigid->getCollisionFlags() | btCollisionObject::CF_KINEMATIC_OBJECT);
     m.rigid->setUserIndex(BID_SMALL);
+    m.rigid->setUserIndex2(0); // not rushing
     m.rigid->setUserPointer(&mechs[small]);
     dynamicsWorld->addRigidBody(m.rigid.get());
   }
@@ -374,6 +376,7 @@ void Game::init() {
     m.rigid->setCustomDebugColor(btVector3(255, 1, 1));
     m.rigid->setCollisionFlags(m.rigid->getCollisionFlags() | btCollisionObject::CF_KINEMATIC_OBJECT);
     m.rigid->setUserIndex(BID_BIG);
+    m.rigid->setUserIndex2(0);
     m.rigid->setUserPointer(&mechs[big]);
     dynamicsWorld->addRigidBody(m.rigid.get());
   }
@@ -407,9 +410,6 @@ void Game::init() {
       }
   }
 }
-
-// test
-createRocket(glm::vec3(0, 3, 0), glm::vec3(0.001, 0, 0), rtype::forward);
 }
 
 
@@ -419,6 +419,11 @@ createRocket(glm::vec3(0, 3, 0), glm::vec3(0.001, 0, 0), rtype::forward);
   auto entity = ex.entities.create();
   entity.assign<ModeArea>(ModeArea{drawn, {10, 0, 10}, 5});
 }
+
+  {
+    auto entity = ex.entities.create();
+    entity.assign<ModeArea>(ModeArea{fake, {-15, 0, -15}, 10});
+  }
 }
 
 
@@ -429,12 +434,26 @@ void Game::bulletCallback(btDynamicsWorld *, btScalar){
         btPersistentManifold *contactManifold = dynamicsWorld->getDispatcher()->getManifoldByIndexInternal(i);
         auto *a = contactManifold->getBody0();
         auto *b = contactManifold->getBody1();
-        for(auto o : {a,b}){
-            if(o->getUserIndex() == BID_ROCKET){
-               auto r = (btRigidBody*) o;
-               r->setUserIndex2(1); // explode
+        bool hasRocket = false;
+        for(auto o : {a,b})
+            if(o->getUserIndex() & BID_ROCKET){
+               ((btRigidBody*) o)->setUserIndex2(1);
+                hasRocket = true;
             }
+        if(hasRocket){
+            if(a->getUserIndex() & BID_ROCKET)
+                std::swap(a,b);
+            if(a->getUserIndex() & BID_PLAYER)
+                mechs[player].HP -= 2;
+            if(a->getUserIndex() & BID_SMALL &&
+                    ((btRigidBody*) b)->getUserIndex2() & BID_ROCKET_HOMING)
+                ((btRigidBody*) a)->setUserIndex2(SMALL_GOTHIT); // might need to check if homing rocket?
+
+
         }
+
+
+
     }
 }
 
@@ -454,13 +473,13 @@ entityx::Entity Game::createCube(const glm::ivec3 &pos) {
   return entity;
 }
 
-entityx::Entity Game::createRocket(const glm::vec3 &pos, const glm::vec3 &vel, rtype type) {
+entityx::Entity Game::createRocket(const glm::vec3 &pos, const glm::vec3 &acc, rtype type) {
   auto motionState = make_shared<btDefaultMotionState>(bttransform(pos));
   auto rbRocket = make_shared<btRigidBody>(btRigidBody::btRigidBodyConstructionInfo(1., motionState.get(), colPoint.get()));
-
-  rbRocket->setLinearVelocity(btcast(vel));
+  rbRocket->setLinearVelocity(btcast(glm::normalize(acc)*2));
   dynamicsWorld->addRigidBody(rbRocket.get());
-  rbRocket->setGravity(btVector3(0, 0, 0)); // after adding to world!
+  //rbRocket->setGravity(btVector3(0, 0, 0)); // after adding to world!
+  rbRocket->setGravity(btcast(acc));
 
   auto entity = ex.entities.create();
   entity.assign<SharedbtRigidBody>(rbRocket);
@@ -469,6 +488,8 @@ entityx::Entity Game::createRocket(const glm::vec3 &pos, const glm::vec3 &vel, r
   if (type == rtype::falling)
     rbRocket->setAngularVelocity(btVector3(0, 1, 0)); // test
   rbRocket->setUserIndex(BID_ROCKET);
+  if(type == rtype::homing)
+      rbRocket->setUserIndex(BID_ROCKET_HOMING);
   rbRocket->setUserIndex2(0);//not yet explode
   //rbRocket->setUserPointer((void *)entity.id().id()); // doesn't work...
   return entity;
@@ -480,57 +501,79 @@ void Game::update(float elapsedSeconds) {
   if (elapsedSeconds > 1)
     elapsedSeconds = 1;
 
-  //activate to be sure
-  for (const auto &m : mechs)
-    m.rigid->activate();
 
-
-
-    for(auto& m : mechs)
-        m.tick();
+  for (auto &m : mechs){
+    //activate to be sure
+       m.rigid->activate();
+       m.tick();
+  }
 
 
   //update physics
   dynamicsWorld->stepSimulation(elapsedSeconds, 10);
 
-  //explode Rockets
-
+  //explode Rockets, steer Rockets
   {
       auto rocket = entityx::ComponentHandle<Rocket>();
       for (auto eRocket : ex.entities.entities_with_components(rocket)){
           auto rigid = eRocket.component<SharedbtRigidBody>()->get();
-          if(rigid->getUserIndex2() != 1)
-              continue;
           auto motionState = eRocket.component<defMotionState>()->get();
           btTransform trans;
           motionState->getWorldTransform(trans);
           auto pos = getWorldPos(trans);
-          if(rocket->real){
-              //Sound for not real inside mode? unlikely
-              soloud->play3d(sfx, pos.x,pos.y,pos.z); // change
-              //boom
-              for(const auto& point :spherePoints){
-                  auto from = btcast(pos);
-                  auto to = btcast(pos + (point * 1.5));//1.5m radius
-    #ifndef NDEBUG
-                  dynamicsWorld->getDebugDrawer()->drawLine(from, to, btVector4(1, 0, 0, 1));
-    #endif
-                  auto closest = btCollisionWorld::ClosestRayResultCallback(from, to);
-                  dynamicsWorld->rayTest(from, to, closest);
-                  if (closest.hasHit()) {
-                    auto obj = closest.m_collisionObject;
-                    if(! obj->isStaticObject() && ! obj->isKinematicObject() && obj->getInternalType() == btCollisionObject::CO_RIGID_BODY){
-                        auto rigidHit = (btRigidBody *)obj; // pray
-                        auto dir = (to - from).normalize();
-                        auto strength = ((to - closest.m_hitPointWorld).length() / (to - from).length()) * 50; // 100-> get thrown through floor...
-                        rigidHit->applyForce(dir*strength, closest.m_hitPointWorld - rigidHit->getWorldTransform().getOrigin());
-                        //rigidHit->applyCentralForce(dir * strength);
-                    }
+
+          if(rigid->getUserIndex2() == 1)
+          {
+              //BOOM?
+              if(rocket->real){
+                  //BOOM!
+                  //Sound for not real inside mode? unlikely
+                  soloud->play3d(sfx, pos.x,pos.y,pos.z); // change
+                  //boom
+                  for(const auto& point :spherePoints){
+                      auto from = btcast(pos);
+                      auto to = btcast(pos + (point * 1.5));//1.5m radius
+        #ifndef NDEBUG
+                      dynamicsWorld->getDebugDrawer()->drawLine(from, to, btVector4(1, 0, 0, 1));
+        #endif
+                      auto closest = btCollisionWorld::ClosestRayResultCallback(from, to);
+                      dynamicsWorld->rayTest(from, to, closest);
+                      if (closest.hasHit()) {
+                        auto obj = closest.m_collisionObject;
+                        if(! obj->isStaticObject() && ! obj->isKinematicObject() && obj->getInternalType() == btCollisionObject::CO_RIGID_BODY){
+                            auto rigidHit = (btRigidBody *)obj; // pray
+                            auto dir = (to - from).normalize();
+                            auto strength = ((to - closest.m_hitPointWorld).length() / (to - from).length()) * 50; // 100-> get thrown through floor...
+                            rigidHit->applyForce(dir*strength, closest.m_hitPointWorld - rigidHit->getWorldTransform().getOrigin());
+                            //rigidHit->applyCentralForce(dir * strength);
+                        }
+                      }
                   }
               }
-          }
-          dynamicsWorld->removeRigidBody(rigid);
-          eRocket.destroy();
+              dynamicsWorld->removeRigidBody(rigid);
+              eRocket.destroy();
+          }else if(rocket->type == rtype::homing){
+              //steer
+              //trying this ("arrival" method):
+              //https://gamedev.stackexchange.com/questions/52988/implementing-a-homing-missile
+              auto a = glm::length(glcast(rigid->getGravity())); // finaly a good use for gravity...
+              auto ppos = mechs[player].getPos();
+              auto rpos = ppos - pos;
+              auto pvel = glcast(mechs[player].rigid->getLinearVelocity());
+              auto vel = glcast(rigid->getLinearVelocity());
+              auto rvel = pvel - vel;
+              auto v = glm::dot(-rvel, rpos);
+              auto eta = -v/a + sqrtf(v*v/(a*a) + 2*(glm::length(rpos))/a); // length was guessed
+              auto ipos = ppos + rvel * eta; // impact, assuming player has no acc or change of dir
+              auto steerdir = ipos - pos;
+              if(glm::length(steerdir) > a)
+                  steerdir = glm::normalize(steerdir) * a;
+              rigid->setGravity(btcast(steerdir));
+           }
+
+
+
+
       }
 
 
@@ -759,7 +802,15 @@ void Game::drawRockets(glow::UsedProgram shader) {
       motionState->getWorldTransform(trans);
       trans.getOpenGLMatrix(glm::value_ptr(model));
     }
-    //scale here
+    auto rigid = *entity.component<SharedbtRigidBody>().get();
+    switch(RocketHandle->type){
+    case rtype::forward:
+        model = glm::scale(model, glm::vec3(.5));
+        break;
+    default:
+        ;
+    }
+    model = rotate(model, glm::normalize(glcast(rigid->getLinearVelocity())));
 
     models[(int)(RocketHandle->type)].push_back(model);
   }

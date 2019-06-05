@@ -76,6 +76,7 @@ struct Mech : SM {
   float animationAlpha = 1;
   double animationsTime[2] = {0, 0};        // bottom, top && a, b
   double animationTimeTop = 0;
+  double animationsFaktor[2] = {1,1}; // don't need one for top
   void setAnimation(animation, animation, double bt = 0, double tt = 0);
   void setAnimation(animation, animation, animation, float ba = 1, double bta = 0, double btb = 0, double tt = 0);
 
@@ -93,6 +94,7 @@ struct Mech : SM {
   static void controlPlayer(int);
   static void startSmall(int);
   static void startBig(int);
+  static void runSmall(int);
 };
 
 

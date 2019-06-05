@@ -21,7 +21,7 @@
 enum Mode {
   normal = 0,
   drawn = 1,
-  renme = 2 // rename me
+  fake = 2
 };
 
 struct ModeArea {
@@ -41,7 +41,7 @@ enum class rtype {
 #define CUBES_MIN -24
 #define CUBES_MAX 25
 #define CUBES_TOTAL 50 //(CUBES_MAX - CUBES_MIN + 1)
-#define NUM_ROCKET_TYPES 1
+#define NUM_ROCKET_TYPES 2
 
 
 //bullet User index:
@@ -51,6 +51,11 @@ enum class rtype {
 #define BID_BIG (1 << 2)
 #define BID_ROCKET (1 << 3)
 #define BID_CUBE (1 << 4)
+#define BID_ROCKET_HOMING ((1 << 6) | BID_ROCKET)
+
+#define SMALL_NONE 0
+#define SMALL_RUN (1 << 0) // run at player
+#define SMALL_GOTHIT (1 << 1) // by Rocket
 
 inline double limitAxis(double a) { return a < 0.1 ? 0 : a; }
 
