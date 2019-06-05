@@ -262,6 +262,7 @@ void Game::init() {
     mShaderOutput = glow::Program::createFromFile("../data/shaders/output");
     mShaderMode = glow::Program::createFromFile("../data/shaders/mode");
     mShaderMech = glow::Program::createFromFile("../data/shaders/mech");
+    mShaderUI = glow::Program::createFromFile("../data/shaders/ui");
   }
 
   // Sound
@@ -422,7 +423,7 @@ void Game::init() {
 
   {
     auto entity = ex.entities.create();
-    entity.assign<ModeArea>(ModeArea{fake, {-15, 0, -15}, 10});
+    entity.assign<ModeArea>(ModeArea{fast, {-15, 0, -15}, 10});
   }
 }
 
@@ -715,6 +716,23 @@ void Game::render(float elapsedSeconds) {
     auto lightDir = glm::vec3(glm::cos(getCurrentTime()), 0, glm::sin(getCurrentTime()));
     shader.setUniform("uLightDir", lightDir);
     mMeshQuad->bind().draw();
+
+
+  }
+  // draw ui
+
+  {
+      auto health = mechs[player].HP;
+      if(health >= 0 && health <= MAX_HEALTH)
+      {
+          GLOW_SCOPED(disable, GL_DEPTH_TEST);
+          GLOW_SCOPED(disable, GL_CULL_FACE);
+          auto shader = mShaderUI->use();
+          shader.setTexture("uTexHealth", mHealthBar[health]);
+          auto model = glm::scale(glm::translate(glm::mat4(), glm::vec3(-.87, -.87, 0)), glm::vec3(.1,.1,1));
+          shader.setUniform("uModel", model);
+          mMeshQuad->bind().draw();
+      }
   }
 }
 
@@ -838,6 +856,7 @@ void Game::onGui() {
       //ImGui::Checkbox("Show Mech", &mDrawMech);
       ImGui::Checkbox("free Camera", &mFreeCamera);
       ImGui::Unindent();
+      //ImGui::SliderFloat3("UI", (float*)&mUIPos, 0.0f, 1.0f);
     }
   }
   ImGui::End();
@@ -940,4 +959,17 @@ void Game::updateCamera(float elapsedSeconds) {
 
   // Camera is smoothed
   mCamera->update(elapsedSeconds);
+
+  //new camera -> new ears:
+  {
+      auto pos = mCamera->getPosition();
+      auto forw = mCamera->getForwardVector();
+      auto up = mCamera->getUpVector();
+      soloud->set3dListenerParameters(
+                  pos.x, pos.y, pos.z, //
+                  forw.x, forw.y, forw.z, //
+                  up.x, up.y, up.z, //
+                  0, 0, 0);
+      soloud->update3dAudio();
+  }
 }

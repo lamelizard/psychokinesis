@@ -21,7 +21,8 @@
 enum Mode {
   normal = 0,
   drawn = 1,
-  fake = 2
+  fake = 2,
+  fast = 3
 };
 
 struct ModeArea {
@@ -74,6 +75,7 @@ private:
   // gfx settings
 private:
   glm::vec3 mBackgroundColor = {.10f, .46f, .83f};
+  glm::vec3 mtestVec = {0,0,0};
   bool mShowWireframe = false;
   bool mShowMenu = false;
   bool mFreeCamera = false;
@@ -87,6 +89,7 @@ private:
   glow::SharedProgram mShaderCube;
   glow::SharedProgram mShaderCubePrepass;
   glow::SharedProgram mShaderMode;
+  glow::SharedProgram mShaderUI;
 
   // meshes
   glow::SharedVertexArray mMeshQuad;
@@ -103,7 +106,7 @@ private:
   glow::SharedTexture2D mTexCubeNormal;
   glow::SharedTexture2D mTexDefNormal;
   glow::SharedTextureCubeMap mSkybox;
-  glow::SharedTexture2D mHealthBar[MAX_HEALTH + 1];
+  glow::SharedTexture mHealthBar[MAX_HEALTH + 1];
   glow::SharedTexture2D mTexRocketAlbedo[NUM_ROCKET_TYPES];
   glow::SharedTexture2D mTexRocketNormal[NUM_ROCKET_TYPES];
 
