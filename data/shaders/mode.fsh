@@ -5,10 +5,10 @@ uniform vec3 uPos;
 uniform float uRadius;
 uniform sampler2DRect uTexDepth;
 
-in float vMode;
+flat in int vMode;
 in vec4 vNdcPosition;
 
-out float fMode;
+out int fMode;
 
 //use include
 vec3 unproject(vec4 ndc, mat4 invProj, mat4 invView)

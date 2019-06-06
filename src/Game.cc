@@ -114,9 +114,15 @@ void Game::init() {
       mFramebufferDepth = glow::Framebuffer::createDepthOnly(mGBufferDepth);
     }
 
+    // fusion
+    {
+      mTargets.push_back(mBufferFuse = glow::TextureRectangle::create(1, 1, GL_RGB16F));
+      mFramebufferFuse = glow::Framebuffer::create("fColor", mBufferFuse);
+    }
+
     // mode
     {
-      mTargets.push_back(mBufferMode = glow::TextureRectangle::create(1, 1, GL_R8)); // GL_RED_INTEGER misses implementation in glow?
+      mTargets.push_back(mBufferMode = glow::TextureRectangle::create(1, 1, GL_R8I)); // GL_RED_INTEGER misses implementation in glow?
       mFramebufferMode = glow::Framebuffer::create("fMode", mBufferMode, mGBufferDepth);
     }
 
@@ -124,12 +130,13 @@ void Game::init() {
     {
       // size is 1x1 for now and is changed onResize
       mTargets.push_back(mGBufferAlbedo = glow::TextureRectangle::create(1, 1, GL_RGB16F));
-      mTargets.push_back(mGBufferMaterial = glow::TextureRectangle::create(1, 1, GL_RG16F));
+      mTargets.push_back(mGBufferPosition = glow::TextureRectangle::create(1, 1, GL_RG16F));
       mTargets.push_back(mGBufferNormal = glow::TextureRectangle::create(1, 1, GL_RGB16F));
       mFramebufferGBuffer = glow::Framebuffer::create(
           {{"fAlbedo", mGBufferAlbedo},
            {"fNormal", mGBufferNormal},
-           {"fMaterial", mGBufferMaterial}},
+           {"fPosition", mGBufferPosition}, // WHY DOES THIS LINE FIX THE NORMALS?
+                  },
           mGBufferDepth);
     }
 
@@ -263,6 +270,7 @@ void Game::init() {
     mShaderMode = glow::Program::createFromFile("../data/shaders/mode");
     mShaderMech = glow::Program::createFromFile("../data/shaders/mech");
     mShaderUI = glow::Program::createFromFile("../data/shaders/ui");
+    mShaderFuse = glow::Program::createFromFile("../data/shaders/fuse");
   }
 
   // Sound
@@ -665,7 +673,8 @@ void Game::render(float elapsedSeconds) {
       shader.setUniform("uInvProj", glm::inverse(proj));
       shader.setUniform("uInvView", glm::inverse(view));
       shader.setUniform("uRadius", r);
-      shader.setUniform("uMode", (int32_t)areaHandle->mode);
+      auto modeID = (int32_t)areaHandle->mode;
+      shader.setUniform("uMode", modeID);
       sphere.draw();
     }
   }
@@ -693,47 +702,56 @@ void Game::render(float elapsedSeconds) {
     }
     */
 
-
-  // render framebuffer content to output with small post-processing effect
+  //screen space:
   {
-    // no framebuffer is bound, i.e. render-to-screen
-    GLOW_SCOPED(disable, GL_DEPTH_TEST);
-    GLOW_SCOPED(disable, GL_CULL_FACE);
-
-    // draw a fullscreen quad for outputting the framebuffer and applying a post-process
-    auto shader = mShaderOutput->use();
-    shader.setTexture("uTexColor", mGBufferAlbedo);
-    shader.setTexture("uTexNormal", mGBufferNormal);
-    shader.setTexture("uTexDepth", mGBufferDepth);
-    shader.setTexture("uTexMode", mBufferMode);
-    //sky
-    shader.setTexture("uSkybox", mSkybox);
-    shader.setUniform("uInvProj", glm::inverse(proj));
-    shader.setUniform("uInvView", inverse(view));
-
-    // let light rotate around the objects
-    // put higher
-    auto lightDir = glm::vec3(glm::cos(getCurrentTime()), 0, glm::sin(getCurrentTime()));
-    shader.setUniform("uLightDir", lightDir);
-    mMeshQuad->bind().draw();
-
-
-  }
-  // draw ui
-
-  {
-      auto health = mechs[player].HP;
-      if(health >= 0 && health <= MAX_HEALTH)
+      GLOW_SCOPED(disable, GL_DEPTH_TEST);
+      GLOW_SCOPED(disable, GL_CULL_FACE);
+      //fuse
       {
-          GLOW_SCOPED(disable, GL_DEPTH_TEST);
-          GLOW_SCOPED(disable, GL_CULL_FACE);
-          auto shader = mShaderUI->use();
-          shader.setTexture("uTexHealth", mHealthBar[health]);
-          auto model = glm::scale(glm::translate(glm::mat4(), glm::vec3(-.87, -.87, 0)), glm::vec3(.1,.1,1));
-          shader.setUniform("uModel", model);
+          auto fb = mFramebufferFuse->bind();
+          auto shader = mShaderFuse->use();
+          shader.setTexture("uTexColor", mGBufferAlbedo);
+          shader.setTexture("uTexNormal", mGBufferNormal);
+          //shader.setTexture("uTexPosition", mGBufferPosition);
+          shader.setTexture("uTexDepth", mGBufferDepth);
+          shader.setTexture("uTexMode", mBufferMode);
+          shader.setTexture("uSkybox", mSkybox);
+          shader.setUniform("uView", view);
+          shader.setUniform("uInvProj", inverse(proj));
+          shader.setUniform("uInvView", inverse(view));
+          shader.setUniform("uZNear", mCamera->getNearClippingPlane());
+          shader.setUniform("uZFar", mCamera->getFarClippingPlane());
+          //change this already...
+          auto lightDir = glm::vec3(glm::cos(getCurrentTime()), 0, glm::sin(getCurrentTime()));
+          shader.setUniform("uLightDir", lightDir);
           mMeshQuad->bind().draw();
       }
+      // draw ui
+      {
+          auto health = mechs[player].HP;
+          if(health >= 0 && health <= MAX_HEALTH)
+          {
+              auto fb = mFramebufferFuse->bind();
+              auto shader = mShaderUI->use();
+              shader.setTexture("uTexHealth", mHealthBar[health]);
+              auto model = glm::scale(glm::translate(glm::mat4(), glm::vec3(-.87, -.87, 0)), glm::vec3(.1,.1,1));
+              shader.setUniform("uModel", model);
+              mMeshQuad->bind().draw();
+          }
+       }
+      // render framebuffer content to output with small post-processing effect
+      {
+        // draw a fullscreen quad for outputting the framebuffer and applying a post-process
+        auto shader = mShaderOutput->use();
+        shader.setTexture("uTexColor", mBufferFuse);
+        mMeshQuad->bind().draw();
+      }
   }
+
+
+
+
+
 }
 
 void Game::drawMech(glow::UsedProgram shader) {

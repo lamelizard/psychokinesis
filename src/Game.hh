@@ -86,6 +86,7 @@ private:
 
   // shaders
   glow::SharedProgram mShaderOutput;
+  glow::SharedProgram mShaderFuse; // was a word with C
   glow::SharedProgram mShaderCube;
   glow::SharedProgram mShaderCubePrepass;
   glow::SharedProgram mShaderMode;
@@ -120,13 +121,17 @@ private:
 
   // opaque
   glow::SharedTextureRectangle mGBufferAlbedo;
-  glow::SharedTextureRectangle mGBufferMaterial; // metallic roughness
+  glow::SharedTextureRectangle mGBufferPosition;
   glow::SharedTextureRectangle mGBufferNormal;
   glow::SharedFramebuffer mFramebufferGBuffer;
 
   // light
   glow::SharedTextureRectangle mBufferLight;
   glow::SharedFramebuffer mFramebufferLight;
+
+  //fusing
+  glow::SharedTextureRectangle mBufferFuse;
+  glow::SharedFramebuffer mFramebufferFuse;
 
   std::vector<glow::SharedTextureRectangle> mTargets;
 
