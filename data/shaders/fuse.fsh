@@ -1,7 +1,7 @@
 uniform sampler2DRect uTexColor;
 uniform sampler2DRect uTexNormal;
 uniform sampler2DRect uTexDepth;
-uniform isampler2DRect uTexMode;
+uniform sampler2DRect uTexMode;
 uniform samplerCube uSkybox;
 
 uniform mat4 uInvProj;
@@ -29,8 +29,8 @@ float zOf(ivec2 uv)
 
 bool isEdge(ivec2 uv)
 {
-    float OutlineNormal = 1;
-    float OutlineDepth = 1;
+    float OutlineNormal = 0.6;
+    float OutlineDepth = 0.8;
 
     vec3 n = texelFetch(uTexNormal, uv).xyz;
     vec3 n1 = texelFetch(uTexNormal, uv + ivec2(1,0)).xyz;
@@ -68,10 +68,8 @@ void main()
 
     if (depth < 1) // opaque
     {
-       int mode = texture(uTexMode, gl_FragCoord.xy).x;
-       if (mode != 0)
-           discard;
-        if (mode == 0){
+        int mode = int(texelFetch(uTexMode, ivec2(gl_FragCoord.xy)).x + .5);
+        if (mode < .1){
         vec3 N = texture(uTexNormal, gl_FragCoord.xy).rgb;
         color  = texture(uTexColor, gl_FragCoord.xy).rgb * max(0.1, dot(normalize(uLightDir), N));
         }
@@ -97,8 +95,10 @@ void main()
             vec3 N = texture(uTexNormal, gl_FragCoord.xy).rgb;
             color  = texture(uTexColor, gl_FragCoord.xy).rgb * max(0.1, dot(normalize(uLightDir), N));
 
-            mix(color, vec3(0,0,0), float(isEdge(ivec2(gl_FragCoord.xy))));
-            color = vec3(1,0,0);
+
+            //mix(color, vec3(1,0,0), float(isEdge(ivec2(gl_FragCoord.xy))));
+            if(isEdge(ivec2(gl_FragCoord.xy)))
+                color = vec3(1,0,0);
         }
     }
     else // sky, from rtglive

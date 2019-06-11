@@ -69,6 +69,11 @@ public:
 private:
   bool mJumps = false;
   bool mJumpWasPressed = false; // last frame
+  float jumpGravityHigh = -9.81;
+  float jumpGravityLow = -15;
+  float jumpGravityFall = -18;
+  float damping = 9.5;
+  float moveForce = 10;
 
   std::vector<glm::vec3> spherePoints;
 
@@ -152,11 +157,7 @@ private:
 
   // Bullet
 private:
-  //#ifdef NDEBUG
   bool mDebugBullet = false;
-  //#else
-  //bool mDebugBullet = true;
-  //#endif
   std::shared_ptr<btBoxShape> colBox;
   std::shared_ptr<btSphereShape> colPoint;
   void bulletCallback(btDynamicsWorld*, btScalar);

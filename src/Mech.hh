@@ -88,6 +88,7 @@ struct Mech : SM {
   void updateTime(double delta);
   void draw(glow::UsedProgram &shader);
   glm::vec3 getPos();
+  void setPosition(glm::vec3);
 
   //actions
   static void emptyAction(int);

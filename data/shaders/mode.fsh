@@ -8,7 +8,7 @@ uniform sampler2DRect uTexDepth;
 flat in int vMode;
 in vec4 vNdcPosition;
 
-out int fMode;
+out float fMode;
 
 //use include
 vec3 unproject(vec4 ndc, mat4 invProj, mat4 invView)
@@ -26,5 +26,7 @@ void main()
     vec3 P = unproject(ndc, uInvProj, uInvView);
     if(distance(uPos, P) > uRadius)
         discard; 
-    fMode = vMode;
+    
+    //fMode = intBitsToFloat(vMode); // why does nothing work?
+    fMode = float(vMode);
 }
