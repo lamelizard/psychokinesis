@@ -83,7 +83,7 @@ void Game::init() {
   // IMPORTANT: call to base class
   GlfwApp::init();
 
-  setTitle("Game Development 2019 TODO change ME"); // TODO
+  setTitle("Psychokinesis");
 
   // start assimp logging
   Assimp::DefaultLogger::create();
@@ -128,7 +128,7 @@ void Game::init() {
     {
         //can't blend integers?
       //mTargets.push_back(mBufferMode = glow::TextureRectangle::create(1, 1, GL_R8I)); // GL_RED_INTEGER misses implementation in glow?
-        mTargets.push_back(mBufferMode = glow::TextureRectangle::create(1, 1, GL_R32F)); 
+        mTargets.push_back(mBufferMode = glow::TextureRectangle::create(1, 1, GL_R16F));
         mFramebufferMode = glow::Framebuffer::create("fMode", mBufferMode, mGBufferDepth);
     }
 
@@ -804,7 +804,7 @@ void Game::drawCubes(glow::UsedProgram shader) {
       static_assert(sizeof(AttMat) == sizeof(glm::mat4x4), "bwah");
       trans.getOpenGLMatrix(glm::value_ptr(modelCube));
     }
-    modelCube *= glm::scale(glm::vec3(0.50001)); // cube.obj has size 2, 0001 to close gaps -> they are no gaps
+    modelCube *= glm::scale(glm::vec3(0.5)); // cube.obj has size 2, +0001 to close gaps -> they are no gaps but z fighting
     //scale down in an mode
     //TODO change mode
     {

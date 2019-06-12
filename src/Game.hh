@@ -69,10 +69,10 @@ public:
 private:
   bool mJumps = false;
   bool mJumpWasPressed = false; // last frame
-  float jumpGravityHigh = -9.81;
+  float jumpGravityHigh = -8;
   float jumpGravityLow = -15;
   float jumpGravityFall = -18;
-  float damping = 9.5;
+  float damping = .95;
   float moveForce = 10;
 
   std::vector<glm::vec3> spherePoints;
