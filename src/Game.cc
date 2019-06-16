@@ -181,6 +181,8 @@ void Game::init() {
       string healthBarFn = texPath + "ui/Health bar";
       string rocketAlbedoFN = texPath + "rocket.albedo.";
       string rocketNormalFN = texPath + "rocket.normal.";
+      string paperFN = texPath + "paper.png";
+      string noise1FN = texPath + "noise_1.png";
 
 
 #ifndef NDEBUG // faster loading
@@ -214,6 +216,8 @@ void Game::init() {
         rocketAlbedoData[i] = async(policy, glow::TextureData::createFromFile, rocketAlbedoFN + to_string(i) + ".png", glow::ColorSpace::sRGB);
         rocketNormalData[i] = async(policy, glow::TextureData::createFromFile, rocketNormalFN + to_string(i) + ".png", glow::ColorSpace::sRGB);
       }
+      auto paperData = async(policy, glow::TextureData::createFromFile, paperFN, glow::ColorSpace::sRGB);
+      auto noise1Data = async(policy, glow::TextureData::createFromFile, noise1FN, glow::ColorSpace::Linear);
 
 
       //into GL
@@ -243,6 +247,10 @@ void Game::init() {
         mTexRocketNormal[i] = glow::Texture2D::createFromData(rocketNormalData[i].get());
         mTexRocketNormal[i]->setObjectLabel(rocketNormalFN);
       }
+      mTexPaper = glow::Texture2D::createFromData(paperData.get());
+      mTexPaper->setObjectLabel(paperFN);
+      mTexNoise1 = glow::Texture2D::createFromData(noise1Data.get());
+      mTexNoise1->setObjectLabel(noise1FN);
 
       //not into GL yet, could change
       Mech::mesh = mechModelData.get();
@@ -754,6 +762,8 @@ void Game::render(float elapsedSeconds) {
           shader.setTexture("uTexDepth", mGBufferDepth);
           shader.setTexture("uTexMode", mBufferMode);
           shader.setTexture("uSkybox", mSkybox);
+          shader.setTexture("uTexPaper", mTexPaper);
+          shader.setTexture("uTexNoise1", mTexNoise1);
           shader.setUniform("uView", view);
           shader.setUniform("uInvProj", inverse(proj));
           shader.setUniform("uInvView", inverse(view));

@@ -119,6 +119,8 @@ private:
   glow::SharedTexture mHealthBar[MAX_HEALTH + 1];
   glow::SharedTexture2D mTexRocketAlbedo[NUM_ROCKET_TYPES];
   glow::SharedTexture2D mTexRocketNormal[NUM_ROCKET_TYPES];
+  glow::SharedTexture2D mTexPaper;
+  glow::SharedTexture2D mTexNoise1;
 
   // Shadow
   glow::SharedTextureRectangle mBufferShadow;

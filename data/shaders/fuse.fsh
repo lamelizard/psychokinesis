@@ -3,6 +3,8 @@ uniform sampler2DRect uTexNormal;
 uniform sampler2DRect uTexDepth;
 uniform sampler2DRect uTexMode;
 uniform samplerCube uSkybox;
+uniform sampler2D uTexPaper;
+//uniform sampler2D uTexNoise1;
 
 uniform mat4 uInvProj;
 uniform mat4 uInvView;
@@ -77,47 +79,39 @@ void main()
     {
         ivec2 uv = ivec2(gl_FragCoord.xy);
         int mode = int(texelFetch(uTexMode, uv).x + .5);
+
+        //I have z-fighting with triangles at an 90° angle, just move one texel
+        vec3 n = texelFetch(uTexNormal, uv).xyz;
+        vec3 n1 = texelFetch(uTexNormal, uv + ivec2(1,0)).xyz;
+        vec3 n2 = texelFetch(uTexNormal, uv + ivec2(-1,0)).xyz;
+        vec3 n3 = texelFetch(uTexNormal, uv + ivec2(0,1)).xyz;
+        vec3 n4 = texelFetch(uTexNormal, uv + ivec2(0,-1)).xyz;
+        if(abs(dot(n,n1)) + abs(dot(n,n2)) + abs(dot(n,n3)) + abs(dot(n,n4)) < .5){
+            uv += ivec2(0,1);
+            n = n3;
+        }
+        //color  = texture(uTexColor, gl_FragCoord.xy).rgb * max(0.1, dot(normalize(uLightDir), n));
+        color  = texelFetch(uTexColor, uv).rgb;
+
+        //get worldspace Pos
+        //https://stackoverflow.com/questions/32227283/getting-world-position-from-depth-buffer-value
+        vec4 clipSpacePosition = vec4(vPosition * 2.0 - 1.0, depth * 2. - 1., 1.0);
+        vec4 viewSpacePosition = uInvProj * clipSpacePosition;
+        viewSpacePosition /= viewSpacePosition.w;
+        vec3 worldPos = (uInvView * viewSpacePosition).xyz;
+
+        //shadow, glow samples
+        vec4 shadowPos = uShadowViewProjMatrix * vec4(worldPos, 1.0);
+        shadowPos.xyz /= shadowPos.w;
+        vec3 l = normalize(uLightPos - worldPos);
+        float bias = -0.005 * tan(acos(dot(n, l)));
+        float shadowFactor = texture(uTexShadow, vec3((shadowPos.xy * .5 + .5) * uTexShadowSize, shadowPos.z * .5 + .5 + bias)).r;
+
         if (mode < .1){
-            //I have z-fighting with triangles at an 90° angle, just move one texel
-            vec3 n = texelFetch(uTexNormal, uv).xyz;
-            vec3 n1 = texelFetch(uTexNormal, uv + ivec2(1,0)).xyz;
-            vec3 n2 = texelFetch(uTexNormal, uv + ivec2(-1,0)).xyz;
-            vec3 n3 = texelFetch(uTexNormal, uv + ivec2(0,1)).xyz;
-            vec3 n4 = texelFetch(uTexNormal, uv + ivec2(0,-1)).xyz;
-            if(abs(dot(n,n1)) + abs(dot(n,n2)) + abs(dot(n,n3)) + abs(dot(n,n4)) < .5){
-                uv += ivec2(0,1);
-                n = n3;
-            }
-            //color  = texture(uTexColor, gl_FragCoord.xy).rgb * max(0.1, dot(normalize(uLightDir), n));
-            color  = texelFetch(uTexColor, uv).rgb;
-
-            //get worldspace Pos
-            //https://stackoverflow.com/questions/32227283/getting-world-position-from-depth-buffer-value
-            vec4 clipSpacePosition = vec4(vPosition * 2.0 - 1.0, depth * 2. - 1., 1.0);
-            vec4 viewSpacePosition = uInvProj * clipSpacePosition;
-            viewSpacePosition /= viewSpacePosition.w;
-            vec3 worldPos = (uInvView * viewSpacePosition).xyz;
-
-            //shadow, glow samples
-            vec4 shadowPos = uShadowViewProjMatrix * vec4(worldPos, 1.0);
-            shadowPos.xyz /= shadowPos.w;
-            vec3 l = normalize(uLightPos - worldPos);
-            float bias = -0.005 * tan(acos(dot(n, l)));
-            float shadowFactor = texture(uTexShadow, vec3((shadowPos.xy * .5 + .5) * uTexShadowSize, shadowPos.z * .5 + .5 + bias) ).r;
-
-
-            //float refDepth = shadowPos.z * .5 + .5;
-            //float shadowFactor = float(refDepth <= shadowDepth);
-            //if (shadowPos.w < 0.0f) // fix "behind-the-light"
-              //  shadowFactor = 1;
-
             color = (max(dot(n, l), 0.) * shadowFactor * 0.9 + 0.1) * color;
             // Yes, hardware PCF works:
             //if(shadowFactor != .0 && shadowFactor != 1.)
                 //color = vec3(1,0,0);
-
-            //color.r = shadowFactor;
-
         }
         else if (mode == 1){
            //Gameboy
@@ -141,13 +135,18 @@ void main()
             //http://www.thomaseichhorn.de/npr-sketch-shader-vvvv/
             vec3 N = texture(uTexNormal, gl_FragCoord.xy).rgb;
             vec3 albedo = texelFetch(uTexColor, uv).rgb;
+            vec3 paper = texture(uTexPaper, vPosition).rgb;
+            //vec3 noise = texture(uTexNoise1, vPosition * 4.).rgb;
             //float grey = dot(albedo, vec3(0.21, 0.71, 0.07));
-            color  = vec3(.5,.5,.5)/* * max(0.1, dot(normalize(uLightDir), N))*/;
 
+            color  = vec3(.7,.7,.7);// * (max(dot(n, l), 0.) * shadowFactor * 0.9 + 0.1);
+            float dFactor = clamp(zOf(uv) / 50., .1, 1.);
+
+            //color = color * dFactor*(1-noise.r) + noise * (1-dFactor*(1-noise.r));
+            color *= paper;
             if(isEdge(uv))
-                color *= clamp(zOf(uv) / 50., .1, 1.); // black outline fades away in the distance
-
-
+                color *= dFactor; // black outline fades away in the distance
+            //color  = vec3(.7,.7,.7) * shadowFactor;
         }
     }
     else // sky, from rtglive
