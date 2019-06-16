@@ -130,7 +130,9 @@ void Game::init() {
 
     // fusion
     {
-      mTargets.push_back(mBufferFuse = glow::TextureRectangle::create(1, 1, GL_RGB16F));
+      //mTargets.push_back(mBufferFuse = glow::Texture2D::create(1, 1, GL_RGB16F)); // need sampler2D for fxaa
+      mBufferFuse = glow::Texture2D::create(1, 1, GL_RGB16F);
+      mBufferFuse->bind().setMinFilter(GL_LINEAR); // disable mipmaps
       mFramebufferFuse = glow::Framebuffer::create("fColor", mBufferFuse);
     }
 
@@ -764,7 +766,7 @@ void Game::render(float elapsedSeconds) {
           shader.setTexture("uTexShadow", mBufferShadow);
           mMeshQuad->bind().draw();
       }
-      // draw ui
+      // draw ui // after fxaa? TODO
       {
           auto health = mechs[player].HP;
           if(health >= 0 && health <= MAX_HEALTH)
@@ -782,6 +784,10 @@ void Game::render(float elapsedSeconds) {
         // draw a fullscreen quad for outputting the framebuffer and applying a post-process
         auto shader = mShaderOutput->use();
         shader.setTexture("uTexColor", mBufferFuse);
+        shader.setUniform("uResolution", glm::vec2(mBufferFuse->getWidth(), mBufferFuse->getHeight()));
+        shader.setUniform("ufxaaQualitySubpix", fxaaQualitySubpix);
+        shader.setUniform("ufxaaQualityEdgeThreshold", fxaaQualityEdgeThreshold);
+        shader.setUniform("ufxaaQualityEdgeThresholdMin", fxaaQualityEdgeThresholdMin);
         mMeshQuad->bind().draw();
       }
   }
@@ -921,6 +927,14 @@ void Game::onGui() {
       ImGui::SliderFloat("MoveForce", &moveForce, 3, 20);
       ImGui::Unindent();
     }
+    ImGui::Text("FXAA:");
+    {
+        ImGui::Indent();
+        ImGui::SliderFloat("QualitySubpix", &fxaaQualitySubpix, .5, 1);
+        ImGui::SliderFloat("QualityEdgeThreshold", &fxaaQualityEdgeThreshold, 0.333, 0.063);
+        ImGui::SliderFloat("QualityEdgeThresholdMin", &fxaaQualityEdgeThresholdMin, 0.0312, 0.0833);
+        ImGui::Unindent();
+    }
   }
   ImGui::End();
 #endif
@@ -934,6 +948,7 @@ void Game::onResize(int w, int h) {
   // resize all framebuffer textures
   for (auto const &t : mTargets)
     t->bind().resize(w, h);
+  mBufferFuse->bind().resize(w,h);
 }
 
 bool Game::onKey(int key, int scancode, int action, int mods) {

@@ -85,6 +85,9 @@ private:
   bool mFreeCamera = false;
   int mShadowMapSize = 16384 / 4; // urks, high
   glm::vec3 mLightPos = {0,100,0};
+  float fxaaQualitySubpix = .75;
+  float fxaaQualityEdgeThreshold = .166;
+  float fxaaQualityEdgeThresholdMin = .0833;
 
   // gfx objects
 private:
@@ -140,7 +143,7 @@ private:
   glow::SharedFramebuffer mFramebufferLight;
 
   //fusing
-  glow::SharedTextureRectangle mBufferFuse;
+  glow::SharedTexture2D mBufferFuse;
   glow::SharedFramebuffer mFramebufferFuse;
 
   std::vector<glow::SharedTextureRectangle> mTargets;
