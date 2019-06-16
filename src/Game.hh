@@ -79,11 +79,12 @@ private:
 
   // gfx settings
 private:
-  glm::vec3 mBackgroundColor = {.10f, .46f, .83f};
   glm::vec3 mtestVec = {0,0,0};
   bool mShowWireframe = false;
   bool mShowMenu = false;
   bool mFreeCamera = false;
+  int mShadowMapSize = 16384 / 4; // urks, high
+  glm::vec3 mLightPos = {0,100,0};
 
   // gfx objects
 private:
@@ -115,6 +116,10 @@ private:
   glow::SharedTexture mHealthBar[MAX_HEALTH + 1];
   glow::SharedTexture2D mTexRocketAlbedo[NUM_ROCKET_TYPES];
   glow::SharedTexture2D mTexRocketNormal[NUM_ROCKET_TYPES];
+
+  // Shadow
+  glow::SharedTextureRectangle mBufferShadow;
+  glow::SharedFramebuffer mFramebufferShadow;
 
   // depth pre-pass
   glow::SharedTextureRectangle mGBufferDepth;
@@ -178,9 +183,9 @@ private:
 
   //draw
 private:
-  void drawMech(glow::UsedProgram shader);
-  void drawCubes(glow::UsedProgram shader);
-  void drawRockets(glow::UsedProgram shader);
+  void drawMech(glow::UsedProgram shader, glm::mat4 proj, glm::mat4 view);
+  void drawCubes(glow::UsedProgram shader, glm::mat4 proj, glm::mat4 view);
+  void drawRockets(glow::UsedProgram shader, glm::mat4 proj, glm::mat4 view);
 
   // test
   //btDefaultMotionState* boxMotionState = nullptr;

@@ -62,6 +62,7 @@ struct Rocket {
   rtype type = rtype::forward;
   bool real = true;
   bool explode = false;
+  bool willSplit = false; // see banjo-tooie final boss
 };
 
 Game *Game::instance = nullptr;
@@ -111,6 +112,15 @@ void Game::init() {
     mCamera = glow::camera::Camera::create();
     mCamera->setFarPlane(200);
     mCamera->setLookAt({.5, 3, -15}, {.5, 7, -10});
+
+    // shadow
+    {
+        // probably should resize as well but what size?
+        mBufferShadow = glow::TextureRectangle::create(mShadowMapSize, mShadowMapSize, GL_DEPTH_COMPONENT32F);
+        mBufferShadow->bind().setWrap(GL_CLAMP_TO_BORDER, GL_CLAMP_TO_BORDER);
+        mBufferShadow->bind().setCompareMode(GL_COMPARE_REF_TO_TEXTURE);
+        mFramebufferShadow = glow::Framebuffer::createDepthOnly(mBufferShadow);
+    }
 
     // depth
     {
@@ -604,13 +614,33 @@ void Game::render(float elapsedSeconds) {
 
   // camera update here because it should be coupled tightly to rendering!
   updateCamera(elapsedSeconds);
+
   // get camera matrices
   auto proj = mCamera->getProjectionMatrix();
   auto view = mCamera->getViewMatrix();
+  // from glow-samples
+  //change parameters!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!1
+  glm::mat4 shadowProj = glm::perspective(glm::pi<float>() / 5.0f, 1.0f, 80.0f, 105.0f);
+  glm::mat4 shadowView= glm::lookAt(mLightPos, glm::vec3(0.0f), glm::vec3(1, 0, 0));
+  glm::mat4 shadowViewProj = shadowProj* shadowView;
 
   //update animations
   for (auto &m : mechs)
     m.updateTime(elapsedSeconds);
+
+  // Shadow
+  {
+      auto fb = mFramebufferShadow->bind();
+      glClear(GL_DEPTH_BUFFER_BIT);
+      GLOW_SCOPED(enable, GL_DEPTH_TEST);
+      GLOW_SCOPED(enable, GL_CULL_FACE);
+      //GLOW_SCOPED(cullFace, GL_FRONT); // bad idea for my cubes
+      GLOW_SCOPED(depthFunc, GL_LESS);
+
+      drawCubes(mShaderCubePrepass->use(), shadowProj, shadowView);
+      drawRockets(mShaderCubePrepass->use(), shadowProj, shadowView);
+      drawMech(mShaderMech->use(), shadowProj, shadowView);
+  }
 
   // Depth
   {
@@ -620,9 +650,9 @@ void Game::render(float elapsedSeconds) {
     GLOW_SCOPED(clearColor, glm::vec3(0, 0, 0));
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-    drawCubes(mShaderCubePrepass->use());
-    drawRockets(mShaderCubePrepass->use());
-    drawMech(mShaderMech->use());
+    drawCubes(mShaderCubePrepass->use(), proj, view);
+    drawRockets(mShaderCubePrepass->use(), proj, view);
+    drawMech(mShaderMech->use(), proj, view);
 
     if (mDebugBullet) {
       GLOW_SCOPED(disable, GL_DEPTH_TEST);
@@ -669,13 +699,12 @@ void Game::render(float elapsedSeconds) {
     GLOW_SCOPED(depthMask, GL_FALSE);
     GLOW_SCOPED(depthFunc, GL_EQUAL);
     GLOW_SCOPED(polygonMode, mShowWireframe ? GL_LINE : GL_FILL);
-    GLOW_SCOPED(clearColor, mBackgroundColor);
+    GLOW_SCOPED(clearColor, glm::vec3(0,0,0));
     glClear(GL_COLOR_BUFFER_BIT | GL_STENCIL_BUFFER_BIT);
 
-    drawCubes(mShaderCube->use());
-    drawRockets(mShaderCube->use());
-    drawMech(mShaderMech->use());
-
+    drawCubes(mShaderCube->use(), proj, view);
+    drawRockets(mShaderCube->use(), proj, view);
+    drawMech(mShaderMech->use(), proj, view);
     // Render Bullet Debug
     if (mDebugBullet) {
       GLOW_SCOPED(disable, GL_DEPTH_TEST);
@@ -728,9 +757,11 @@ void Game::render(float elapsedSeconds) {
           shader.setUniform("uInvView", inverse(view));
           shader.setUniform("uZNear", mCamera->getNearClippingPlane());
           shader.setUniform("uZFar", mCamera->getFarClippingPlane());
-          //change this already...
-          auto lightDir = glm::vec3(glm::cos(getCurrentTime()), 0, glm::sin(getCurrentTime()));
-          shader.setUniform("uLightDir", lightDir);
+          //from glow samples
+          shader.setUniform("uLightPos", mLightPos);
+          shader.setUniform("uTexShadowSize", (float)mShadowMapSize);
+          shader.setUniform("uShadowViewProjMatrix", shadowViewProj);
+          shader.setTexture("uTexShadow", mBufferShadow);
           mMeshQuad->bind().draw();
       }
       // draw ui
@@ -761,20 +792,17 @@ void Game::render(float elapsedSeconds) {
 
 }
 
-void Game::drawMech(glow::UsedProgram shader) {
-  shader.setUniform("uProj", mCamera->getProjectionMatrix());
-  shader.setUniform("uView", mCamera->getViewMatrix());
-  shader.setTexture("uTexMode", mBufferMode);
+void Game::drawMech(glow::UsedProgram shader, glm::mat4 proj, glm::mat4 view) {
+    shader.setUniform("uProj", proj);
+    shader.setUniform("uView", view);
+    shader.setTexture("uTexMode", mBufferMode);
   for (auto &m : mechs)
     m.draw(shader);
 }
 
-void Game::drawCubes(glow::UsedProgram shader) {
-  auto proj = mCamera->getProjectionMatrix();
-  auto view = mCamera->getViewMatrix();
-
-  shader.setUniform("uProj", proj);
-  shader.setUniform("uView", view);
+void Game::drawCubes(glow::UsedProgram shader, glm::mat4 proj, glm::mat4 view) {
+    shader.setUniform("uProj", proj);
+    shader.setUniform("uView", view);
 
   shader.setTexture("uTexAlbedo", mTexCubeAlbedo);
   shader.setTexture("uTexNormal", mTexCubeNormal);
@@ -824,10 +852,7 @@ void Game::drawCubes(glow::UsedProgram shader) {
   mMeshCube->bind().draw(models.size());
 }
 
-void Game::drawRockets(glow::UsedProgram shader) {
-  auto proj = mCamera->getProjectionMatrix();
-  auto view = mCamera->getViewMatrix();
-
+void Game::drawRockets(glow::UsedProgram shader, glm::mat4 proj, glm::mat4 view) {
   shader.setUniform("uProj", proj);
   shader.setUniform("uView", view);
   shader.setTexture("uTexMode", mBufferMode);
