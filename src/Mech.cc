@@ -70,7 +70,14 @@ void Mech::draw(glow::UsedProgram &shader) {
   shader.setTexture("uTexNormal", texNormal);
 
 
-  mesh->draw(shader, animationsTime[0], loops[animations[0]], names[animations[0]]);
+  //mesh->draw(shader, animationsTime[0], loops[animations[0]], names[animations[0]]);
+  auto g = Game::instance;
+  if(!g->DebugingAnimations)
+        mesh->drawMech(shader, names[animations[0]], names[animations[1]], names[animationTop], animationAlpha, animationsTime[0], animationsTime[1], animationTimeTop, animationAngle);
+  else
+        mesh->drawMech(shader, names[(animation)g->debugAnimations[0]], names[(animation)g->debugAnimations[1]], names[(animation)g->debugAnimations[2]], //
+                g->debugAnimationAlpha, g->debugAnimationTimes[0], g->debugAnimationTimes[1], g->debugAnimationTimes[2], g->debugAnimationAngle);
+
   //mechModel->draw(shader, debugTime, true, "Hit"); //"WalkInPlace");
   // skeleton
   // mechModel->debugRenderer.render(proj * view * glm::scale(glm::vec3(0.01)));
@@ -360,7 +367,7 @@ void Mech::runSmall(int t) {
         //homing rocket
         auto &p = g->mechs[player];
         auto dir = glm::normalize(p.getPos() - pos);
-        auto entity = g->createRocket(pos - glm::vec3(0, 1, 0) + (dir * 2.5), dir * 4, rtype::homing); // y-1 since else likely to hit ground  //TODO higher acc? and constraints to limeit velocity -> better homing
+        auto entity = g->createRocket(pos - glm::vec3(0, 1, 0) + (dir * 3), dir * 4, rtype::homing); // y-1 since else likely to hit ground  //TODO higher acc? and constraints to limeit velocity -> better homing
         if (m.HP > 3) {                                                                                // wait to be easier
           //TODO need default animation...
           m.setAction([entity](int t) {

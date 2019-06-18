@@ -83,11 +83,17 @@ private:
   bool mShowWireframe = false;
   bool mShowMenu = false;
   bool mFreeCamera = false;
+  bool mNoAttacks = false;
   int mShadowMapSize = 16384 / 4; // urks, high
   glm::vec3 mLightPos = {0,100,0};
   float fxaaQualitySubpix = .75;
   float fxaaQualityEdgeThreshold = .166;
   float fxaaQualityEdgeThresholdMin = .0833;
+  bool DebugingAnimations = false;
+  float debugAnimationAlpha = 0;
+  glm::ivec3 debugAnimations = {0,0,0};
+  glm::vec3 debugAnimationTimes = {0,0,0};
+  float debugAnimationAngle = 0;
 
   // gfx objects
 private:

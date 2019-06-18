@@ -509,6 +509,8 @@ entityx::Entity Game::createCube(const glm::ivec3 &pos) {
 }
 
 entityx::Entity Game::createRocket(const glm::vec3 &pos, const glm::vec3 &acc, rtype type) {
+    if(mNoAttacks)
+        return ex.entities.create(); // hope that doesn't break
   auto motionState = make_shared<btDefaultMotionState>(bttransform(pos));
   auto rbRocket = make_shared<btRigidBody>(btRigidBody::btRigidBodyConstructionInfo(1., motionState.get(), colPoint.get()));
   rbRocket->setLinearVelocity(btcast(glm::normalize(acc)*2));
@@ -924,6 +926,7 @@ void Game::onGui() {
       ImGui::Checkbox("Debug Bullet", &mDebugBullet);
       //ImGui::Checkbox("Show Mech", &mDrawMech);
       ImGui::Checkbox("free Camera", &mFreeCamera);
+      ImGui::Checkbox("no attacks", &mNoAttacks);
       ImGui::Unindent();
       //ImGui::SliderFloat3("UI", (float*)&mUIPos, 0.0f, 1.0f);
     }
@@ -945,6 +948,17 @@ void Game::onGui() {
         ImGui::SliderFloat("QualityEdgeThresholdMin", &fxaaQualityEdgeThresholdMin, 0.0312, 0.0833);
         ImGui::Unindent();
     }
+    ImGui::Text("DebugAnimations:");
+    {
+        ImGui::Indent();
+        ImGui::Checkbox("Yes?", &DebugingAnimations);
+        ImGui::SliderFloat("alpha", &debugAnimationAlpha, 0, 1);
+        ImGui::SliderInt3("animations", (int*)&debugAnimations, Mech::run, Mech::none);
+        ImGui::SliderFloat3("times", (float*)&debugAnimationTimes, 0, 4);
+        ImGui::SliderFloat("angle", &debugAnimationAngle, -4, 4);
+        ImGui::Unindent();
+    }
+
   }
   ImGui::End();
 #endif
@@ -1036,7 +1050,7 @@ void Game::updateCamera(float elapsedSeconds) {
     if (!ImGuiwantMouse) {
       auto mouse_delta = input().getLastMouseDelta() / 100.0f;
       if (mouse_delta.x < 1000) // ???
-        mCamera->handle.orbit(mouse_delta.x, mouse_delta.y);
+        mCamera->handle.orbit(mouse_delta.x, 0);
 
       auto pos = mCamera->handle.getPosition();
       //pos.y = std::max(0.1f, pos.y);

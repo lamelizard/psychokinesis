@@ -53,7 +53,8 @@ struct Mech : SM {
     //{getup,"DefaultToWalk"},
     {hit,"Hit"},
     {sbigA, "ShootBigCanon_A"},
-    {sbigB, "ShootBigCanon_B"}
+    {sbigB, "ShootBigCanon_B"},
+    {none, ""}
   };
 
 
@@ -77,6 +78,7 @@ struct Mech : SM {
   double animationsTime[2] = {0, 0};        // bottom, top && a, b
   double animationTimeTop = 0;
   double animationsFaktor[2] = {1,1}; // don't need one for top
+  double animationAngle = 0;
   void setAnimation(animation, animation, double bt = 0, double tt = 0);
   void setAnimation(animation, animation, animation, float ba = 1, double bta = 0, double btb = 0, double tt = 0);
 

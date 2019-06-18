@@ -121,6 +121,105 @@ void AssimpModel::draw(const glow::UsedProgram &shader, double t, bool loop, con
   va->bind().draw();
 }
 
+void AssimpModel::drawMech(const UsedProgram &shader, const std::string &abaS, const std::string &abbS, const std::string &atS, float ba, double bta, double btb, double tt, float angle)
+{
+    if (!va)
+       createVertexArray();
+     assert(va);
+
+     if(!abaS.length() || !abbS.length())
+         return;
+
+     auto aba = animations[abaS];
+     auto abb = animations[abbS];
+     aiAnimation *at = nullptr;
+     if(atS.length())
+         at = animations[atS];
+
+     bool lba = true;
+     if(abaS ==  "DefaultToWalk" || abaS == "Hit" || abaS ==  "SleepToDefault"){
+     //    ba = 0; //TODO add back later maybe?
+         lba = false;
+     }
+
+     double tiba = 0, tibb = 0, tit = 0;
+     assert(aba->mTicksPerSecond > 0 && abb->mTicksPerSecond > 0 && (!at || at->mTicksPerSecond > 0));
+     tiba = bta * aba->mTicksPerSecond;
+     tibb = btb * abb->mTicksPerSecond;
+     if(at){
+         tit = tt * at->mTicksPerSecond;
+         tit = std::min(tit, at->mDuration);
+     }
+     if(lba)
+         tiba = fmod(tiba, aba->mDuration);
+     else
+         tiba = std::min(tiba, aba->mDuration);
+     tibb = fmod(tibb, abb->mDuration);
+
+
+
+     glm::mat4 boneArray[MAX_BONES];
+
+     auto globalInverse = scene->mRootNode->mTransformation; // needed?
+     globalInverse.Inverse();
+
+     aiAnimation *anims[3] = {aba, abb, at};
+     double tickss[3] = {tiba, tibb, tit};
+
+
+     const auto fillArray = [this, &boneArray, anims, tickss, ba, globalInverse](aiNode *thisNode, aiMatrix4x4 parent, auto &fillArray) -> void {
+       // https://github.com/vovan4ik123/assimp-Cpp-OpenGL-skeletal-animation/blob/master/Load_3D_model_2/Model.cpp
+       auto transform = aiMatrix4x4();
+       aiMatrix4x4 transforms[3] = {transform, transform, transform};
+
+       if(thisNode->mName == aiString("Foot01_R"))
+           void(0);// TODO
+
+       aiVector3D scalings[3];
+       aiQuaternion rotations[3];
+       aiVector3D positions[3];
+
+       for(int i = 0; i < (anims[2]?3:2); i++) { // 3 if we have at
+           if (nodeAnimations[anims[i]].count(thisNode)) // node's animated
+             transforms[i] = this->getAnimMat(tickss[i], nodeAnimations[anims[i]][thisNode]);
+           else
+             transforms[i] = thisNode->mTransformation; // node not animated
+
+           transforms[i].Decompose(scalings[i], rotations[i], positions[i]);
+       }
+
+
+       aiQuaternion rotation;
+       aiVector3D scaling = scalings[0] * (1 - ba) + scalings[1] * ba;
+       aiVector3D position = positions[0] * (1 - ba) + positions[1] * ba;
+       aiQuaternion::Interpolate(rotation, rotations[0], rotations[1], ba);
+
+       // TODO t
+
+       transform = parent * aiMatrix4x4(scaling, rotation, position);
+
+
+       if (boneIDOfNode.count(thisNode) == 1) { // the node's a bone
+         glm::mat4 boneMat = aiCast(globalInverse * transform * offsetOfNode[thisNode]);
+         //boneMat = glm::transpose(boneMat);
+              for (int i = 0; i < 3; i++)// test
+           boneMat[3][i] /= 100;
+         boneArray[boneIDOfNode[thisNode]] = boneMat;
+
+       }
+
+
+       for (auto i = 0u; i < thisNode->mNumChildren; i++)
+         fillArray(thisNode->mChildren[i], transform, fillArray);
+     };
+     fillArray(scene->mRootNode, aiMatrix4x4(), fillArray);
+ assert(boneIDOfNode.size() <= MAX_BONES);
+
+     shader.setUniform("uBones[0]", MAX_BONES, boneArray); // really, uBones[0] instead of uBones...
+     va->bind().draw();
+}
+
+
 aiMatrix4x4 AssimpModel::getAnimMat(float ticks, aiNodeAnim *anim) {
   aiVector3D scaling;
   aiQuaternion rotation;
