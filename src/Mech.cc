@@ -54,18 +54,12 @@ void Mech::draw(glow::UsedProgram &shader) {
   model = glm::translate(model, getPos());
   //rotate
   {
-    auto angle = glm::angle(moveDir, glm::vec3(0, 0, 1));
-    auto cross = glm::normalize(-glm::cross(moveDir, glm::vec3(0, 0, 1)));
-    if (isnan(glm::length(cross))) // couldn't get cross product // still doesn'towrk...
-      //FIXME TODO -> mech vs unity fix...
-      //if(angle < 0.01 && angle > -0.01)
-      //cross = glm::vec3(0,1,0);
-      //else
-      if (abs(angle) < 3.15 && abs(angle) > 3.13) {
-        cross = glm::vec3(0, 1, 0);
-        //model = glm::rotate(model, 3.141592f, glm::vec3(0, 0, 1)); // unity fix???
-      }
-    model = glm::rotate(model, angle, cross);
+    //auto angle = glm::angle(moveDir, glm::vec3(0, 0, 1));
+    moveDir = normalize(moveDir); // ?
+    auto angle = glm::acos(glm::dot(moveDir, glm::vec3(0,0,1)));
+    if(moveDir.x < 0)
+        angle = -angle;
+    model = glm::rotate(model, angle, glm::vec3(0, 1, 0));
   }
   model = glm::translate(model, meshOffset);
   model = glm::scale(model, glm::vec3(scale));
