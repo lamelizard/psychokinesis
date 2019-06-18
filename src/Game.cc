@@ -41,6 +41,9 @@
 
 #include "conversion.hh"
 
+
+//#define NOGUI
+
 GLOW_SHARED(class, btRigidBody);
 GLOW_SHARED(class, btMotionState);
 using defMotionState = std::shared_ptr<btDefaultMotionState>;
@@ -59,11 +62,12 @@ struct Rocket {
   rtype type = rtype::forward;
   bool real = true;
   bool explode = false;
+  bool willSplit = false; // see banjo-tooie final boss
 };
 
 Game *Game::instance = nullptr;
 
-#ifndef NDEBUG
+#ifndef NOGUI
 Game::Game() : GlfwApp(Gui::ImGui) {}
 #else
 Game::Game() : GlfwApp(Gui::None) {}
@@ -80,7 +84,7 @@ void Game::init() {
   // IMPORTANT: call to base class
   GlfwApp::init();
 
-  setTitle("Game Development 2019 TODO change ME"); // TODO
+  setTitle("Psychokinesis");
 
   // start assimp logging
   Assimp::DefaultLogger::create();
@@ -106,7 +110,17 @@ void Game::init() {
   // create gfx resources
   {
     mCamera = glow::camera::Camera::create();
+    mCamera->setFarPlane(200);
     mCamera->setLookAt({.5, 3, -15}, {.5, 7, -10});
+
+    // shadow
+    {
+        // probably should resize as well but what size?
+        mBufferShadow = glow::TextureRectangle::create(mShadowMapSize, mShadowMapSize, GL_DEPTH_COMPONENT32F);
+        mBufferShadow->bind().setWrap(GL_CLAMP_TO_BORDER, GL_CLAMP_TO_BORDER);
+        mBufferShadow->bind().setCompareMode(GL_COMPARE_REF_TO_TEXTURE);
+        mFramebufferShadow = glow::Framebuffer::createDepthOnly(mBufferShadow);
+    }
 
     // depth
     {
@@ -114,22 +128,33 @@ void Game::init() {
       mFramebufferDepth = glow::Framebuffer::createDepthOnly(mGBufferDepth);
     }
 
+    // fusion
+    {
+      //mTargets.push_back(mBufferFuse = glow::Texture2D::create(1, 1, GL_RGB16F)); // need sampler2D for fxaa
+      mBufferFuse = glow::Texture2D::create(1, 1, GL_RGB16F);
+      mBufferFuse->bind().setMinFilter(GL_LINEAR); // disable mipmaps
+      mFramebufferFuse = glow::Framebuffer::create("fColor", mBufferFuse);
+    }
+
     // mode
     {
-      mTargets.push_back(mBufferMode = glow::TextureRectangle::create(1, 1, GL_R8)); // GL_RED_INTEGER misses implementation in glow?
-      mFramebufferMode = glow::Framebuffer::create("fMode", mBufferMode, mGBufferDepth);
+        //can't blend integers?
+      //mTargets.push_back(mBufferMode = glow::TextureRectangle::create(1, 1, GL_R8I)); // GL_RED_INTEGER misses implementation in glow?
+        mTargets.push_back(mBufferMode = glow::TextureRectangle::create(1, 1, GL_R16F));
+        mFramebufferMode = glow::Framebuffer::create("fMode", mBufferMode, mGBufferDepth);
     }
 
     // GBuffer
     {
       // size is 1x1 for now and is changed onResize
       mTargets.push_back(mGBufferAlbedo = glow::TextureRectangle::create(1, 1, GL_RGB16F));
-      mTargets.push_back(mGBufferMaterial = glow::TextureRectangle::create(1, 1, GL_RG16F));
+      mTargets.push_back(mGBufferPosition = glow::TextureRectangle::create(1, 1, GL_RG16F));
       mTargets.push_back(mGBufferNormal = glow::TextureRectangle::create(1, 1, GL_RGB16F));
       mFramebufferGBuffer = glow::Framebuffer::create(
           {{"fAlbedo", mGBufferAlbedo},
            {"fNormal", mGBufferNormal},
-           {"fMaterial", mGBufferMaterial}},
+           {"fPosition", mGBufferPosition}, // WHY DOES THIS LINE FIX THE NORMALS?
+                  },
           mGBufferDepth);
     }
 
@@ -156,6 +181,8 @@ void Game::init() {
       string healthBarFn = texPath + "ui/Health bar";
       string rocketAlbedoFN = texPath + "rocket.albedo.";
       string rocketNormalFN = texPath + "rocket.normal.";
+      string paperFN = texPath + "paper.png";
+      string noise1FN = texPath + "noise_1.png";
 
 
 #ifndef NDEBUG // faster loading
@@ -189,6 +216,8 @@ void Game::init() {
         rocketAlbedoData[i] = async(policy, glow::TextureData::createFromFile, rocketAlbedoFN + to_string(i) + ".png", glow::ColorSpace::sRGB);
         rocketNormalData[i] = async(policy, glow::TextureData::createFromFile, rocketNormalFN + to_string(i) + ".png", glow::ColorSpace::sRGB);
       }
+      auto paperData = async(policy, glow::TextureData::createFromFile, paperFN, glow::ColorSpace::sRGB);
+      auto noise1Data = async(policy, glow::TextureData::createFromFile, noise1FN, glow::ColorSpace::Linear);
 
 
       //into GL
@@ -218,6 +247,10 @@ void Game::init() {
         mTexRocketNormal[i] = glow::Texture2D::createFromData(rocketNormalData[i].get());
         mTexRocketNormal[i]->setObjectLabel(rocketNormalFN);
       }
+      mTexPaper = glow::Texture2D::createFromData(paperData.get());
+      mTexPaper->setObjectLabel(paperFN);
+      mTexNoise1 = glow::Texture2D::createFromData(noise1Data.get());
+      mTexNoise1->setObjectLabel(noise1FN);
 
       //not into GL yet, could change
       Mech::mesh = mechModelData.get();
@@ -262,6 +295,8 @@ void Game::init() {
     mShaderOutput = glow::Program::createFromFile("../data/shaders/output");
     mShaderMode = glow::Program::createFromFile("../data/shaders/mode");
     mShaderMech = glow::Program::createFromFile("../data/shaders/mech");
+    mShaderUI = glow::Program::createFromFile("../data/shaders/ui");
+    mShaderFuse = glow::Program::createFromFile("../data/shaders/fuse");
   }
 
   // Sound
@@ -422,7 +457,7 @@ void Game::init() {
 
   {
     auto entity = ex.entities.create();
-    entity.assign<ModeArea>(ModeArea{fake, {-15, 0, -15}, 10});
+    entity.assign<ModeArea>(ModeArea{fast, {-15, 0, -15}, 10});
   }
 }
 
@@ -589,13 +624,33 @@ void Game::render(float elapsedSeconds) {
 
   // camera update here because it should be coupled tightly to rendering!
   updateCamera(elapsedSeconds);
+
   // get camera matrices
   auto proj = mCamera->getProjectionMatrix();
   auto view = mCamera->getViewMatrix();
+  // from glow-samples
+  //change parameters!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!1
+  glm::mat4 shadowProj = glm::perspective(glm::pi<float>() / 5.0f, 1.0f, 80.0f, 105.0f);
+  glm::mat4 shadowView= glm::lookAt(mLightPos, glm::vec3(0.0f), glm::vec3(1, 0, 0));
+  glm::mat4 shadowViewProj = shadowProj* shadowView;
 
   //update animations
   for (auto &m : mechs)
     m.updateTime(elapsedSeconds);
+
+  // Shadow
+  {
+      auto fb = mFramebufferShadow->bind();
+      glClear(GL_DEPTH_BUFFER_BIT);
+      GLOW_SCOPED(enable, GL_DEPTH_TEST);
+      GLOW_SCOPED(enable, GL_CULL_FACE);
+      //GLOW_SCOPED(cullFace, GL_FRONT); // bad idea for my cubes
+      GLOW_SCOPED(depthFunc, GL_LESS);
+
+      drawCubes(mShaderCubePrepass->use(), shadowProj, shadowView);
+      drawRockets(mShaderCubePrepass->use(), shadowProj, shadowView);
+      drawMech(mShaderMech->use(), shadowProj, shadowView);
+  }
 
   // Depth
   {
@@ -605,9 +660,9 @@ void Game::render(float elapsedSeconds) {
     GLOW_SCOPED(clearColor, glm::vec3(0, 0, 0));
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-    drawCubes(mShaderCubePrepass->use());
-    drawRockets(mShaderCubePrepass->use());
-    drawMech(mShaderMech->use());
+    drawCubes(mShaderCubePrepass->use(), proj, view);
+    drawRockets(mShaderCubePrepass->use(), proj, view);
+    drawMech(mShaderMech->use(), proj, view);
 
     if (mDebugBullet) {
       GLOW_SCOPED(disable, GL_DEPTH_TEST);
@@ -616,32 +671,7 @@ void Game::render(float elapsedSeconds) {
     }
   }
 
-  // GBuffer
-  {
-    auto fb = mFramebufferGBuffer->bind();
-    // glViewport is automatically set by framebuffer
-    GLOW_SCOPED(enable, GL_DEPTH_TEST);
-    GLOW_SCOPED(enable, GL_CULL_FACE);
-    GLOW_SCOPED(depthMask, GL_FALSE);
-    GLOW_SCOPED(depthFunc, GL_EQUAL);
-    GLOW_SCOPED(polygonMode, mShowWireframe ? GL_LINE : GL_FILL);
-    GLOW_SCOPED(clearColor, mBackgroundColor);
-    glClear(GL_COLOR_BUFFER_BIT | GL_STENCIL_BUFFER_BIT);
-
-    drawCubes(mShaderCube->use());
-    drawRockets(mShaderCube->use());
-    drawMech(mShaderMech->use());
-
-    // Render Bullet Debug
-    if (mDebugBullet) {
-      GLOW_SCOPED(disable, GL_DEPTH_TEST);
-      // dynamicsWorld->debugDrawWorld();
-      bulletDebugger->draw(proj * view);
-    }
-  }
-
   // Mode
-  // move up after depth prepass ?
   {
     auto fb = mFramebufferMode->bind();
     GLOW_SCOPED(enable, GL_CULL_FACE);
@@ -664,10 +694,36 @@ void Game::render(float elapsedSeconds) {
       shader.setUniform("uInvProj", glm::inverse(proj));
       shader.setUniform("uInvView", glm::inverse(view));
       shader.setUniform("uRadius", r);
-      shader.setUniform("uMode", (int32_t)areaHandle->mode);
+      auto modeID = (int32_t)areaHandle->mode;
+      shader.setUniform("uMode", modeID);
       sphere.draw();
     }
   }
+
+  // GBuffer
+  {
+    auto fb = mFramebufferGBuffer->bind();
+    // glViewport is automatically set by framebuffer
+    GLOW_SCOPED(enable, GL_DEPTH_TEST);
+    GLOW_SCOPED(enable, GL_CULL_FACE);
+    GLOW_SCOPED(depthMask, GL_FALSE);
+    GLOW_SCOPED(depthFunc, GL_EQUAL);
+    GLOW_SCOPED(polygonMode, mShowWireframe ? GL_LINE : GL_FILL);
+    GLOW_SCOPED(clearColor, glm::vec3(0,0,0));
+    glClear(GL_COLOR_BUFFER_BIT | GL_STENCIL_BUFFER_BIT);
+
+    drawCubes(mShaderCube->use(), proj, view);
+    drawRockets(mShaderCube->use(), proj, view);
+    drawMech(mShaderMech->use(), proj, view);
+    // Render Bullet Debug
+    if (mDebugBullet) {
+      GLOW_SCOPED(disable, GL_DEPTH_TEST);
+      // dynamicsWorld->debugDrawWorld();
+      bulletDebugger->draw(proj * view);
+    }
+  }
+
+
 
 
   // Light
@@ -692,48 +748,81 @@ void Game::render(float elapsedSeconds) {
     }
     */
 
-
-  // render framebuffer content to output with small post-processing effect
+  //screen space:
   {
-    // no framebuffer is bound, i.e. render-to-screen
-    GLOW_SCOPED(disable, GL_DEPTH_TEST);
-    GLOW_SCOPED(disable, GL_CULL_FACE);
-
-    // draw a fullscreen quad for outputting the framebuffer and applying a post-process
-    auto shader = mShaderOutput->use();
-    shader.setTexture("uTexColor", mGBufferAlbedo);
-    shader.setTexture("uTexNormal", mGBufferNormal);
-    shader.setTexture("uTexDepth", mGBufferDepth);
-    shader.setTexture("uTexMode", mBufferMode);
-    //sky
-    shader.setTexture("uSkybox", mSkybox);
-    shader.setUniform("uInvProj", glm::inverse(proj));
-    shader.setUniform("uInvView", inverse(view));
-
-    // let light rotate around the objects
-    // put higher
-    auto lightDir = glm::vec3(glm::cos(getCurrentTime()), 0, glm::sin(getCurrentTime()));
-    shader.setUniform("uLightDir", lightDir);
-    mMeshQuad->bind().draw();
+      GLOW_SCOPED(disable, GL_DEPTH_TEST);
+      GLOW_SCOPED(disable, GL_CULL_FACE);
+      //fuse
+      {
+          auto fb = mFramebufferFuse->bind();
+          auto shader = mShaderFuse->use();
+          shader.setTexture("uTexColor", mGBufferAlbedo);
+          shader.setTexture("uTexNormal", mGBufferNormal);
+          //shader.setTexture("uTexPosition", mGBufferPosition);
+          shader.setTexture("uTexDepth", mGBufferDepth);
+          shader.setTexture("uTexMode", mBufferMode);
+          shader.setTexture("uSkybox", mSkybox);
+          shader.setTexture("uTexPaper", mTexPaper);
+          shader.setTexture("uTexNoise1", mTexNoise1);
+          shader.setUniform("uView", view);
+          shader.setUniform("uInvProj", inverse(proj));
+          shader.setUniform("uInvView", inverse(view));
+          shader.setUniform("uZNear", mCamera->getNearClippingPlane());
+          shader.setUniform("uZFar", mCamera->getFarClippingPlane());
+          //from glow samples
+          shader.setUniform("uLightPos", mLightPos);
+          shader.setUniform("uTexShadowSize", (float)mShadowMapSize);
+          shader.setUniform("uShadowViewProjMatrix", shadowViewProj);
+          shader.setTexture("uTexShadow", mBufferShadow);
+          mMeshQuad->bind().draw();
+      }
+      // draw ui // after fxaa? TODO
+      {
+          auto health = mechs[player].HP;
+          if(health >= 0 && health <= MAX_HEALTH)
+          {
+              auto fb = mFramebufferFuse->bind();
+              auto shader = mShaderUI->use();
+              shader.setTexture("uTexHealth", mHealthBar[health]);
+              auto model = glm::scale(glm::translate(glm::mat4(), glm::vec3(-.87, -.87, 0)), glm::vec3(.1,.1,1));
+              shader.setUniform("uModel", model);
+              mMeshQuad->bind().draw();
+          }
+       }
+      // render framebuffer content to output with small post-processing effect
+      {
+        // draw a fullscreen quad for outputting the framebuffer and applying a post-process
+        auto shader = mShaderOutput->use();
+        shader.setTexture("uTexColor", mBufferFuse);
+        shader.setUniform("uResolution", glm::vec2(mBufferFuse->getWidth(), mBufferFuse->getHeight()));
+        shader.setUniform("ufxaaQualitySubpix", fxaaQualitySubpix);
+        shader.setUniform("ufxaaQualityEdgeThreshold", fxaaQualityEdgeThreshold);
+        shader.setUniform("ufxaaQualityEdgeThresholdMin", fxaaQualityEdgeThresholdMin);
+        mMeshQuad->bind().draw();
+      }
   }
+
+
+
+
+
 }
 
-void Game::drawMech(glow::UsedProgram shader) {
-  shader.setUniform("uProj", mCamera->getProjectionMatrix());
-  shader.setUniform("uView", mCamera->getViewMatrix());
+void Game::drawMech(glow::UsedProgram shader, glm::mat4 proj, glm::mat4 view) {
+    shader.setUniform("uProj", proj);
+    shader.setUniform("uView", view);
+    shader.setTexture("uTexMode", mBufferMode);
   for (auto &m : mechs)
     m.draw(shader);
 }
 
-void Game::drawCubes(glow::UsedProgram shader) {
-  auto proj = mCamera->getProjectionMatrix();
-  auto view = mCamera->getViewMatrix();
-
-  shader.setUniform("uProj", proj);
-  shader.setUniform("uView", view);
+void Game::drawCubes(glow::UsedProgram shader, glm::mat4 proj, glm::mat4 view) {
+    shader.setUniform("uProj", proj);
+    shader.setUniform("uView", view);
 
   shader.setTexture("uTexAlbedo", mTexCubeAlbedo);
   shader.setTexture("uTexNormal", mTexCubeNormal);
+  shader.setTexture("uTexMode", mBufferMode);
 
   // model matrices
   vector<glm::mat4> models;
@@ -759,7 +848,7 @@ void Game::drawCubes(glow::UsedProgram shader) {
       static_assert(sizeof(AttMat) == sizeof(glm::mat4x4), "bwah");
       trans.getOpenGLMatrix(glm::value_ptr(modelCube));
     }
-    modelCube *= glm::scale(glm::vec3(0.5)); // cube.obj has size 2
+    modelCube *= glm::scale(glm::vec3(0.5)); // cube.obj has size 2, +0001 to close gaps -> they are no gaps but z fighting
     //scale down in an mode
     //TODO change mode
     {
@@ -779,12 +868,10 @@ void Game::drawCubes(glow::UsedProgram shader) {
   mMeshCube->bind().draw(models.size());
 }
 
-void Game::drawRockets(glow::UsedProgram shader) {
-  auto proj = mCamera->getProjectionMatrix();
-  auto view = mCamera->getViewMatrix();
-
+void Game::drawRockets(glow::UsedProgram shader, glm::mat4 proj, glm::mat4 view) {
   shader.setUniform("uProj", proj);
   shader.setUniform("uView", view);
+  shader.setTexture("uTexMode", mBufferMode);
 
   // model matrices
   vector<glm::mat4> models[NUM_ROCKET_TYPES];
@@ -828,7 +915,7 @@ void Game::drawRockets(glow::UsedProgram shader) {
 
 // Update the GUI
 void Game::onGui() {
-#ifndef NDEBUG
+#ifndef NOGUI
   if (ImGui::Begin("GameDev Project SS19")) {
     ImGui::Text("Settings:");
     {
@@ -838,6 +925,25 @@ void Game::onGui() {
       //ImGui::Checkbox("Show Mech", &mDrawMech);
       ImGui::Checkbox("free Camera", &mFreeCamera);
       ImGui::Unindent();
+      //ImGui::SliderFloat3("UI", (float*)&mUIPos, 0.0f, 1.0f);
+    }
+    ImGui::Text("Controll:");
+    {
+      ImGui::Indent();
+      ImGui::SliderFloat("High", &jumpGravityHigh, -1, -30);
+      ImGui::SliderFloat("Low", &jumpGravityLow, -1, -30);
+      ImGui::SliderFloat("Fall", &jumpGravityFall, -1, -30);
+      ImGui::SliderFloat("Damping", &damping, 0.1, 1.0);
+      ImGui::SliderFloat("MoveForce", &moveForce, 3, 20);
+      ImGui::Unindent();
+    }
+    ImGui::Text("FXAA:");
+    {
+        ImGui::Indent();
+        ImGui::SliderFloat("QualitySubpix", &fxaaQualitySubpix, .5, 1);
+        ImGui::SliderFloat("QualityEdgeThreshold", &fxaaQualityEdgeThreshold, 0.333, 0.063);
+        ImGui::SliderFloat("QualityEdgeThresholdMin", &fxaaQualityEdgeThresholdMin, 0.0312, 0.0833);
+        ImGui::Unindent();
     }
   }
   ImGui::End();
@@ -852,6 +958,7 @@ void Game::onResize(int w, int h) {
   // resize all framebuffer textures
   for (auto const &t : mTargets)
     t->bind().resize(w, h);
+  mBufferFuse->bind().resize(w,h);
 }
 
 bool Game::onKey(int key, int scancode, int action, int mods) {
@@ -872,7 +979,7 @@ void Game::updateCamera(float elapsedSeconds) {
   //todo move closer to char when looking up
 
   bool ImGuiwantMouse = false;
-#ifndef NDEBUG
+#ifndef NOGUI
   ImGuiwantMouse = ImGui::GetIO().WantCaptureMouse;
 #endif
 
@@ -918,7 +1025,7 @@ void Game::updateCamera(float elapsedSeconds) {
     // move camera handle (position), accepts relative moves
     mCamera->handle.move(rel_move);
   } else {
-#ifdef NDEBUG
+#ifdef NOGUI
     setCursorMode(glow::glfw::CursorMode::Disabled);
 #endif
     glm::vec3 target = glcast(mechs[player].rigid->getWorldTransform().getOrigin());
@@ -940,4 +1047,17 @@ void Game::updateCamera(float elapsedSeconds) {
 
   // Camera is smoothed
   mCamera->update(elapsedSeconds);
+
+  //new camera -> new ears:
+  {
+      auto pos = mCamera->getPosition();
+      auto forw = mCamera->getForwardVector();
+      auto up = mCamera->getUpVector();
+      soloud->set3dListenerParameters(
+                  pos.x, pos.y, pos.z, //
+                  forw.x, forw.y, forw.z, //
+                  up.x, up.y, up.z, //
+                  0, 0, 0);
+      soloud->update3dAudio();
+  }
 }

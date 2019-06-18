@@ -10,6 +10,11 @@ https://opengameart.org/content/health-bar-0
 Rocket0 (edited): This work, made by Unnamed (Viktor.Hahn@web.de), is licensed under the Creative Commons Attribution-ShareAlike 3.0 Unported License. http://creativecommons.org/licenses/by-sa/3.0/
 https://opengameart.org/content/rocket-launcher
 
+FXAA.frag (edited): This software contains source code provided by NVIDIA Corporation.
+licence: https://github.com/NVIDIAGameWorks/GraphicsSamples/blob/master/license.txt
 
-TODO mech link
+"The Assault Mech" (modified): from Unity Asset Store by TRIPLEBRICK
+https://assetstore.unity.com/packages/3d/characters/robots/the-assault-mech-90395
+https://unity3d.com/de/legal/as_terms
+
 

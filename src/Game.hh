@@ -21,7 +21,8 @@
 enum Mode {
   normal = 0,
   drawn = 1,
-  fake = 2
+  fake = 2,
+  fast = 3
 };
 
 struct ModeArea {
@@ -68,15 +69,25 @@ public:
 private:
   bool mJumps = false;
   bool mJumpWasPressed = false; // last frame
+  float jumpGravityHigh = -8;
+  float jumpGravityLow = -15;
+  float jumpGravityFall = -18;
+  float damping = .95;
+  float moveForce = 10;
 
   std::vector<glm::vec3> spherePoints;
 
   // gfx settings
 private:
-  glm::vec3 mBackgroundColor = {.10f, .46f, .83f};
+  glm::vec3 mtestVec = {0,0,0};
   bool mShowWireframe = false;
   bool mShowMenu = false;
   bool mFreeCamera = false;
+  int mShadowMapSize = 16384 / 4; // urks, high
+  glm::vec3 mLightPos = {0,100,0};
+  float fxaaQualitySubpix = .75;
+  float fxaaQualityEdgeThreshold = .166;
+  float fxaaQualityEdgeThresholdMin = .0833;
 
   // gfx objects
 private:
@@ -84,9 +95,11 @@ private:
 
   // shaders
   glow::SharedProgram mShaderOutput;
+  glow::SharedProgram mShaderFuse; // was a word with C
   glow::SharedProgram mShaderCube;
   glow::SharedProgram mShaderCubePrepass;
   glow::SharedProgram mShaderMode;
+  glow::SharedProgram mShaderUI;
 
   // meshes
   glow::SharedVertexArray mMeshQuad;
@@ -103,9 +116,15 @@ private:
   glow::SharedTexture2D mTexCubeNormal;
   glow::SharedTexture2D mTexDefNormal;
   glow::SharedTextureCubeMap mSkybox;
-  glow::SharedTexture2D mHealthBar[MAX_HEALTH + 1];
+  glow::SharedTexture mHealthBar[MAX_HEALTH + 1];
   glow::SharedTexture2D mTexRocketAlbedo[NUM_ROCKET_TYPES];
   glow::SharedTexture2D mTexRocketNormal[NUM_ROCKET_TYPES];
+  glow::SharedTexture2D mTexPaper;
+  glow::SharedTexture2D mTexNoise1;
+
+  // Shadow
+  glow::SharedTextureRectangle mBufferShadow;
+  glow::SharedFramebuffer mFramebufferShadow;
 
   // depth pre-pass
   glow::SharedTextureRectangle mGBufferDepth;
@@ -117,13 +136,17 @@ private:
 
   // opaque
   glow::SharedTextureRectangle mGBufferAlbedo;
-  glow::SharedTextureRectangle mGBufferMaterial; // metallic roughness
+  glow::SharedTextureRectangle mGBufferPosition;
   glow::SharedTextureRectangle mGBufferNormal;
   glow::SharedFramebuffer mFramebufferGBuffer;
 
   // light
   glow::SharedTextureRectangle mBufferLight;
   glow::SharedFramebuffer mFramebufferLight;
+
+  //fusing
+  glow::SharedTexture2D mBufferFuse;
+  glow::SharedFramebuffer mFramebufferFuse;
 
   std::vector<glow::SharedTextureRectangle> mTargets;
 
@@ -144,11 +167,7 @@ private:
 
   // Bullet
 private:
-  //#ifdef NDEBUG
   bool mDebugBullet = false;
-  //#else
-  //bool mDebugBullet = true;
-  //#endif
   std::shared_ptr<btBoxShape> colBox;
   std::shared_ptr<btSphereShape> colPoint;
   void bulletCallback(btDynamicsWorld*, btScalar);
@@ -169,9 +188,9 @@ private:
 
   //draw
 private:
-  void drawMech(glow::UsedProgram shader);
-  void drawCubes(glow::UsedProgram shader);
-  void drawRockets(glow::UsedProgram shader);
+  void drawMech(glow::UsedProgram shader, glm::mat4 proj, glm::mat4 view);
+  void drawCubes(glow::UsedProgram shader, glm::mat4 proj, glm::mat4 view);
+  void drawRockets(glow::UsedProgram shader, glm::mat4 proj, glm::mat4 view);
 
   // test
   //btDefaultMotionState* boxMotionState = nullptr;
