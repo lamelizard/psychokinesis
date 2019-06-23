@@ -116,6 +116,9 @@ void Game::init() {
     // shadow
     {
         // probably should resize as well but what size?
+        int maxSize = 0;
+        glGetIntegerv(GL_MAX_TEXTURE_SIZE, &maxSize);
+        mShadowMapSize = maxSize / 2; // heuristic
         mBufferShadow = glow::TextureRectangle::create(mShadowMapSize, mShadowMapSize, GL_DEPTH_COMPONENT32F);
         mBufferShadow->bind().setWrap(GL_CLAMP_TO_BORDER, GL_CLAMP_TO_BORDER);
         mBufferShadow->bind().setCompareMode(GL_COMPARE_REF_TO_TEXTURE);
@@ -543,6 +546,7 @@ void Game::update(float elapsedSeconds) {
     //activate to be sure
        m.rigid->activate();
        m.tick();
+       m.drawPos = m.getPos(); // fix position
   }
 
 
@@ -664,11 +668,40 @@ void Game::render(float elapsedSeconds) {
 
     drawCubes(mShaderCubePrepass->use(), proj, view);
     drawRockets(mShaderCubePrepass->use(), proj, view);
-    drawMech(mShaderMech->use(), proj, view);
+    //drawMech(mShaderMech->use(), proj, view);
 
     if (mDebugBullet) {
       GLOW_SCOPED(disable, GL_DEPTH_TEST);
       dynamicsWorld->debugDrawWorld();
+      bulletDebugger->draw(proj * view);
+    }
+  }
+
+  // GBuffer
+  {
+    auto fb = mFramebufferGBuffer->bind();
+    // glViewport is automatically set by framebuffer
+    GLOW_SCOPED(enable, GL_DEPTH_TEST);
+    GLOW_SCOPED(enable, GL_CULL_FACE);
+    GLOW_SCOPED(depthMask, GL_FALSE);
+    GLOW_SCOPED(depthFunc, GL_EQUAL);
+    GLOW_SCOPED(polygonMode, mShowWireframe ? GL_LINE : GL_FILL);
+    GLOW_SCOPED(clearColor, glm::vec3(0,0,0));
+    glClear(GL_COLOR_BUFFER_BIT | GL_STENCIL_BUFFER_BIT);
+
+    drawCubes(mShaderCube->use(), proj, view);
+    drawRockets(mShaderCube->use(), proj, view);
+    {
+        GLOW_SCOPED(enable, GL_CULL_FACE);
+        GLOW_SCOPED(depthMask, GL_TRUE);
+        GLOW_SCOPED(depthFunc, GL_LESS);
+        drawMech(mShaderMech->use(), proj, view);
+    }
+
+    // Render Bullet Debug
+    if (mDebugBullet) {
+      GLOW_SCOPED(disable, GL_DEPTH_TEST);
+      // dynamicsWorld->debugDrawWorld();
       bulletDebugger->draw(proj * view);
     }
   }
@@ -701,31 +734,6 @@ void Game::render(float elapsedSeconds) {
       sphere.draw();
     }
   }
-
-  // GBuffer
-  {
-    auto fb = mFramebufferGBuffer->bind();
-    // glViewport is automatically set by framebuffer
-    GLOW_SCOPED(enable, GL_DEPTH_TEST);
-    GLOW_SCOPED(enable, GL_CULL_FACE);
-    GLOW_SCOPED(depthMask, GL_FALSE);
-    GLOW_SCOPED(depthFunc, GL_EQUAL);
-    GLOW_SCOPED(polygonMode, mShowWireframe ? GL_LINE : GL_FILL);
-    GLOW_SCOPED(clearColor, glm::vec3(0,0,0));
-    glClear(GL_COLOR_BUFFER_BIT | GL_STENCIL_BUFFER_BIT);
-
-    drawCubes(mShaderCube->use(), proj, view);
-    drawRockets(mShaderCube->use(), proj, view);
-    drawMech(mShaderMech->use(), proj, view);
-    // Render Bullet Debug
-    if (mDebugBullet) {
-      GLOW_SCOPED(disable, GL_DEPTH_TEST);
-      // dynamicsWorld->debugDrawWorld();
-      bulletDebugger->draw(proj * view);
-    }
-  }
-
-
 
 
   // Light
@@ -778,7 +786,7 @@ void Game::render(float elapsedSeconds) {
           shader.setTexture("uTexShadow", mBufferShadow);
           mMeshQuad->bind().draw();
       }
-      // draw ui // after fxaa? TODO
+      // draw ui // after fxaa too pixely...
       {
           auto health = mechs[player].HP;
           if(health >= 0 && health <= MAX_HEALTH)
@@ -813,7 +821,7 @@ void Game::render(float elapsedSeconds) {
 void Game::drawMech(glow::UsedProgram shader, glm::mat4 proj, glm::mat4 view) {
     shader.setUniform("uProj", proj);
     shader.setUniform("uView", view);
-    shader.setTexture("uTexMode", mBufferMode);
+    //shader.setTexture("uTexMode", mBufferMode);
   for (auto &m : mechs)
     m.draw(shader);
 }
@@ -824,7 +832,7 @@ void Game::drawCubes(glow::UsedProgram shader, glm::mat4 proj, glm::mat4 view) {
 
   shader.setTexture("uTexAlbedo", mTexCubeAlbedo);
   shader.setTexture("uTexNormal", mTexCubeNormal);
-  shader.setTexture("uTexMode", mBufferMode);
+  //shader.setTexture("uTexMode", mBufferMode);
 
   // model matrices
   vector<glm::mat4> models;
@@ -873,7 +881,7 @@ void Game::drawCubes(glow::UsedProgram shader, glm::mat4 proj, glm::mat4 view) {
 void Game::drawRockets(glow::UsedProgram shader, glm::mat4 proj, glm::mat4 view) {
   shader.setUniform("uProj", proj);
   shader.setUniform("uView", view);
-  shader.setTexture("uTexMode", mBufferMode);
+  //shader.setTexture("uTexMode", mBufferMode);
 
   // model matrices
   vector<glm::mat4> models[NUM_ROCKET_TYPES];
@@ -1042,20 +1050,22 @@ void Game::updateCamera(float elapsedSeconds) {
 #ifdef NOGUI
     setCursorMode(glow::glfw::CursorMode::Disabled);
 #endif
+    auto lastPos = mCamera->handle.getPosition();
     glm::vec3 target = glcast(mechs[player].rigid->getWorldTransform().getOrigin());
     mCamera->handle.setTarget(target);
-    mCamera->handle.setTargetDistance(5);
-
+    //mCamera->handle.setTargetDistance(5);
+    mCamera->handle.setTargetDistance(2 + 2* sin((lastPos - target).y));
 
     if (!ImGuiwantMouse) {
       auto mouse_delta = input().getLastMouseDelta() / 100.0f;
       if (mouse_delta.x < 1000) // ???
-        mCamera->handle.orbit(mouse_delta.x, 0);
+        mCamera->handle.orbit(mouse_delta.x, mouse_delta.y);
 
-      auto pos = mCamera->handle.getPosition();
+
       //pos.y = std::max(0.1f, pos.y);
       //mCamera->handle.setPosition(pos);
-      mCamera->handle.move(glm::vec3(0, std::max(.0, 0.1 - pos.y), 0));
+      //mCamera->handle.move(glm::vec3(0, std::max(.0, 0.1 - pos.y), 0));
+
     }
   }
 

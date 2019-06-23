@@ -15,6 +15,8 @@ out vec3 vNormal;
 out vec3 vTangent;
 out vec2 vTexCoord;
 
+invariant gl_Position;
+
 void main()
 {
 
@@ -29,7 +31,6 @@ void main()
                + (uBones[aBoneIDs.z] * iPosition) * aBoneWeights.z //
                + (uBones[aBoneIDs.w] * iPosition) * aBoneWeights.w;
 
-
     // assume uModel has no non-uniform scaling
     vNormal = mat3(uModel) * aNormal;
     vTangent = mat3(uModel) * aTangent;
@@ -39,4 +40,7 @@ void main()
     vWorldPos = vec3(uModel * pos);
     //vWorldPos = vec3(pos);
     gl_Position = uProj * uView * vec4(vWorldPos, 1);
+
+    //if(aBoneWeights.x + aBoneWeights.y + aBoneWeights.z + aBoneWeights.w < 0.999)
+      //  gl_Position = vec4(0,0,0,1);
 }

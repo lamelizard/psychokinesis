@@ -9,6 +9,8 @@ out vec3 fAlbedo;
 out vec3 fNormal;
 //out vec3 fMaterial;
 
+layout(early_fragment_tests) in;
+
 void main()
 {
     // local dirs

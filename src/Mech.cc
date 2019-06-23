@@ -3,6 +3,7 @@
 #include <cmath>
 #include <cassert>
 #include <set>
+#include <algorithm>
 
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
@@ -51,15 +52,21 @@ void Mech::updateTime(double delta) {
 
 void Mech::draw(glow::UsedProgram &shader) {
   glm::mat4 model;
-  model = glm::translate(model, getPos());
+  model = glm::translate(model, drawPos);
   //rotate
+  float angleView = 0;
   {
     //auto angle = glm::angle(moveDir, glm::vec3(0, 0, 1));
     moveDir = normalize(moveDir); // ?
-    auto angle = glm::acos(glm::dot(moveDir, glm::vec3(0,0,1)));
+    auto angleMove = acos(dot(moveDir, glm::vec3(0,0,1)));
     if(moveDir.x < 0)
-        angle = -angle;
-    model = glm::rotate(model, angle, glm::vec3(0, 1, 0));
+        angleMove = -angleMove;
+    viewDir = normalize(viewDir);
+    angleView = acos(dot(viewDir, glm::vec3(0,0,1)));
+    if(viewDir.x < 0)
+        angleView = -angleView;
+    angleView -= angleMove;//relative
+    model = glm::rotate(model, angleMove, glm::vec3(0, 1, 0));
   }
   model = glm::translate(model, meshOffset);
   model = glm::scale(model, glm::vec3(scale));
@@ -73,7 +80,7 @@ void Mech::draw(glow::UsedProgram &shader) {
   //mesh->draw(shader, animationsTime[0], loops[animations[0]], names[animations[0]]);
   auto g = Game::instance;
   if(!g->DebugingAnimations)
-        mesh->drawMech(shader, names[animations[0]], names[animations[1]], names[animationTop], animationAlpha, animationsTime[0], animationsTime[1], animationTimeTop, animationAngle);
+        mesh->drawMech(shader, names[animations[0]], names[animations[1]], names[animationTop], animationAlpha, animationsTime[0], animationsTime[1], animationTimeTop, angleView);
   else
         mesh->drawMech(shader, names[(animation)g->debugAnimations[0]], names[(animation)g->debugAnimations[1]], names[(animation)g->debugAnimations[2]], //
                 g->debugAnimationAlpha, g->debugAnimationTimes[0], g->debugAnimationTimes[1], g->debugAnimationTimes[2], g->debugAnimationAngle);
@@ -219,18 +226,22 @@ void Mech::controlPlayer(int) {
       bool closeToGround = false;
       float ground = 0; // valid if closeToGround
       float closeToGroundBorder = m.floatOffset * 1.2;
-      {
-        auto from = bulPos - btVector3(0, m.collision->getHalfHeight() + m.collision->getRadius(), 0); //heigth is notthe height...
+      vector<float> results;
+      for(int angle = -3; angle < 3; angle += 1){
+        auto from = bulPos - btVector3(sin(angle)*.3, m.collision->getHalfHeight() + m.collision->getRadius(), cos(angle)*.3); //heigth is notthe height...
         if (from.y() < 0 && from.y() > -0.01)                                                          //stuck slighlty in ground...
           from.setY(0.01);
         auto to = from - btVector3(0, closeToGroundBorder, 0);
         g->dynamicsWorld->getDebugDrawer()->drawLine(from, to, btVector4(1, 0, 0, 1));
         auto closest = btCollisionWorld::ClosestRayResultCallback(from, to);
         g->dynamicsWorld->rayTest(from, to, closest);
-        if (closest.hasHit()) {
+        if (closest.hasHit())
+          results.push_back(closest.m_hitPointWorld.y());
+      }
+      if(results.size() > 3){ // half hit
           closeToGround = true;
-          ground = closest.m_hitPointWorld.y();
-        }
+          sort(results.begin(), results.end());
+          ground = results[results.size() / 2];
       }
 
       // jumping
@@ -297,6 +308,7 @@ void Mech::startBig(int) {
 void Mech::runSmall(int t) {
   auto g = Game::instance;
   auto &m = g->mechs[small];
+  auto &p = g->mechs[player];
   if (m.rigid->getUserIndex2() == SMALL_GOTHIT) {
     m.HP--;
     m.rigid->setUserIndex2(SMALL_NONE);
@@ -347,7 +359,6 @@ void Mech::runSmall(int t) {
 
   //rocket
   if (t % (60 + ((m.HP) * 15)) == 0) {
-    auto &p = g->mechs[player];
     auto dir = glm::normalize(p.getPos() - pos);
     g->createRocket(pos + (dir * 3), dir * 4, rtype::forward); // 4?
   }
@@ -384,6 +395,7 @@ void Mech::runSmall(int t) {
 
   auto nextStepPos = pos + ((futurePos - pos) * (1. / reachGoalInTicks));
   m.moveDir = glm::normalize(futurePos - pos);
+  m.viewDir = glm::normalize(p.getPos() - pos);
   assert(m.rigid->isKinematicObject());
   //https://pybullet.org/Bullet/phpBB3/viewtopic.php?t=11530
   //m.motionState->m_graphicsWorldTrans.setOrigin(btcast(nextStepPos));

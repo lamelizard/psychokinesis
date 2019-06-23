@@ -167,13 +167,10 @@ void AssimpModel::drawMech(const UsedProgram &shader, const std::string &abaS, c
      double tickss[3] = {tiba, tibb, tit};
 
 
-     const auto fillArray = [this, &boneArray, anims, tickss, ba, globalInverse](aiNode *thisNode, aiMatrix4x4 parent, auto &fillArray) -> void {
+     const auto fillArray = [this, &boneArray, anims, tickss, ba, angle, globalInverse](aiNode *thisNode, aiMatrix4x4 parent, auto &fillArray) -> void {
        // https://github.com/vovan4ik123/assimp-Cpp-OpenGL-skeletal-animation/blob/master/Load_3D_model_2/Model.cpp
        auto transform = aiMatrix4x4();
        aiMatrix4x4 transforms[3] = {transform, transform, transform};
-
-       if(thisNode->mName == aiString("Foot01_R"))
-           void(0);// TODO
 
        aiVector3D scalings[3];
        aiQuaternion rotations[3];
@@ -195,6 +192,8 @@ void AssimpModel::drawMech(const UsedProgram &shader, const std::string &abaS, c
        aiQuaternion::Interpolate(rotation, rotations[0], rotations[1], ba);
 
        // TODO t
+       if(thisNode->mName == aiString("Body"))
+           rotation = rotation * aiQuaternion(aiVector3D(1,0,0), angle);
 
        transform = parent * aiMatrix4x4(scaling, rotation, position);
 
@@ -509,9 +508,11 @@ AssimpModel::AssimpModel(const std::string &filename) : filename(filename) {
         nodeAnimations[animation][node] = animNode;
       }
     }
-   (void)0;
-  // for (auto& w : vertexData->boneWeights)
-  //  w = glm::normalize(w);
+
+  // ONLY FOR MECH.FBX!!!
+   for (auto& w : vertexData->boneWeights)
+    if(w.x+w.y+w.z+w.w < 0.999)
+        w.x = 1;
 }
 
 // mostly from glow-extras:
