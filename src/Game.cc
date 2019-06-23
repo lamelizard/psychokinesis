@@ -546,7 +546,7 @@ void Game::update(float elapsedSeconds) {
     //activate to be sure
        m.rigid->activate();
        m.tick();
-       m.drawPos = m.getPos(); // fix position
+       m.updateLook();
   }
 
 

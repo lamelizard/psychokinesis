@@ -66,6 +66,7 @@ struct Mech : SM {
   glm::vec3 meshOffset;
   double floatOffset; // from bottom
   double scale = 1;
+  std::vector<glm::mat4> bones;
 
 
   std::shared_ptr<btCapsuleShape> collision;
@@ -89,6 +90,7 @@ struct Mech : SM {
 
   //void updateLogic();
   void updateTime(double delta);
+  void updateLook();
   void draw(glow::UsedProgram &shader);
   glm::vec3 getPos();
   void setPosition(glm::vec3);

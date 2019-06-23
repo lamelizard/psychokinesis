@@ -11,6 +11,7 @@
 #include <glow/common/log.hh>
 #include <glow/objects/Program.hh>
 #include <glow/objects/Texture2D.hh>
+#include <glow/objects/VertexArray.hh>
 
 #include <GLFW/glfw3.h>
 
@@ -22,6 +23,9 @@ using namespace std;
 using namespace glow;
 
 SharedAssimpModel Mech::mesh;
+
+//main cannon (L): (-0.97,4.8,4.1)
+//second cannon (L): (-1.32,4.52,3.5)
 
 void Mech::setAnimation(Mech::animation ab, Mech::animation at, double bt, double tt) {
   animations[0] = ab;
@@ -48,6 +52,11 @@ void Mech::updateTime(double delta) {
   animationsTime[0] += delta * animationsFaktor[0];
   animationsTime[1] += delta * animationsFaktor[1];
   animationTimeTop += delta * 1; // lame
+}
+
+void Mech::updateLook()
+{
+    drawPos = getPos(); // fix position
 }
 
 void Mech::draw(glow::UsedProgram &shader) {
@@ -80,10 +89,14 @@ void Mech::draw(glow::UsedProgram &shader) {
   //mesh->draw(shader, animationsTime[0], loops[animations[0]], names[animations[0]]);
   auto g = Game::instance;
   if(!g->DebugingAnimations)
-        mesh->drawMech(shader, names[animations[0]], names[animations[1]], names[animationTop], animationAlpha, animationsTime[0], animationsTime[1], animationTimeTop, angleView);
+        bones = mesh->getMechBones(names[animations[0]], names[animations[1]], names[animationTop], animationAlpha, animationsTime[0], animationsTime[1], animationTimeTop, angleView);
   else
-        mesh->drawMech(shader, names[(animation)g->debugAnimations[0]], names[(animation)g->debugAnimations[1]], names[(animation)g->debugAnimations[2]], //
+        bones = mesh->getMechBones(names[(animation)g->debugAnimations[0]], names[(animation)g->debugAnimations[1]], names[(animation)g->debugAnimations[2]], //
                 g->debugAnimationAlpha, g->debugAnimationTimes[0], g->debugAnimationTimes[1], g->debugAnimationTimes[2], g->debugAnimationAngle);
+
+  shader.setUniform("uBones[0]", MAX_BONES, bones.data()); // really, uBones[0] instead of uBones...
+
+  mesh->getVA()->bind().draw();
 
   //mechModel->draw(shader, debugTime, true, "Hit"); //"WalkInPlace");
   // skeleton

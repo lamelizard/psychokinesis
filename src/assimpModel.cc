@@ -3,6 +3,7 @@
 #include <cmath>
 #include <fstream>
 #include <functional>
+#include <exception>
 
 #include <glm/glm.hpp>
 
@@ -13,8 +14,6 @@
 #include <glow/objects/VertexArray.hh>
 
 #include <assimp/postprocess.h>
-
-#define MAX_BONES 64
 
 using namespace glow;
 
@@ -117,18 +116,24 @@ void AssimpModel::draw(const glow::UsedProgram &shader, double t, bool loop, con
   fillArray(scene->mRootNode, aiMatrix4x4(), fillArray);
 
   shader.setUniform("uBones[0]", MAX_BONES, boneArray); // really, uBones[0] instead of uBones...
-
   va->bind().draw();
 }
 
-void AssimpModel::drawMech(const UsedProgram &shader, const std::string &abaS, const std::string &abbS, const std::string &atS, float ba, double bta, double btb, double tt, float angle)
-{
+int AssimpModel::getMechBoneID(const std::string &name){
+ return boneIDOfName[name];
+}
+
+SharedVertexArray AssimpModel::getVA(){
     if (!va)
        createVertexArray();
      assert(va);
+     return va;
+}
 
+std::vector<glm::mat4> AssimpModel::getMechBones(const std::string &abaS, const std::string &abbS, const std::string &atS, float ba, double bta, double btb, double tt, float angle)
+{
      if(!abaS.length() || !abbS.length())
-         return;
+         throw new std::runtime_error("");
 
      auto aba = animations[abaS];
      auto abb = animations[abbS];
@@ -158,7 +163,7 @@ void AssimpModel::drawMech(const UsedProgram &shader, const std::string &abaS, c
 
 
 
-     glm::mat4 boneArray[MAX_BONES];
+     std::vector<glm::mat4> boneArray(MAX_BONES);
 
      auto globalInverse = scene->mRootNode->mTransformation; // needed?
      globalInverse.Inverse();
@@ -192,6 +197,7 @@ void AssimpModel::drawMech(const UsedProgram &shader, const std::string &abaS, c
        aiQuaternion::Interpolate(rotation, rotations[0], rotations[1], ba);
 
        // TODO t
+
        if(thisNode->mName == aiString("Body"))
            rotation = rotation * aiQuaternion(aiVector3D(1,0,0), angle);
 
@@ -214,8 +220,9 @@ void AssimpModel::drawMech(const UsedProgram &shader, const std::string &abaS, c
      fillArray(scene->mRootNode, aiMatrix4x4(), fillArray);
  assert(boneIDOfNode.size() <= MAX_BONES);
 
-     shader.setUniform("uBones[0]", MAX_BONES, boneArray); // really, uBones[0] instead of uBones...
-     va->bind().draw();
+     return boneArray;
+     //shader.setUniform("uBones[0]", MAX_BONES, boneArray); // really, uBones[0] instead of uBones...
+     //va->bind().draw();
 }
 
 
@@ -467,6 +474,7 @@ AssimpModel::AssimpModel(const std::string &filename) : filename(filename) {
         auto node = scene->mRootNode->FindNode(bone->mName);
         assert(node);
         boneIDOfNode[node] = boneID;
+        boneIDOfName[bone->mName.C_Str()] = boneID;
         offsetOfNode[node] = bone->mOffsetMatrix;
 
         // weights
