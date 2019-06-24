@@ -1,5 +1,6 @@
 uniform sampler2D uTexAlbedo;
 uniform sampler2D uTexNormal;
+uniform sampler2D uTexMaterial;
 
 in vec3 vWorldPos;
 in vec3 vNormal;
@@ -8,6 +9,7 @@ in vec2 vTexCoord;
 
 out vec3 fAlbedo;
 out vec3 fNormal;
+out vec2 fMaterial;
 
 layout(early_fragment_tests) in;
 
@@ -26,8 +28,11 @@ void main()
     N = normalize(mat3(T, B, N) * normalMap);
     fNormal = N;
 
+    //material
+    vec2 material = texture(uTexMaterial, vTexCoord).ra;
+    fMaterial = vec2(material.x, 1 - material.y);
+
     // read color texture
     vec3 albedo = texture(uTexAlbedo, vTexCoord).rgb;
-
     fAlbedo = albedo;
 }

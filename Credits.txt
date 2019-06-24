@@ -17,4 +17,9 @@ licence: https://github.com/NVIDIAGameWorks/GraphicsSamples/blob/master/license.
 https://assetstore.unity.com/packages/3d/characters/robots/the-assault-mech-90395
 https://unity3d.com/de/legal/as_terms
 
+"Sci-Fi Industrial Floor 4 - PBR0345" (modified) (cube textures)
+https://www.textures.com/download/pbr0402/137273?q=Machine%2C
+https://www.textures.com/faq-license.html
+
+
 

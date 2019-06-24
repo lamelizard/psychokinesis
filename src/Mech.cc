@@ -84,6 +84,7 @@ void Mech::draw(glow::UsedProgram &shader) {
   shader.setUniform("uModel", model);
   shader.setTexture("uTexAlbedo", texAlbedo);
   shader.setTexture("uTexNormal", texNormal);
+  shader.setTexture("uTexMaterial", texMaterial);
 
 
   //mesh->draw(shader, animationsTime[0], loops[animations[0]], names[animations[0]]);
@@ -201,8 +202,11 @@ void Mech::controlPlayer(int) {
 
         if (glm::length(relDir) > .1f)
           glm::normalize(relDir);
-        else if (glm::length(relDir) < 0.1 && hasController) // a.k.a. 0
-          relDir = glm::normalize(glm::vec3(limitAxis(gamepadState.axes[GLFW_GAMEPAD_AXIS_LEFT_X]), 0, limitAxis(gamepadState.axes[GLFW_GAMEPAD_AXIS_LEFT_Y])));
+        else if (glm::length(relDir) < 0.1 && hasController) {// a.k.a. 0
+            glm::vec3 conDir(limitAxis(gamepadState.axes[GLFW_GAMEPAD_AXIS_LEFT_X]), 0, limitAxis(-gamepadState.axes[GLFW_GAMEPAD_AXIS_LEFT_Y]));
+            relDir = conDir / max(1.f, length(conDir));// no fast diagonal walk, we aint goldeneye
+        }
+
       }
 
 

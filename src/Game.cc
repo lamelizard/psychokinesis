@@ -84,7 +84,7 @@ void Game::init() {
   // IMPORTANT: call to base class
   GlfwApp::init();
 
-  setTitle("Psychokinesis");
+  setTitle("Psychokinesis"); // N.I. ?
 
   // start assimp logging
   Assimp::DefaultLogger::create();
@@ -151,12 +151,16 @@ void Game::init() {
     {
       // size is 1x1 for now and is changed onResize
       mTargets.push_back(mGBufferAlbedo = glow::TextureRectangle::create(1, 1, GL_RGB16F));
-      mTargets.push_back(mGBufferPosition = glow::TextureRectangle::create(1, 1, GL_RG16F));
+      mTargets.push_back(mGBufferMaterial = glow::TextureRectangle::create(1, 1, GL_RG16F));
       mTargets.push_back(mGBufferNormal = glow::TextureRectangle::create(1, 1, GL_RGB16F));
+      auto fix = glow::TextureRectangle::create(1, 1, GL_R16F);
+      mTargets.push_back(fix);
       mFramebufferGBuffer = glow::Framebuffer::create(
           {{"fAlbedo", mGBufferAlbedo},
+
+           {"fMaterial", mGBufferMaterial},
            {"fNormal", mGBufferNormal},
-           {"fPosition", mGBufferPosition}, // WHY DOES THIS LINE FIX THE NORMALS?
+           {"fFIXMYBUG", fix} // WHY DOES THIS LINE FIX the last rectangle
                   },
           mGBufferDepth);
     }
@@ -176,10 +180,13 @@ void Game::init() {
       string texPath = "../data/textures/";
       string cubeAlbedoFN = texPath + "cube.albedo.png";
       string cubeNormalFN = texPath + "cube.normal.png";
+      string cubeMetallicFN = texPath + "cube.metallic.png";
+      string cubeRoughnessFN = texPath + "cube.roughness.png";
       string smallFN = texPath + "normal.png";
       string bgPath = texPath + "galaxy/";
-      string mechAlbedoFN = texPath + "mech.albedo.png";
-      string mechNormalFN = texPath + "mech.normal.png";
+      string mechAlbedoFN = texPath + "mech.albedo.";
+      string mechNormalFN = texPath + "mech.normal.";
+      string mechMaterialFN = texPath + "mech.material.";
       string mechModelFN = "../data/models/mech/mech.fbx";
       string healthBarFn = texPath + "ui/Health bar";
       string rocketAlbedoFN = texPath + "rocket.albedo.";
@@ -187,18 +194,13 @@ void Game::init() {
       string paperFN = texPath + "paper.png";
       string noise1FN = texPath + "noise_1.png";
 
-
-#ifndef NDEBUG // faster loading
-      mechAlbedoFN = smallFN;
-      mechNormalFN = smallFN;
-#endif
-
       //loading async
-      const auto policy = launch::deferred; // TODO, why does this break with async
-      //todo glow::TextureData::createFromFile creates warnings?
+      const auto policy = launch::async;
 
       auto cubeAlbedoData = async(policy, glow::TextureData::createFromFile, cubeAlbedoFN, glow::ColorSpace::sRGB);
       auto cubeNormalData = async(policy, glow::TextureData::createFromFile, cubeNormalFN, glow::ColorSpace::Linear);
+      auto cubeMetallicData = async(policy, glow::TextureData::createFromFile, cubeMetallicFN, glow::ColorSpace::Linear);
+      auto cubeRoughnessData = async(policy, glow::TextureData::createFromFile, cubeRoughnessFN, glow::ColorSpace::Linear);
       auto bgData = async(policy, glow::TextureData::createFromFileCube, //
                           bgPath + "right.png",                          //
                           bgPath + "left.png",                           //
@@ -207,9 +209,13 @@ void Game::init() {
                           bgPath + "front.png",                          //
                           bgPath + "back.png",                           //
                           glow::ColorSpace::sRGB);
-      auto mechAlbedoData = async(policy, glow::TextureData::createFromFile, mechAlbedoFN, glow::ColorSpace::sRGB);
-      auto mechNormalData = async(policy, glow::TextureData::createFromFile, mechNormalFN, glow::ColorSpace::Linear);
-      auto mechModelData = async(policy, AssimpModel::load, mechModelFN);
+      auto mechAlbedoData0 = async(policy, glow::TextureData::createFromFile, mechAlbedoFN + "0.png", glow::ColorSpace::sRGB);
+      auto mechNormalData0 = async(policy, glow::TextureData::createFromFile, mechNormalFN + "0.png", glow::ColorSpace::Linear);
+      auto mechMaterialData0 = async(policy, glow::TextureData::createFromFile, mechMaterialFN + "0.png", glow::ColorSpace::Linear);
+      auto mechAlbedoData1 = async(policy, glow::TextureData::createFromFile, mechAlbedoFN + "1.png", glow::ColorSpace::sRGB);
+      auto mechNormalData1 = async(policy, glow::TextureData::createFromFile, mechNormalFN + "1.png", glow::ColorSpace::Linear);
+      auto mechMaterialData1 = async(policy, glow::TextureData::createFromFile, mechMaterialFN + "1.png", glow::ColorSpace::Linear);
+      auto mechAlbedoData2 = async(policy, glow::TextureData::createFromFile, mechAlbedoFN + "2.png", glow::ColorSpace::sRGB);
       future<glow::SharedTextureData> healthBarData[MAX_HEALTH + 1];
       for (int i = 0; i <= MAX_HEALTH; i++)
         healthBarData[i] = std::async(policy, glow::TextureData::createFromFile, healthBarFn + to_string(i) + ".png", glow::ColorSpace::sRGB);
@@ -221,24 +227,34 @@ void Game::init() {
       }
       auto paperData = async(policy, glow::TextureData::createFromFile, paperFN, glow::ColorSpace::sRGB);
       auto noise1Data = async(policy, glow::TextureData::createFromFile, noise1FN, glow::ColorSpace::Linear);
-
+      //linear:
+      auto mechModelData = async(launch::deferred, AssimpModel::load, mechModelFN); // WHY DOES THIS BREAK WITH ASYNC?
+      //not into GL yet, could change
+      Mech::mesh = mechModelData.get();
 
       //into GL
       mTexCubeAlbedo = glow::Texture2D::createFromData(cubeAlbedoData.get());
       mTexCubeAlbedo->setObjectLabel(cubeAlbedoFN);
       mTexCubeNormal = glow::Texture2D::createFromData(cubeNormalData.get());
       mTexCubeNormal->setObjectLabel(cubeNormalFN);
+      mTexCubeMetallic = glow::Texture2D::createFromData(cubeMetallicData.get());
+      mTexCubeMetallic->setObjectLabel(cubeMetallicFN);
+      mTexCubeRoughness = glow::Texture2D::createFromData(cubeRoughnessData.get());
+      mTexCubeRoughness->setObjectLabel(cubeRoughnessFN);
       mSkybox = glow::TextureCubeMap::createFromData(bgData.get());
       mSkybox->setObjectLabel(bgPath);
-      mechs[player].texAlbedo = glow::Texture2D::createFromData(mechAlbedoData.get());
+      mechs[player].texAlbedo = glow::Texture2D::createFromData(mechAlbedoData0.get());
       mechs[player].texAlbedo->setObjectLabel(mechAlbedoFN);
-      mechs[player].texNormal = glow::Texture2D::createFromData(mechNormalData.get());
+      mechs[player].texNormal = glow::Texture2D::createFromData(mechNormalData0.get());
       mechs[player].texNormal->setObjectLabel(mechNormalFN);
-      //temp, TODO
-      mechs[small].texAlbedo = mechs[player].texAlbedo;
-      mechs[small].texNormal = mechs[player].texNormal;
-      mechs[big].texAlbedo = mechs[player].texAlbedo;
-      mechs[big].texNormal = mechs[player].texNormal;
+      mechs[player].texMaterial = glow::Texture2D::createFromData(mechMaterialData0.get());
+      mechs[player].texMaterial->setObjectLabel(mechMaterialFN);
+      mechs[small].texAlbedo = glow::Texture2D::createFromData(mechAlbedoData1.get());
+      mechs[small].texNormal = glow::Texture2D::createFromData(mechNormalData1.get());
+      mechs[small].texMaterial = glow::Texture2D::createFromData(mechMaterialData1.get());
+      mechs[big].texAlbedo = glow::Texture2D::createFromData(mechAlbedoData2.get());
+      mechs[big].texNormal = mechs[small].texNormal;
+      mechs[big].texMaterial = mechs[small].texMaterial;
 
       for (int i = 0; i <= MAX_HEALTH; i++) {
         mHealthBar[i] = glow::Texture2D::createFromData(healthBarData[i].get());
@@ -254,9 +270,6 @@ void Game::init() {
       mTexPaper->setObjectLabel(paperFN);
       mTexNoise1 = glow::Texture2D::createFromData(noise1Data.get());
       mTexNoise1->setObjectLabel(noise1FN);
-
-      //not into GL yet, could change
-      Mech::mesh = mechModelData.get();
 
       //mTexDefNormal = glow::Texture2D::createFromFile(texPath + "normal.png", glow::ColorSpace::Linear);
     }
@@ -323,7 +336,7 @@ void Game::init() {
       music.load("../data/sounds/heroic_demise_loop.ogg");
       music.setLooping(true);
       musicHandle = soloud->playBackground(music, 0);
-      soloud->fadeVolume(musicHandle, 1, 30);
+      soloud->fadeVolume(musicHandle, .7, 30);
     }
     // sfx
     {
@@ -664,17 +677,11 @@ void Game::render(float elapsedSeconds) {
     GLOW_SCOPED(enable, GL_DEPTH_TEST);
     GLOW_SCOPED(enable, GL_CULL_FACE);
     GLOW_SCOPED(clearColor, glm::vec3(0, 0, 0));
-    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+    glClear(GL_DEPTH_BUFFER_BIT);
 
     drawCubes(mShaderCubePrepass->use(), proj, view);
     drawRockets(mShaderCubePrepass->use(), proj, view);
     //drawMech(mShaderMech->use(), proj, view);
-
-    if (mDebugBullet) {
-      GLOW_SCOPED(disable, GL_DEPTH_TEST);
-      dynamicsWorld->debugDrawWorld();
-      bulletDebugger->draw(proj * view);
-    }
   }
 
   // GBuffer
@@ -687,7 +694,7 @@ void Game::render(float elapsedSeconds) {
     GLOW_SCOPED(depthFunc, GL_EQUAL);
     GLOW_SCOPED(polygonMode, mShowWireframe ? GL_LINE : GL_FILL);
     GLOW_SCOPED(clearColor, glm::vec3(0,0,0));
-    glClear(GL_COLOR_BUFFER_BIT | GL_STENCIL_BUFFER_BIT);
+    glClear(GL_COLOR_BUFFER_BIT);
 
     drawCubes(mShaderCube->use(), proj, view);
     drawRockets(mShaderCube->use(), proj, view);
@@ -696,19 +703,19 @@ void Game::render(float elapsedSeconds) {
         GLOW_SCOPED(depthMask, GL_TRUE);
         GLOW_SCOPED(depthFunc, GL_LESS);
         drawMech(mShaderMech->use(), proj, view);
-    }
-
-    // Render Bullet Debug
-    if (mDebugBullet) {
-      GLOW_SCOPED(disable, GL_DEPTH_TEST);
-      // dynamicsWorld->debugDrawWorld();
-      bulletDebugger->draw(proj * view);
+        // Render Bullet Debug
+        if (mDebugBullet) {
+          GLOW_SCOPED(disable, GL_DEPTH_TEST);
+          // dynamicsWorld->debugDrawWorld();
+          bulletDebugger->draw(proj * view);
+        }
     }
   }
 
   // Mode
   {
     auto fb = mFramebufferMode->bind();
+    glClear(GL_COLOR_BUFFER_BIT);
     GLOW_SCOPED(enable, GL_CULL_FACE);
     GLOW_SCOPED(enable, GL_DEPTH_TEST);
     GLOW_SCOPED(depthMask, GL_FALSE); // Disable depth write
@@ -768,7 +775,7 @@ void Game::render(float elapsedSeconds) {
           auto shader = mShaderFuse->use();
           shader.setTexture("uTexColor", mGBufferAlbedo);
           shader.setTexture("uTexNormal", mGBufferNormal);
-          //shader.setTexture("uTexPosition", mGBufferPosition);
+          shader.setTexture("uTexMaterial", mGBufferMaterial);
           shader.setTexture("uTexDepth", mGBufferDepth);
           shader.setTexture("uTexMode", mBufferMode);
           shader.setTexture("uSkybox", mSkybox);
@@ -779,6 +786,7 @@ void Game::render(float elapsedSeconds) {
           shader.setUniform("uInvView", inverse(view));
           shader.setUniform("uZNear", mCamera->getNearClippingPlane());
           shader.setUniform("uZFar", mCamera->getFarClippingPlane());
+          shader.setUniform("uCamPos", mCamera->getPosition());
           //from glow samples
           shader.setUniform("uLightPos", mLightPos);
           shader.setUniform("uTexShadowSize", (float)mShadowMapSize);
@@ -812,9 +820,7 @@ void Game::render(float elapsedSeconds) {
       }
   }
 
-
-
-
+  bulletDebugger->clearLines();
 
 }
 
@@ -832,7 +838,8 @@ void Game::drawCubes(glow::UsedProgram shader, glm::mat4 proj, glm::mat4 view) {
 
   shader.setTexture("uTexAlbedo", mTexCubeAlbedo);
   shader.setTexture("uTexNormal", mTexCubeNormal);
-  //shader.setTexture("uTexMode", mBufferMode);
+  shader.setTexture("uTexMetallic", mTexCubeMetallic);
+  shader.setTexture("uTexRoughness", mTexCubeRoughness);
 
   // model matrices
   vector<glm::mat4> models;
@@ -844,7 +851,7 @@ void Game::drawCubes(glow::UsedProgram shader, glm::mat4 proj, glm::mat4 view) {
   {
     auto area = entityx::ComponentHandle<ModeArea>();
     for (auto entity : ex.entities.entities_with_components(area))
-      if (area->mode == drawn)
+      if (area->mode == fast)
         scaleAreas.push_back(*area.get());
   }
 
@@ -915,6 +922,8 @@ void Game::drawRockets(glow::UsedProgram shader, glm::mat4 proj, glm::mat4 view)
   for (int i = 0; i < NUM_ROCKET_TYPES; i++) {
     shader.setTexture("uTexAlbedo", mTexRocketAlbedo[i]);
     shader.setTexture("uTexNormal", mTexRocketNormal[i]);
+    shader.setTexture("uTexMetallic", mTexDefMaterial);
+    shader.setTexture("uTexRoughness", mTexDefMaterial);
 
     auto abModels = mMeshRocket[i]->getAttributeBuffer("aModel");
     assert(abModels);
@@ -1046,31 +1055,53 @@ void Game::updateCamera(float elapsedSeconds) {
 
     // move camera handle (position), accepts relative moves
     mCamera->handle.move(rel_move);
+      mCamera->update(elapsedSeconds);
   } else {
+      GLFWgamepadstate gamepadState;
+      bool hasController = glfwJoystickIsGamepad(GLFW_JOYSTICK_1) && glfwGetGamepadState(GLFW_JOYSTICK_1, &gamepadState);
 #ifdef NOGUI
     setCursorMode(glow::glfw::CursorMode::Disabled);
 #endif
+
+
     auto lastPos = mCamera->handle.getPosition();
     glm::vec3 target = glcast(mechs[player].rigid->getWorldTransform().getOrigin());
+    static glm::vec3 lastTarget = target;
+    mCamera->handle.move(target - lastTarget);
     mCamera->handle.setTarget(target);
-    //mCamera->handle.setTargetDistance(5);
     mCamera->handle.setTargetDistance(2 + 2* sin((lastPos - target).y));
+    //mCamera->handle.setTargetDistance(5);
+    /*{
+        auto dif = (lastPos - lastTarget);
+        dif.y = 0;
+        dif = normalize(dif);
+        auto angle = acos(dot(dif, normalize((lastPos - lastTarget))));
+        if(lastPos.y < lastTarget.y)
+            angle *= -1;
+        mCamera->handle.setTargetDistance(2 + 2* sin(angle));
+    }*/
+
 
     if (!ImGuiwantMouse) {
       auto mouse_delta = input().getLastMouseDelta() / 100.0f;
       if (mouse_delta.x < 1000) // ???
         mCamera->handle.orbit(mouse_delta.x, mouse_delta.y);
-
-
       //pos.y = std::max(0.1f, pos.y);
       //mCamera->handle.setPosition(pos);
       //mCamera->handle.move(glm::vec3(0, std::max(.0, 0.1 - pos.y), 0));
 
     }
+    if(hasController)
+      mCamera->handle.orbit(limitAxis(gamepadState.axes[GLFW_GAMEPAD_AXIS_RIGHT_X]) / 15, //
+                            limitAxis(-gamepadState.axes[GLFW_GAMEPAD_AXIS_RIGHT_Y]) / 15);
+
+     mCamera->update(elapsedSeconds);
+    //mCamera->handle.setTargetDistance(2 + 2* sin((mCamera->getPosition() - target).y));
+
+    lastTarget = target;
   }
 
-  // Camera is smoothed
-  mCamera->update(elapsedSeconds);
+
 
   //new camera -> new ears:
   {

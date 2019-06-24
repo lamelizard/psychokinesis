@@ -86,6 +86,7 @@ struct Mech : SM {
 
   glow::SharedTexture2D texAlbedo;
   glow::SharedTexture2D texNormal;
+  glow::SharedTexture2D texMaterial;
   static SharedAssimpModel mesh;
 
   //void updateLogic();

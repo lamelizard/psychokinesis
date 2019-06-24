@@ -50,7 +50,7 @@ private:
 
 
 public:
-  static SharedAssimpModel load(const std::string &filename); // safe to do in a thread
+  static SharedAssimpModel load(const std::string &filename); // safe to do in a thread... broken???
   void draw();                                                // glow::Program should be active
   void draw(const glow::UsedProgram &, double time, bool loop, const std::string &animation);
   std::vector<glm::mat4> getMechBones(const std::string &aba, const std::string &abb, const std::string &at, float ba, double bta, double btb, double tt, float angle);

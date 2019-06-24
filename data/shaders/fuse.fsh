@@ -1,5 +1,6 @@
 uniform sampler2DRect uTexColor;
 uniform sampler2DRect uTexNormal;
+uniform sampler2DRect uTexMaterial;
 uniform sampler2DRect uTexDepth;
 uniform sampler2DRect uTexMode;
 uniform samplerCube uSkybox;
@@ -9,9 +10,10 @@ uniform sampler2D uTexPaper;
 uniform mat4 uInvProj;
 uniform mat4 uInvView;
 uniform mat4 uView;
+uniform vec3 uLightPos;
+uniform vec3 uCamPos;
 
 //shadow
-uniform vec3 uLightPos;
 uniform sampler2DRectShadow uTexShadow;
 uniform float uTexShadowSize;
 uniform mat4 uShadowViewProjMatrix;
@@ -26,14 +28,13 @@ in vec2 vPosition;
 out vec3 fColor;
 
 // from glow samples (modified)
-
 float zOf(ivec2 uv)
 {
     //return -vec4(uView * vec4(worldPos, 1.0)).z;
     float zNormalised = 2.0 * texelFetch(uTexDepth, uv).x - 1.0;
     return 2.0 * uZNear * uZFar / (uZFar + uZNear - zNormalised * (uZFar - uZNear));
 }
-
+// from glow samples (modified)
 bool isEdge(ivec2 uv)
 {
     float OutlineNormal = 1;
@@ -67,7 +68,41 @@ bool isEdge(ivec2 uv)
 
     return e > 1;
 }
+// from glow samples
+vec3 shadingSpecularGGX(vec3 N, vec3 V, vec3 L, float roughness, vec3 F0)
+{
+    // see http://www.filmicworlds.com/2014/04/21/optimizing-ggx-shaders-with-dotlh/
+    vec3 H = normalize(V + L);
 
+    float dotLH = max(dot(L, H), 0.0);
+    float dotNH = max(dot(N, H), 0.0);
+    float dotNL = max(dot(N, L), 0.0);
+    float dotNV = max(dot(N, V), 0.0);
+
+    float alpha = roughness * roughness;
+
+    // D (GGX normal distribution)
+    float alphaSqr = alpha * alpha;
+    float denom = dotNH * dotNH * (alphaSqr - 1.0) + 1.0;
+    float D = alphaSqr / (denom * denom);
+    // no pi because BRDF -> lighting
+
+    // F (Fresnel term)
+    float F_a = 1.0;
+    float F_b = pow(1.0 - dotLH, 5); // manually?
+    vec3 F = mix(vec3(F_b), vec3(F_a), F0);
+
+    // G (remapped hotness, see Unreal Shading)
+    float k = (alpha + 2 * roughness + 1) / 8.0;
+    float G = dotNL / (mix(dotNL, 1, k) * mix(dotNV, 1, k));
+    // '* dotNV' - canceled by normalization
+
+    // '/ dotLN' - canceled by lambert
+    // '/ dotNV' - canceled by G
+    return D * F * G / 4.0;
+}
+
+//Black -> only borders visible
 
 void main()
 {
@@ -81,17 +116,16 @@ void main()
         int mode = int(texelFetch(uTexMode, uv).x + .5);
 
         //I have z-fighting with triangles at an 90° angle, just move one texel
-        vec3 n = texelFetch(uTexNormal, uv).xyz;
-        vec3 n1 = texelFetch(uTexNormal, uv + ivec2(1,0)).xyz;
-        vec3 n2 = texelFetch(uTexNormal, uv + ivec2(-1,0)).xyz;
-        vec3 n3 = texelFetch(uTexNormal, uv + ivec2(0,1)).xyz;
-        vec3 n4 = texelFetch(uTexNormal, uv + ivec2(0,-1)).xyz;
-        if(abs(dot(n,n1)) + abs(dot(n,n2)) + abs(dot(n,n3)) + abs(dot(n,n4)) < .5){
+        vec3 N = texelFetch(uTexNormal, uv).xyz;
+        vec3 N1 = texelFetch(uTexNormal, uv + ivec2(1,0)).xyz;
+        vec3 N2 = texelFetch(uTexNormal, uv + ivec2(-1,0)).xyz;
+        vec3 N3 = texelFetch(uTexNormal, uv + ivec2(0,1)).xyz;
+        vec3 N4 = texelFetch(uTexNormal, uv + ivec2(0,-1)).xyz;
+        if(abs(dot(N,N1)) + abs(dot(N,N2)) + abs(dot(N,N3)) + abs(dot(N,N4)) < .5){
             uv += ivec2(0,1);
-            n = n3;
+            N = N3;
         }
-        //color  = texture(uTexColor, gl_FragCoord.xy).rgb * max(0.1, dot(normalize(uLightDir), n));
-        color  = texelFetch(uTexColor, uv).rgb;
+        vec3 albedo = texelFetch(uTexColor, uv).rgb;
 
         //get worldspace Pos
         //https://stackoverflow.com/questions/32227283/getting-world-position-from-depth-buffer-value
@@ -103,15 +137,41 @@ void main()
         //shadow, glow samples
         vec4 shadowPos = uShadowViewProjMatrix * vec4(worldPos, 1.0);
         shadowPos.xyz /= shadowPos.w;
-        vec3 l = normalize(uLightPos - worldPos);
-        float bias = -0.005 * tan(acos(dot(n, l)));
+        vec3 L = normalize(uLightPos - worldPos);
+        float bias = -0.005 * tan(acos(dot(N, L)));
         float shadowFactor = texture(uTexShadow, vec3((shadowPos.xy * .5 + .5) * uTexShadowSize, shadowPos.z * .5 + .5 + bias)).r;
+        //negative shadow possible!!! -> shadowfactor > 1! COOL!
+        // Yes, hardware PCF works:
+        //if(shadowFactor != .0 && shadowFactor != 1.)
+           //albedo = vec3(1,0,0);
+        shadowFactor *= 1 - length(shadowPos.xy) / sqrt(2);
 
         if (mode < .1){
-            color = (max(dot(n, l), 0.) * shadowFactor * 0.9 + 0.1) * color;
-            // Yes, hardware PCF works:
-            //if(shadowFactor != .0 && shadowFactor != 1.)
-                //color = vec3(1,0,0);
+            //modified from glow samples
+            vec2 material = texelFetch(uTexMaterial, uv).xy;
+            float Metallic = material.x;
+            float Roughness = material.y;
+            vec3 V = normalize(uCamPos - worldPos);
+            vec3 R = reflect(-V, N);
+            vec3 diffuse = albedo * (1 - Metallic);
+            vec3 specular = mix(vec3(0.04), albedo, Metallic); // fixed spec for non-metals
+
+            float reflectivity = 0.05 * Metallic;
+            float lod = Roughness * 15; // 15?
+            vec3 reflection = textureLod(uSkybox, R, lod).rgb;
+
+            float dotNL = dot(N, L);
+            float dotRL = dot(R, L);
+
+            vec3 lightColor = vec3((max(dot(N, L), 0.) * shadowFactor * 0.9 + 0.1)); // make more red?
+
+           // color += vec3(0.04); // ambient
+            color += lightColor * diffuse * max(0.0, dotNL); // lambert
+            color += lightColor * shadingSpecularGGX(N, V, L, max(0.01, Roughness), specular); // ggx
+            color += reflectivity * reflection; // reflection
+
+            //color = color* .05 + .95 *reflection.bgr; //VERY COOL, USE THIS!!!
+
         }
         else if (mode == 1){
            //Gameboy
@@ -123,18 +183,14 @@ void main()
                             vec3(0.61, 0.74, 0.06)//color = 1 -> int = 4?
                            );
            //vec2 coord = floor(gl_FragCoord.xy * 100) / 99;
-           //vec3 N = texture(uTexNormal, coord).rgb;
-           //color  = texture(uTexColor, coord).rgb * max(0.1, dot(normalize(uLightDir), N));
-           vec3 N = texture(uTexNormal, gl_FragCoord.xy).rgb;
-           color  = texture(uTexColor, gl_FragCoord.xy).rgb /** max(0.1, dot(normalize(uLightDir), N))*/;
+           color = (max(dot(N, L), 0.) * shadowFactor * 0.9 + 0.1) * albedo;
            float grey = dot(color, vec3(0.21, 0.71, 0.07));
            int fourGrey = int(grey * 4);
            color = GB[fourGrey];
         }
         else if (mode == 3){
             //http://www.thomaseichhorn.de/npr-sketch-shader-vvvv/
-            vec3 N = texture(uTexNormal, gl_FragCoord.xy).rgb;
-            vec3 albedo = texelFetch(uTexColor, uv).rgb;
+
             vec3 paper = texture(uTexPaper, vPosition).rgb;
             //vec3 noise = texture(uTexNoise1, vPosition * 4.).rgb;
             //float grey = dot(albedo, vec3(0.21, 0.71, 0.07));
@@ -163,5 +219,5 @@ void main()
     }
 
     fColor = color;
-   
+
 }

@@ -58,7 +58,7 @@ enum class rtype {
 #define SMALL_RUN (1 << 0) // run at player
 #define SMALL_GOTHIT (1 << 1) // by Rocket
 
-inline double limitAxis(double a) { return a < 0.1 ? 0 : a; }
+inline double limitAxis(double a) { return a < .1 && a > -.1? 0 : a; }
 
 class Game : public glow::glfw::GlfwApp {
     friend class Mech;
@@ -120,7 +120,10 @@ private:
   // textures
   glow::SharedTexture2D mTexCubeAlbedo;
   glow::SharedTexture2D mTexCubeNormal;
+  glow::SharedTexture2D mTexCubeMetallic;
+  glow::SharedTexture2D mTexCubeRoughness;
   glow::SharedTexture2D mTexDefNormal;
+  glow::SharedTexture2D mTexDefMaterial;
   glow::SharedTextureCubeMap mSkybox;
   glow::SharedTexture mHealthBar[MAX_HEALTH + 1];
   glow::SharedTexture2D mTexRocketAlbedo[NUM_ROCKET_TYPES];
@@ -142,7 +145,7 @@ private:
 
   // opaque
   glow::SharedTextureRectangle mGBufferAlbedo;
-  glow::SharedTextureRectangle mGBufferPosition;
+  glow::SharedTextureRectangle mGBufferMaterial;
   glow::SharedTextureRectangle mGBufferNormal;
   glow::SharedFramebuffer mFramebufferGBuffer;
 
