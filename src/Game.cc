@@ -1081,19 +1081,36 @@ void Game::updateCamera(float elapsedSeconds) {
         mCamera->handle.setTargetDistance(2 + 2* sin(angle));
     }*/
 
+    float dX = 0, dY = 0;
+        //get dX, dY
+        {
+        if (!ImGuiwantMouse) {
+          auto mouse_delta = input().getLastMouseDelta() / 100.0f;
+          if (mouse_delta.x < 1000){ // ???
+              dX += mouse_delta.x;
+              dY += mouse_delta.y;
+            //mCamera->handle.orbit(mouse_delta.x, mouse_delta.y);
+          }
+          //pos.y = std::max(0.1f, pos.y);
+          //mCamera->handle.setPosition(pos);
+          //mCamera->handle.move(glm::vec3(0, std::max(.0, 0.1 - pos.y), 0));
 
-    if (!ImGuiwantMouse) {
-      auto mouse_delta = input().getLastMouseDelta() / 100.0f;
-      if (mouse_delta.x < 1000) // ???
-        mCamera->handle.orbit(mouse_delta.x, mouse_delta.y);
-      //pos.y = std::max(0.1f, pos.y);
-      //mCamera->handle.setPosition(pos);
-      //mCamera->handle.move(glm::vec3(0, std::max(.0, 0.1 - pos.y), 0));
+        }
+        if(hasController){
+            dX += limitAxis( gamepadState.axes[GLFW_GAMEPAD_AXIS_RIGHT_X]) / 15;
+            dY += limitAxis(-gamepadState.axes[GLFW_GAMEPAD_AXIS_RIGHT_Y]) / 15;
+        }
+        if(isKeyPressed(GLFW_KEY_KP_4))
+            dX -= .1f;
+        if(isKeyPressed(GLFW_KEY_KP_6))
+            dX += .1f;
+        if(isKeyPressed(GLFW_KEY_KP_8))
+            dY -= .1f;
+        if(isKeyPressed(GLFW_KEY_KP_2))
+            dY += .1f;
+        }
+     mCamera->handle.orbit(dX, dY);
 
-    }
-    if(hasController)
-      mCamera->handle.orbit(limitAxis(gamepadState.axes[GLFW_GAMEPAD_AXIS_RIGHT_X]) / 15, //
-                            limitAxis(-gamepadState.axes[GLFW_GAMEPAD_AXIS_RIGHT_Y]) / 15);
 
      mCamera->update(elapsedSeconds);
     //mCamera->handle.setTargetDistance(2 + 2* sin((mCamera->getPosition() - target).y));
