@@ -1066,61 +1066,39 @@ void Game::updateCamera(float elapsedSeconds) {
 
     auto lastPos = mCamera->handle.getPosition();
     glm::vec3 target = glcast(mechs[player].rigid->getWorldTransform().getOrigin());
+    static glm::vec3 lastTarget = target;
+    mCamera->handle.move(target - lastTarget);
     mCamera->handle.setTarget(target);
-    //mCamera->handle.setTargetDistance(2 + 2* sin((lastPos - target).y));
+    mCamera->handle.setTargetDistance(2 + 2* sin((lastPos - target).y));
+    //mCamera->handle.setTargetDistance(5);
+    /*{
+        auto dif = (lastPos - lastTarget);
+        dif.y = 0;
+        dif = normalize(dif);
+        auto angle = acos(dot(dif, normalize((lastPos - lastTarget))));
+        if(lastPos.y < lastTarget.y)
+            angle *= -1;
+        mCamera->handle.setTargetDistance(2 + 2* sin(angle));
+    }*/
 
-    float dX = 0, dY = 0;
+
     if (!ImGuiwantMouse) {
       auto mouse_delta = input().getLastMouseDelta() / 100.0f;
-      if (mouse_delta.x < 1000){ // ???
-          dX += mouse_delta.x;
-          dY += mouse_delta.y;
-        //mCamera->handle.orbit(mouse_delta.x, mouse_delta.y);
-      }
+      if (mouse_delta.x < 1000) // ???
+        mCamera->handle.orbit(mouse_delta.x, mouse_delta.y);
       //pos.y = std::max(0.1f, pos.y);
       //mCamera->handle.setPosition(pos);
       //mCamera->handle.move(glm::vec3(0, std::max(.0, 0.1 - pos.y), 0));
 
     }
-    if(hasController){
-        dX += limitAxis( gamepadState.axes[GLFW_GAMEPAD_AXIS_RIGHT_X]) / 15;
-        dY += limitAxis(-gamepadState.axes[GLFW_GAMEPAD_AXIS_RIGHT_Y]) / 15;
-    }
-    mCamera->handle.orbit(dX, 0);
-    auto h = &mCamera->handle;
-    h->mTarget.transform.position.y += dY * 10;
-    h->mTarget.transform.position.y = min(h->mTarget.transform.position.y, 100.f);
-    h->mTarget.transform.position.y = max(h->mTarget.target.y - 3.f, h->mTarget.transform.position.y);
+    if(hasController)
+      mCamera->handle.orbit(limitAxis(gamepadState.axes[GLFW_GAMEPAD_AXIS_RIGHT_X]) / 15, //
+                            limitAxis(-gamepadState.axes[GLFW_GAMEPAD_AXIS_RIGHT_Y]) / 15);
 
-     //mCamera->update(elapsedSeconds);
-    // custom handle update, mostly from glow-extras
+     mCamera->update(elapsedSeconds);
+    //mCamera->handle.setTargetDistance(2 + 2* sin((mCamera->getPosition() - target).y));
 
-    {
-        auto dt = elapsedSeconds;
-        // Always slerp forward
-        auto alphaRot = std::min(1.f, glow::transform::exponentialDecayAlpha(h->sensitivity.rotation, dt));
-        h->mPhysical.forward = glm::normalize(glm::lerp(h->mPhysical.forward, h->mTarget.forward, alphaRot));
-        // SmoothingMode::Orbit
-        {
-            // Lerp target
-            auto alphaTarget = std::min(1.f, glow::transform::exponentialDecayAlpha(h->sensitivity.target, dt));
-            h->mPhysical.target = glm::lerp(h->mPhysical.target, h->mTarget.target, alphaTarget);
-            // Set position
-            //h->mPhysical.transform.position = h->mPhysical.target - h->mPhysical.forward * h->mPhysical.targetDistance;
-            //h->mPhysical.transform.position = h->mPhysical.target - (h->mPhysical.forward * glm::vec3(1,0,1) * h->mPhysical.targetDistance + h->mPhysical.forward.y * glm::vec3(0,1,0));
-            //h->mPhysical.transform.position.y = max(h->mPhysical.target.y - .3f, h->mPhysical.transform.position.y);
-            h->mPhysical.transform.position = h->mPhysical.target - (h->mPhysical.forward * glm::vec3(1,0,1) * h->mPhysical.targetDistance + h->mPhysical.forward.y * glm::vec3(0,1,0));
-        }
-
-        // Set rotation from forward vector
-        h->mPhysical.transform.rotation = h->forwardToRotation(h->mPhysical.forward);
-
-        // Always lerp target distance
-        h->mTarget.targetDistance = 2 + 2 * sin((h->mTarget.transform.position.y- h->mTarget.target.y) / 10);
-        auto alphaDist = std::min(1.f, glow::transform::exponentialDecayAlpha(h->sensitivity.distance, dt));
-        h->mPhysical.targetDistance = glm::lerp(h->mPhysical.targetDistance, h->mTarget.targetDistance, alphaDist);
-    }
-
+    lastTarget = target;
   }
 
 

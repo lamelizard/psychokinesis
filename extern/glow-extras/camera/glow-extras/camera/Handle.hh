@@ -15,7 +15,7 @@ namespace camera
  */
 class Handle
 {
-public:
+private:
     enum class SmoothingMode
     {
         FPS,
@@ -45,7 +45,7 @@ public:
         float target = 25.f;
     } sensitivity;
 
-public:
+private:
     static glm::quat forwardToRotation(glm::vec3 const& forward, glm::vec3 const& up = glow::transform::Up());
 
 public:
