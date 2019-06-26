@@ -30,7 +30,7 @@ SharedAssimpModel Mech::mesh;
 void Mech::setAnimation(Mech::animation ab, Mech::animation at, double bt, double tt) {
   animations[0] = ab;
   animationTop = at;
-  animationAlpha = 1;
+  animationAlpha = 0;
   animationsTime[0] = bt;
   animationTimeTop = tt;
   animationsFaktor[0] = 1;
@@ -313,7 +313,7 @@ void Mech::startSmall(int t) {
   }
 
   if (t > 4 * 60 + 68 + 60) { //getup finished + 1s
-    m.setAnimation(walk, none);
+    m.setAnimation(run, none);
     m.setAction(runSmall);
   }
 }
@@ -334,7 +334,7 @@ void Mech::runSmall(int t) {
   auto groundOffset = glm::vec3(0, m.collision->getHalfHeight() + m.collision->getRadius() + m.floatOffset, 0);
   static int nextGoal = 1;
   static int currentWay = 0;
-  static int timeNeeded = 10 * 60;
+  static int timeNeeded = 5 * 60;
   static int reachGoalInTicks = timeNeeded; // testme, 1.75 m/s
   static glm::vec3 lastPosition = glm::vec3(0.5, 0, 18.5) + groundOffset;
   auto pos = m.getPos();
@@ -405,9 +405,31 @@ void Mech::runSmall(int t) {
         }
       }
     }
+
     way = ways[currentWay];
     futurePos = way[nextGoal];
     reachGoalInTicks = timeNeeded;
+    auto futureMoveDir = normalize(futurePos - pos);
+
+    //jump
+    auto angle = glm::angle(m.moveDir, futureMoveDir);
+    if(dot(cross(glm::vec3(0,1,0), m.moveDir), futureMoveDir) < 0)
+        angle *= -1;
+    if(angle > .5 || angle < -.5){
+        m.setAnimation(runjump, none);
+        m.animationsFaktor[0] = 24./60.;
+        m.setAction([angle](int ticks){
+            static auto ticksNeeded = 60;
+            auto g = Game::instance;
+            auto &m = g->mechs[small];
+            m.moveDir = glm::rotate(m.moveDir, angle / ticksNeeded, glm::vec3(0,1,0));
+            if(ticks >= ticksNeeded){
+                m.setAnimation(run, none);
+                m.setAction(runSmall);
+            }
+        });
+        return;
+    }
   }
 
   auto nextStepPos = pos + ((futurePos - pos) * (1. / reachGoalInTicks));
