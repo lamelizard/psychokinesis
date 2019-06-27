@@ -15,8 +15,6 @@ out vec3 vNormal;
 out vec3 vTangent;
 out vec2 vTexCoord;
 
-invariant gl_Position;
-
 void main()
 {
 

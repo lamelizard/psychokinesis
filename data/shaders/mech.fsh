@@ -11,7 +11,9 @@ out vec3 fAlbedo;
 out vec3 fNormal;
 out vec2 fMaterial;
 
+#if __VERSION__ >= 400
 layout(early_fragment_tests) in;
+#endif
 
 void main()
 {

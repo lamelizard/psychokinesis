@@ -7,8 +7,10 @@ uniform float ufxaaQualityEdgeThresholdMin;
 in vec2 vPosition;
 
 out vec3 fColor;
+#if __VERSION__ >= 400
+        #include "FXAA.frag"
+#endif
 
-#include "FXAA.frag"
 
 void main()
 {
@@ -16,7 +18,8 @@ void main()
     vec3 color = vec3(0,0,0);
 
     //color  = texture(uTexColor, vPosition).rgb;
-
+#if __VERSION__ >= 400
+        #include "FXAA.frag"
     color = FxaaPixelShader(
             vPosition, // where am I?
             FxaaFloat4(0.0f, 0.0f, 0.0f, 0.0f), // Console only
@@ -29,7 +32,9 @@ void main()
             ufxaaQualityEdgeThresholdMin,
             0.f, 0.f, 0.f, FxaaFloat4(0.0f, 0.0f, 0.0f, 0.0f) // Console only
         ).rgb;
-
+#else
+        color  = texture(uTexColor, vPosition).rgb;
+#endif
 
     // conversion to sRGB
     color = pow(color, vec3(1 / 2.224));

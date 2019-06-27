@@ -139,7 +139,11 @@ void main()
         shadowPos.xyz /= shadowPos.w;
         vec3 L = normalize(uLightPos - worldPos);
         float bias = -0.005 * tan(acos(dot(N, L)));
+#if __VERSION__ >= 400
         float shadowFactor = texture(uTexShadow, vec3((shadowPos.xy * .5 + .5) * uTexShadowSize, shadowPos.z * .5 + .5 + bias)).r;
+#else
+        float shadowFactor = 1.;
+#endif
         //negative shadow possible!!! -> shadowfactor > 1! COOL!
         // Yes, hardware PCF works:
         //if(shadowFactor != .0 && shadowFactor != 1.)
