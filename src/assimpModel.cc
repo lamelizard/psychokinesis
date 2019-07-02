@@ -520,7 +520,7 @@ AssimpModel::AssimpModel(const std::string &filename) : filename(filename) {
   // ONLY FOR MECH.FBX!!!
    for (auto& w : vertexData->boneWeights)
     if(w.x+w.y+w.z+w.w < 0.999)
-        w.x = 1;
+        w = glm::vec4(1,0,0,0);
 }
 
 // mostly from glow-extras:

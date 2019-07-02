@@ -32,6 +32,7 @@ struct Mech : SM {
     runjump, // 24
     walk, // 50
     getup, // 34
+    startWalk, // 25
     hit, // 50
     sbigA, // 15
     sbigB, // 15
@@ -43,6 +44,7 @@ struct Mech : SM {
     {runjump,true},
     {walk,true},
     {getup,false},
+    {startWalk, false},
     {hit,false},
   };
   std::map<animation, std::string> names = {
@@ -50,7 +52,7 @@ struct Mech : SM {
     {runjump,"RunJump_InPlace"},
     {walk,"WalkInPlace"},
     {getup,"SleepToDefault"},
-    //{getup,"DefaultToWalk"},
+    {startWalk, "DefaultToWalk"},
     {hit,"Hit"},
     {sbigA, "ShootBigCanon_A"},
     {sbigB, "ShootBigCanon_B"},
@@ -83,6 +85,7 @@ struct Mech : SM {
   //double animationAngle = 0;
   void setAnimation(animation, animation, double bt = 0, double tt = 0);
   void setAnimation(animation, animation, animation, float ba = 1, double bta = 0, double btb = 0, double tt = 0);
+  void walkAnimation(float speed);
 
   glow::SharedTexture2D texAlbedo;
   glow::SharedTexture2D texNormal;
@@ -98,6 +101,7 @@ struct Mech : SM {
 
   //actions
   static void emptyAction(int);
+  static void startPlayer(int);
   static void controlPlayer(int);
   static void startSmall(int);
   static void startBig(int);

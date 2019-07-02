@@ -48,6 +48,26 @@ void Mech::setAnimation(Mech::animation aba, Mech::animation abb, Mech::animatio
   animationsFaktor[1] = 1;
 }
 
+void Mech::walkAnimation(float speed){
+//assert(speed >= 0 && speed <= 1); // fails, but what we get is good enough
+speed = max(0.f, min(1.f, speed));
+animations[1] = walk;
+animationsFaktor[1] = 2; // ...
+if(speed < .5){
+    animations[0] = startWalk;
+    animationsFaktor[0] = 0;
+    animationAlpha = speed * 2;
+    if (speed < .1)
+        animationsTime[1] = 0;
+} else {
+    animations[0] = run;
+    animationsFaktor[0] = animationsFaktor[1] * 24. / 50.;
+    animationsTime[0] = animationsTime[1] * 24. / 50.;
+    animationAlpha = (1 - speed) * 2;
+}
+
+}
+
 void Mech::updateTime(double delta) {
   animationsTime[0] += delta * animationsFaktor[0];
   animationsTime[1] += delta * animationsFaktor[1];
@@ -162,7 +182,6 @@ void Mech::controlPlayer(int) {
       if (playerModes.count(drawn)) {
         //maxSpeed = 3;
         m.rigid->setLinearFactor(btVector3(.7, .7, .7));
-        //m.rigid->setGravity(m.rigid->getGravity() * .7);
         if (!musicSlow) {
           musicSlow = true;
           g->soloud->fadeRelativePlaySpeed(g->musicHandle, .7, 2);
@@ -200,12 +219,13 @@ void Mech::controlPlayer(int) {
         if (g->isKeyPressed(GLFW_KEY_DOWN) || (g->isKeyPressed(GLFW_KEY_S) && !g->mFreeCamera))
           relDir.z -= 1;
 
-        if (glm::length(relDir) > .1f)
+        /*if (glm::length(relDir) > .1f)
           glm::normalize(relDir);
-        else if (glm::length(relDir) < 0.1 && hasController) {// a.k.a. 0
-            glm::vec3 conDir(limitAxis(gamepadState.axes[GLFW_GAMEPAD_AXIS_LEFT_X]), 0, limitAxis(-gamepadState.axes[GLFW_GAMEPAD_AXIS_LEFT_Y]));
-            relDir = conDir / max(1.f, length(conDir));// no fast diagonal walk, we aint goldeneye
+        else*/ if (glm::length(relDir) < 0.1 && hasController) {// a.k.a. 0
+            relDir = glm::vec3(limitAxis(gamepadState.axes[GLFW_GAMEPAD_AXIS_LEFT_X]), 0, limitAxis(-gamepadState.axes[GLFW_GAMEPAD_AXIS_LEFT_Y]));
+
         }
+        relDir /= max(1.f, length(relDir));// no fast diagonal walk, we aint goldeneye
 
       }
 
@@ -238,6 +258,7 @@ void Mech::controlPlayer(int) {
         btSpeed = btSpeed.normalize() * maxSpeed;
       btSpeed.setY(ySpeed);
       m.rigid->setLinearVelocity(btSpeed);
+      m.walkAnimation(btSpeed.length() / maxSpeed);
 
       // close to ground?
       bool closeToGround = false;
@@ -245,8 +266,8 @@ void Mech::controlPlayer(int) {
       float closeToGroundBorder = m.floatOffset * 1.2;
       vector<float> results;
       for(int angle = -3; angle < 3; angle += 1){
-        auto from = bulPos - btVector3(sin(angle)*.3, m.collision->getHalfHeight() + m.collision->getRadius(), cos(angle)*.3); //heigth is notthe height...
-        if (from.y() < 0 && from.y() > -0.01)                                                          //stuck slighlty in ground...
+        auto from = bulPos - btVector3(sin(angle)*.3, m.collision->getHalfHeight() + m.collision->getRadius() + .01, cos(angle)*.3); //heigth is notthe height...
+        if (from.y() <= 0.01 && from.y() > -0.01)                                                          //stuck slighlty in ground...
           from.setY(0.01);
         auto to = from - btVector3(0, closeToGroundBorder, 0);
         g->dynamicsWorld->getDebugDrawer()->drawLine(from, to, btVector4(1, 0, 0, 1));
@@ -305,16 +326,39 @@ void Mech::emptyAction(int) {}
 void Mech::startSmall(int t) {
   auto g = Game::instance;
   auto &m = g->mechs[small];
-  if (t <= 4 * 60)
+  m.moveDir = glm::vec3(-1,0,0);
+  if (t <= 6 * 60)
     m.setAnimation(getup, none);
-  if (t == 4 * 60) {
+  if (t == 6 * 60) {
     auto pos = m.getPos();
     g->soloud->play3d(g->sfx, pos.x, pos.y, pos.z);
   }
 
-  if (t > 4 * 60 + 68 + 60) { //getup finished + 1s
+  if (t > 6 * 60 + 68 + 60) { //getup finished + 1s
     m.setAnimation(run, none);
     m.setAction(runSmall);
+  }
+}
+
+void Mech::startPlayer(int t) {
+  auto g = Game::instance;
+  auto &m = g->mechs[player];
+  m.moveDir = glm::vec3(0,0,1);
+  auto pos = m.getPos();
+  m.setPosition(glm::vec3(pos.x, m.collision->getHalfHeight() + m.collision->getRadius() + m.floatOffset, pos.y));
+  if(t == 0){
+      m.setAnimation(getup, none);
+      m.animationsFaktor[0] = 0;
+  }
+  if (t == 2 * 60) {
+    m.animationsFaktor[0] = 1;
+    g->soloud->play3d(g->sfx, pos.x, pos.y, pos.z);
+  }
+
+  if (t > 2 * 60 + 68) { //getup finished
+    m.setAnimation(startWalk, none);
+    m.animationsFaktor[0] = 0;
+    m.setAction(controlPlayer);
   }
 }
 
@@ -334,11 +378,12 @@ void Mech::runSmall(int t) {
   auto groundOffset = glm::vec3(0, m.collision->getHalfHeight() + m.collision->getRadius() + m.floatOffset, 0);
   static int nextGoal = 1;
   static int currentWay = 0;
-  static int timeNeeded = 5 * 60;
-  static int reachGoalInTicks = timeNeeded; // testme, 1.75 m/s
+  static const int timeNeeded = 3 * 60;
+  static int reachGoalInTicks = timeNeeded; //
   static glm::vec3 lastPosition = glm::vec3(0.5, 0, 18.5) + groundOffset;
   auto pos = m.getPos();
 
+  // one waypoint to another are 18 steps
   static const vector<glm::vec3> ways[4] = {{{0.5, 0, 18.5},
                                              {-17.5, 0, 18.5},
                                              {-17.5, 0, 0.5},
@@ -383,6 +428,7 @@ void Mech::runSmall(int t) {
   //walk
   auto way = ways[currentWay];
   auto futurePos = way[nextGoal] + groundOffset;
+  // todo smoothstep the walking speed
 
   if (reachGoalInTicks == 0) {
     nextGoal++;

@@ -1,13 +1,13 @@
-"galaxy" Skybox out of public domain / CC0 by StumpyStrust
-https://opengameart.org/content/space-skyboxes-0
+"Space Skyboxes" out of public domain / CC0 by StumpyStrust
+https://opengameart.org/content/space-skyboxes-09
 
-"Heroic Demise [Updated Version]" (edited by me) out of public domain / CC0 by Matthew Pablo
+"Heroic Demise [Updated Version]" (edited) out of public domain / CC0 by Matthew Pablo
 https://opengameart.org/content/heroic-demise-updated-version
 
 health bar out of public domain / CC0 by MortalPhoenix
 https://opengameart.org/content/health-bar-0
 
-Rocket0 (edited): This work, made by Unnamed (Viktor.Hahn@web.de), is licensed under the Creative Commons Attribution-ShareAlike 3.0 Unported License. http://creativecommons.org/licenses/by-sa/3.0/
+Rocket from "Rocket Launcher" (edited): This work, made by Unnamed (Viktor.Hahn@web.de), is licensed under the Creative Commons Attribution-ShareAlike 3.0 Unported License. http://creativecommons.org/licenses/by-sa/3.0/
 https://opengameart.org/content/rocket-launcher
 
 FXAA.frag (edited): This software contains source code provided by NVIDIA Corporation.
@@ -21,5 +21,11 @@ https://unity3d.com/de/legal/as_terms
 https://www.textures.com/download/pbr0402/137273?q=Machine%2C
 https://www.textures.com/faq-license.html
 
+"Spiked Ball" (modified) made by azzajess and licenced under CC BY 4.0 (CC Attribution)
+https://sketchfab.com/3d-models/spiked-ball-b03e6a597b794953977c7d60c27492bd
 
+"bomb" (modified) made by lostsoundzz and licenced under CC BY 4.0 (CC Attribution)
+https://sketchfab.com/3d-models/bomb-45e0eb9afc694a808fc847332b759bc0
 
+some shader code (marked and modified) licenced under MIT
+https://graphics.rwth-aachen.de:9000/Glow/glow-samples

@@ -42,7 +42,7 @@ enum class rtype {
 #define CUBES_MIN -24
 #define CUBES_MAX 25
 #define CUBES_TOTAL 50 //(CUBES_MAX - CUBES_MIN + 1)
-#define NUM_ROCKET_TYPES 2
+#define NUM_ROCKET_TYPES 3
 
 
 //bullet User index:
@@ -53,6 +53,7 @@ enum class rtype {
 #define BID_ROCKET (1 << 3)
 #define BID_CUBE (1 << 4)
 #define BID_ROCKET_HOMING ((1 << 6) | BID_ROCKET)
+#define BID_ROCKET_FALLING ((1 << 7) | BID_ROCKET)
 
 #define SMALL_NONE 0
 #define SMALL_RUN (1 << 0) // run at player
@@ -67,13 +68,14 @@ public:
   static Game *instance;
   // logic
 private:
+  int updateRate = 60;
   bool mJumps = false;
   bool mJumpWasPressed = false; // last frame
   float jumpGravityHigh = -8;
   float jumpGravityLow = -15;
   float jumpGravityFall = -18;
   float damping = .95;
-  float moveForce = 10;
+  float moveForce = 15;
 
   std::vector<glm::vec3> spherePoints;
 
@@ -128,6 +130,8 @@ private:
   glow::SharedTexture mHealthBar[MAX_HEALTH + 1];
   glow::SharedTexture2D mTexRocketAlbedo[NUM_ROCKET_TYPES];
   glow::SharedTexture2D mTexRocketNormal[NUM_ROCKET_TYPES];
+  glow::SharedTexture2D mTexRocketMetallic[NUM_ROCKET_TYPES];
+  glow::SharedTexture2D mTexRocketRoughness[NUM_ROCKET_TYPES];
   glow::SharedTexture2D mTexPaper;
   glow::SharedTexture2D mTexNoise1;
 

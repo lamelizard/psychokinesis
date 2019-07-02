@@ -175,7 +175,6 @@ void main()
             color += reflectivity * reflection; // reflection
 
             //color = color* .05 + .95 *reflection.bgr; //VERY COOL, USE THIS!!!
-
         }
         else if (mode == 1){
            //Gameboy

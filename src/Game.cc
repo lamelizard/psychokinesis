@@ -94,7 +94,7 @@ void Game::init() {
       spherePoints.reserve(500);
       if(spherePoints.empty()){
           std::uniform_real_distribution<double> dist(0.0, 1.0);
-          std::mt19937 gen (87234587123648);//juts guessing
+          std::mt19937 gen (87234587123648); // just guessing
           for(int i = 0; i < 500; i++){
               double t =  6.28318530718 * dist(gen);
               double p = acos(1 - 2 * dist(gen));
@@ -189,8 +189,7 @@ void Game::init() {
       string mechMaterialFN = texPath + "mech.material.";
       string mechModelFN = "../data/models/mech/mech.fbx";
       string healthBarFn = texPath + "ui/Health bar";
-      string rocketAlbedoFN = texPath + "rocket.albedo.";
-      string rocketNormalFN = texPath + "rocket.normal.";
+      string rocketFN = texPath + "rocket.";
       string paperFN = texPath + "paper.png";
       string noise1FN = texPath + "noise_1.png";
 
@@ -221,9 +220,13 @@ void Game::init() {
         healthBarData[i] = std::async(policy, glow::TextureData::createFromFile, healthBarFn + to_string(i) + ".png", glow::ColorSpace::sRGB);
       future<glow::SharedTextureData> rocketAlbedoData[NUM_ROCKET_TYPES];
       future<glow::SharedTextureData> rocketNormalData[NUM_ROCKET_TYPES];
+      future<glow::SharedTextureData> rocketMetallicData[NUM_ROCKET_TYPES];
+      future<glow::SharedTextureData> rocketRoughnessData[NUM_ROCKET_TYPES];
       for (int i = 0; i < NUM_ROCKET_TYPES; i++) {
-        rocketAlbedoData[i] = async(policy, glow::TextureData::createFromFile, rocketAlbedoFN + to_string(i) + ".png", glow::ColorSpace::sRGB);
-        rocketNormalData[i] = async(policy, glow::TextureData::createFromFile, rocketNormalFN + to_string(i) + ".png", glow::ColorSpace::sRGB);
+        rocketAlbedoData[i] = async(policy, glow::TextureData::createFromFile, rocketFN + "albedo." + to_string(i) + ".png", glow::ColorSpace::sRGB);
+        rocketNormalData[i] = async(policy, glow::TextureData::createFromFile, rocketFN + "normal." + to_string(i) + ".png", glow::ColorSpace::sRGB);
+        rocketMetallicData[i] = async(policy, glow::TextureData::createFromFile, rocketFN + "metallic." + to_string(i) + ".png", glow::ColorSpace::sRGB);
+        rocketRoughnessData[i] = async(policy, glow::TextureData::createFromFile, rocketFN + "roughness." + to_string(i) + ".png", glow::ColorSpace::sRGB);
       }
       auto paperData = async(policy, glow::TextureData::createFromFile, paperFN, glow::ColorSpace::sRGB);
       auto noise1Data = async(policy, glow::TextureData::createFromFile, noise1FN, glow::ColorSpace::Linear);
@@ -262,9 +265,13 @@ void Game::init() {
       }
       for (int i = 0; i < NUM_ROCKET_TYPES; i++) {
         mTexRocketAlbedo[i] = glow::Texture2D::createFromData(rocketAlbedoData[i].get());
-        mTexRocketAlbedo[i]->setObjectLabel(rocketAlbedoFN);
+        mTexRocketAlbedo[i]->setObjectLabel(rocketFN);
         mTexRocketNormal[i] = glow::Texture2D::createFromData(rocketNormalData[i].get());
-        mTexRocketNormal[i]->setObjectLabel(rocketNormalFN);
+        mTexRocketNormal[i]->setObjectLabel(rocketFN);
+        mTexRocketMetallic[i] = glow::Texture2D::createFromData(rocketMetallicData[i].get());
+        mTexRocketMetallic[i]->setObjectLabel(rocketFN);
+        mTexRocketRoughness[i] = glow::Texture2D::createFromData(rocketRoughnessData[i].get());
+        mTexRocketRoughness[i]->setObjectLabel(rocketFN);
       }
       mTexPaper = glow::Texture2D::createFromData(paperData.get());
       mTexPaper->setObjectLabel(paperFN);
@@ -369,14 +376,15 @@ void Game::init() {
     Mech &m = mechs[player];
     m.type = player;
     m.HP = MAX_HEALTH;
-    m.setAction(Mech::controlPlayer);
+    m.setAction(Mech::startPlayer);
     m.moveDir = glm::vec3(-.1, 0, 1.1);
     m.viewDir = glm::vec3(0, 0, 1.1);
     m.scale = .2;
     m.floatOffset = 0.25;
     m.collision = make_shared<btCapsuleShape>(0.4, 0.5);
-    m.meshOffset = glm::vec3(0, -(m.collision->getHalfHeight() + m.collision->getRadius() + m.floatOffset), -0.3);
-    m.motionState = make_shared<btDefaultMotionState>(bttransform(glm::vec3(0, 7, -10))); // fall down in an epic way
+    auto groundOffset = m.collision->getHalfHeight() + m.collision->getRadius() + m.floatOffset;
+    m.meshOffset = glm::vec3(0, -groundOffset, 0); // -.3
+    m.motionState = make_shared<btDefaultMotionState>(bttransform(glm::vec3(0, groundOffset, -10)));
     m.rigid = make_shared<btRigidBody>(btRigidBody::btRigidBodyConstructionInfo(1.f, m.motionState.get(), m.collision.get()));
     m.rigid->setAngularFactor(0);
     m.rigid->setCustomDebugColor(btVector3(255, 1, 1));
@@ -538,21 +546,21 @@ entityx::Entity Game::createRocket(const glm::vec3 &pos, const glm::vec3 &acc, r
   entity.assign<SharedbtRigidBody>(rbRocket);
   entity.assign<defMotionState>(motionState);
   entity.assign<Rocket>(Rocket{type, true});
-  if (type == rtype::falling)
-    rbRocket->setAngularVelocity(btVector3(0, 1, 0)); // test
   rbRocket->setUserIndex(BID_ROCKET);
   if(type == rtype::homing)
       rbRocket->setUserIndex(BID_ROCKET_HOMING);
+  if(type == rtype::falling){
+      rbRocket->setAngularVelocity(btVector3(0, 1, 0)); // test
+      rbRocket->setUserIndex(BID_ROCKET_FALLING);
+  }
   rbRocket->setUserIndex2(0);//not yet explode
   //rbRocket->setUserPointer((void *)entity.id().id()); // doesn't work...
   return entity;
 }
 
-void Game::update(float elapsedSeconds) {
-  // update game in 60 Hz fixed timestep
-  // fix debugging?
-  if (elapsedSeconds > 1)
-    elapsedSeconds = 1;
+void Game::update(float) {
+  // update game in 60 Hz fixed timestep, most of the time
+  setUpdateRate(updateRate);
 
 
   for (auto &m : mechs){
@@ -562,9 +570,8 @@ void Game::update(float elapsedSeconds) {
        m.updateLook();
   }
 
-
   //update physics
-  dynamicsWorld->stepSimulation(elapsedSeconds, 10);
+  dynamicsWorld->stepSimulation( 0.01666666666, 10);
 
   //explode Rockets, steer Rockets
   {
@@ -640,9 +647,9 @@ void Game::update(float elapsedSeconds) {
 void Game::render(float elapsedSeconds) {
   // render game variable timestep
 
-
   // camera update here because it should be coupled tightly to rendering!
   updateCamera(elapsedSeconds);
+  elapsedSeconds *= 60. / updateRate; // only camera is free from slowdown
 
   // get camera matrices
   auto proj = mCamera->getProjectionMatrix();
@@ -682,6 +689,10 @@ void Game::render(float elapsedSeconds) {
     drawCubes(mShaderCubePrepass->use(), proj, view);
     drawRockets(mShaderCubePrepass->use(), proj, view);
     //drawMech(mShaderMech->use(), proj, view);
+    if (mDebugBullet) {
+      dynamicsWorld->debugDrawWorld();
+      bulletDebugger->draw(proj * view);
+    }
   }
 
   // GBuffer
@@ -706,7 +717,6 @@ void Game::render(float elapsedSeconds) {
         // Render Bullet Debug
         if (mDebugBullet) {
           GLOW_SCOPED(disable, GL_DEPTH_TEST);
-          // dynamicsWorld->debugDrawWorld();
           bulletDebugger->draw(proj * view);
         }
     }
@@ -873,7 +883,8 @@ void Game::drawCubes(glow::UsedProgram shader, glm::mat4 proj, glm::mat4 view) {
       for (const auto &area : scaleAreas) {
         auto distanceFactor = (glm::distance(area.pos, trans) / area.radius);
         if (distanceFactor < 1)
-          modelCube *= glm::scale(glm::vec3((1 - distanceFactor) * 0.15 + 0.85));
+          //modelCube *= glm::scale(glm::vec3(distanceFactor * 0.02 + 0.95));
+            modelCube *= glm::scale(glm::vec3(0.95));
       }
     }
     models.push_back(modelCube);
@@ -922,8 +933,8 @@ void Game::drawRockets(glow::UsedProgram shader, glm::mat4 proj, glm::mat4 view)
   for (int i = 0; i < NUM_ROCKET_TYPES; i++) {
     shader.setTexture("uTexAlbedo", mTexRocketAlbedo[i]);
     shader.setTexture("uTexNormal", mTexRocketNormal[i]);
-    shader.setTexture("uTexMetallic", mTexDefMaterial);
-    shader.setTexture("uTexRoughness", mTexDefMaterial);
+    shader.setTexture("uTexMetallic", mTexRocketMetallic[i]);
+    shader.setTexture("uTexRoughness", mTexRocketRoughness[i]);
 
     auto abModels = mMeshRocket[i]->getAttributeBuffer("aModel");
     assert(abModels);
@@ -939,7 +950,7 @@ void Game::onGui() {
     ImGui::Text("Settings:");
     {
       ImGui::Indent();
-      ImGui::Checkbox("Show Wireframe", &mShowWireframe);
+      ImGui::SliderInt("updateRate", &updateRate, 1, 200);
       ImGui::Checkbox("Debug Bullet", &mDebugBullet);
       //ImGui::Checkbox("Show Mech", &mDrawMech);
       ImGui::Checkbox("free Camera", &mFreeCamera);
@@ -967,11 +978,12 @@ void Game::onGui() {
     }
     ImGui::Text("DebugAnimations:");
     {
+        ImGui::Text(((string)"Speed: " + to_string(mechs[player].rigid->getLinearVelocity().length())).c_str());
         ImGui::Indent();
         ImGui::Checkbox("Yes?", &DebugingAnimations);
         ImGui::SliderFloat("alpha", &debugAnimationAlpha, 0, 1);
-        ImGui::SliderInt3("animations", (int*)&debugAnimations, Mech::run, Mech::none);
-        ImGui::SliderFloat3("times", (float*)&debugAnimationTimes, 0, 4);
+        ImGui::SliderInt3("animations", (int*)&debugAnimations, Mech::run, Mech::sbigB);
+        ImGui::SliderFloat3("times", (float*)&debugAnimationTimes, 0, 1.7);
         ImGui::SliderFloat("angle", &debugAnimationAngle, -4, 4);
         ImGui::Unindent();
     }

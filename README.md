@@ -1,6 +1,6 @@
 # GameDevelopment Practical 2019
 
-## Git global setup 
+## Git global setup
 
 This must be done before your first commit.
 
