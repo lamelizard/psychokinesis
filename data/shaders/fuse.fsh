@@ -150,19 +150,25 @@ void main()
            //albedo = vec3(1,0,0);
         shadowFactor *= 1 - length(shadowPos.xy) / sqrt(2);
 
+
+        //Reflection
+        //modified from glow samples
+        vec2 material = texelFetch(uTexMaterial, uv).xy;
+        float Metallic = material.x;
+        float Roughness = material.y;
+        vec3 V = normalize(uCamPos - worldPos);
+        vec3 R = reflect(-V, N);
+
         if (mode < .1){
             //modified from glow samples
-            vec2 material = texelFetch(uTexMaterial, uv).xy;
-            float Metallic = material.x;
-            float Roughness = material.y;
-            vec3 V = normalize(uCamPos - worldPos);
-            vec3 R = reflect(-V, N);
+
             vec3 diffuse = albedo * (1 - Metallic);
             vec3 specular = mix(vec3(0.04), albedo, Metallic); // fixed spec for non-metals
-
             float reflectivity = 0.05 * Metallic;
+
             float lod = Roughness * 15; // 15?
             vec3 reflection = textureLod(uSkybox, R, lod).rgb;
+
 
             float dotNL = dot(N, L);
             float dotRL = dot(R, L);
@@ -174,23 +180,21 @@ void main()
             color += lightColor * shadingSpecularGGX(N, V, L, max(0.01, Roughness), specular); // ggx
             color += reflectivity * reflection; // reflection
 
-            //color = color* .05 + .95 *reflection.bgr; //VERY COOL, USE THIS!!!
+            // color = color* .05 + .95 * reflection.bgr; //VERY COOL, USE THIS!!!
 
         }
         else if (mode == 1){
-           //Gameboy
-           vec3 GB[5] = vec3[5](   
-                            vec3(0.06, 0.22, 0.06),
-                            vec3(0.19, 0.39, 0.19),
-                            vec3(0.55, 0.67, 0.06),
-                            vec3(0.61, 0.74, 0.06),
-                            vec3(0.61, 0.74, 0.06)//color = 1 -> int = 4?
-                           );
-           //vec2 coord = floor(gl_FragCoord.xy * 100) / 99;
-           color = (max(dot(N, L), 0.) * shadowFactor * 0.9 + 0.1) * albedo;
-           float grey = dot(color, vec3(0.21, 0.71, 0.07));
-           int fourGrey = int(grey * 4);
-           color = GB[fourGrey];
+           // ~Neon
+           float inten[5] = float[5](.0f, .5f, .7f, 1.f, 1.f); // use sin(time)!!!
+           color = albedo;
+           color = vec3(inten[int(color.r * 4)], inten[int(color.g * 4)], inten[int(color.b * 4)]);
+        }
+        else if (mode == 2){
+            // disco
+            color = albedo;
+            color = (color * .03 + .97 * textureLod(uSkybox, R, 4).bgr) * (1 - shadowFactor);
+
+
         }
         else if (mode == 3){
             //http://www.thomaseichhorn.de/npr-sketch-shader-vvvv/

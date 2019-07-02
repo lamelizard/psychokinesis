@@ -159,7 +159,7 @@ void Mech::controlPlayer(int) {
     // handle slowdown
     {
       static bool musicSlow = true;
-      if (playerModes.count(drawn)) {
+      if (playerModes.count(neon)) {
         //maxSpeed = 3;
         m.rigid->setLinearFactor(btVector3(.7, .7, .7));
         //m.rigid->setGravity(m.rigid->getGravity() * .7);
@@ -416,15 +416,45 @@ void Mech::runSmall(int t) {
     if(dot(cross(glm::vec3(0,1,0), m.moveDir), futureMoveDir) < 0)
         angle *= -1;
     if(angle > .5 || angle < -.5){
-        m.setAnimation(runjump, none);
-        m.animationsFaktor[0] = 24./60.;
+        //m.setAnimation(runjump, none);
+        //m.animationsFaktor[0] = 24./60.;
         m.setAction([angle](int ticks){
-            static auto ticksNeeded = 60;
+            // looks clunky, but it IS a robot, so...
+            static const auto ticksNeeded = 55;
             auto g = Game::instance;
             auto &m = g->mechs[small];
-            m.moveDir = glm::rotate(m.moveDir, angle / ticksNeeded, glm::vec3(0,1,0));
+
+            //animate
+            if(ticks == 0){
+                m.setAnimation(getup, none, 30. / 30.); // end is 34
+                m.animationsFaktor[0] = -1.8;
+            }
+            if(ticks == 10) // 17
+                m.animationsFaktor[0] = 1.8;
+            if(ticks == 20)
+                m.animationsFaktor[0] = 0;
+
+            //landing
+            if(ticks == 45)
+                m.animationsFaktor[0] = -1.5;
+            if(ticks == 50)
+                m.animationsFaktor[0] = 1.5;
+
+
+            //rotate
+            if(ticks >= 20 && ticks < 40)
+                m.moveDir = glm::rotate(m.moveDir, angle / 20, glm::vec3(0,1,0));
+
+            // up and down
+            if(ticks >= 15 && ticks < 30)
+                m.setPosition(m.getPos() + glm::vec3(0,0.1,0));
+            if(ticks >= 30 && ticks < 45)
+                m.setPosition(m.getPos() - glm::vec3(0,0.1,0));
+
+            //stop
             if(ticks >= ticksNeeded){
                 m.setAnimation(run, none);
+                m.animationsFaktor[0] = 1;
                 m.setAction(runSmall);
             }
         });

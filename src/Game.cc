@@ -58,6 +58,11 @@ struct Cube {
   glm::ivec3 pos;
 };
 
+struct LineVertex {
+  glm::vec3 pos;
+  glm::vec3 color;
+};
+
 struct Rocket {
   rtype type = rtype::forward;
   bool real = true;
@@ -84,7 +89,7 @@ void Game::init() {
   // IMPORTANT: call to base class
   GlfwApp::init();
 
-  setTitle("Psychokinesis"); // N.I. ?
+  setTitle("Psychokinesis - I know how you'll feel"); // N.I. ?
 
   // start assimp logging
   Assimp::DefaultLogger::create();
@@ -303,6 +308,14 @@ void Game::init() {
       });
       mMeshRocket[i]->bind().attach(modelMatrices);
     }
+    //Lines
+    auto abLines = glow::ArrayBuffer::create();
+    abLines->setObjectLabel("Line ab");
+    abLines->defineAttributes({{&LineVertex::pos, "position"}, //
+                               {&LineVertex::color, "color"}});
+    mVALine = glow::VertexArray::create(abLines, GL_LINES);
+    mVALine->setObjectLabel("Line va");
+
 
 
     //shader
@@ -468,12 +481,17 @@ void Game::init() {
 // test mode area
 {
   auto entity = ex.entities.create();
-  entity.assign<ModeArea>(ModeArea{drawn, {10, 0, 10}, 5});
+  entity.assign<ModeArea>(ModeArea{neon, {10, 0, 10}, 5});
 }
 
   {
     auto entity = ex.entities.create();
-    entity.assign<ModeArea>(ModeArea{fast, {-15, 0, -15}, 10});
+    entity.assign<ModeArea>(ModeArea{drawn, {-15, 0, -15}, 10});
+  }
+
+  {
+    auto entity = ex.entities.create();
+    entity.assign<ModeArea>(ModeArea{disco, {-15, 0, 15}, 10});
   }
 }
 
@@ -623,6 +641,21 @@ void Game::update(float elapsedSeconds) {
               if(glm::length(steerdir) > a)
                   steerdir = glm::normalize(steerdir) * a;
               rigid->setGravity(btcast(steerdir));
+              if(pos.y <= 1){
+                  btTransform trans = rigid->getWorldTransform();
+                  auto p = trans.getOrigin();
+                  p.setY(1);
+                  trans.setOrigin(p);
+                  rigid->setWorldTransform(trans);
+                  rigid->setLinearFactor(btVector3(1,0,1));
+              }
+              //rotate
+              auto rotAxis = -normalize(cross(vel, glm::vec3(0,1,0)));
+              btQuaternion quat(btcast(rotAxis), min(2.5, pow(length(vel) / 4, 2))); // make this look better
+              vec4out.x = quat.getAngle();
+              float x, y, z;
+              quat.getEulerZYX(z,y,x);
+              rigid->setAngularVelocity(btVector3(x,y,z));
            }
 
 
@@ -851,7 +884,7 @@ void Game::drawCubes(glow::UsedProgram shader, glm::mat4 proj, glm::mat4 view) {
   {
     auto area = entityx::ComponentHandle<ModeArea>();
     for (auto entity : ex.entities.entities_with_components(area))
-      if (area->mode == fast)
+      if (area->mode == drawn)
         scaleAreas.push_back(*area.get());
   }
 
@@ -932,6 +965,24 @@ void Game::drawRockets(glow::UsedProgram shader, glm::mat4 proj, glm::mat4 view)
   }
 }
 
+void Game::drawLines(glow::UsedProgram shader, glm::mat4 proj, glm::mat4 view)
+{
+    shader.setUniform("uProj", proj);
+    shader.setUniform("uView", view);
+
+  auto ab = mVALine->getAttributeBuffer("position");
+  static bool init = false;
+  if(!init){
+      random_shuffle(spherePoints.begin(), spherePoints.end());
+
+
+
+   }
+
+  //rotate around center...
+
+}
+
 // Update the GUI
 void Game::onGui() {
 #ifndef NOGUI
@@ -947,6 +998,7 @@ void Game::onGui() {
       ImGui::Unindent();
       //ImGui::SliderFloat3("UI", (float*)&mUIPos, 0.0f, 1.0f);
     }
+    ImGui::Text(((string)"Out: " + to_string(vec4out.x) + " " + to_string(vec4out.y)).c_str());
     ImGui::Text("Controll:");
     {
       ImGui::Indent();

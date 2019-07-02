@@ -20,9 +20,9 @@
 
 enum Mode {
   normal = 0,
-  drawn = 1,
-  fake = 2,
-  fast = 3
+  neon = 1,
+  disco = 2,
+  drawn = 3
 };
 
 struct ModeArea {
@@ -74,6 +74,7 @@ private:
   float jumpGravityFall = -18;
   float damping = .95;
   float moveForce = 10;
+  glm::vec4 vec4out = {};
 
   std::vector<glm::vec3> spherePoints;
 
@@ -106,12 +107,14 @@ private:
   glow::SharedProgram mShaderCubePrepass;
   glow::SharedProgram mShaderMode;
   glow::SharedProgram mShaderUI;
+  glow::SharedProgram mShaderLine;
 
   // meshes
   glow::SharedVertexArray mMeshQuad;
   glow::SharedVertexArray mMeshCube;
   glow::SharedVertexArray mMeshSphere;
   glow::SharedVertexArray mMeshRocket[NUM_ROCKET_TYPES];
+  glow::SharedVertexArray mVALine;
 
   // mech
   glow::SharedProgram mShaderMech;
@@ -200,6 +203,7 @@ private:
   void drawMech(glow::UsedProgram shader, glm::mat4 proj, glm::mat4 view);
   void drawCubes(glow::UsedProgram shader, glm::mat4 proj, glm::mat4 view);
   void drawRockets(glow::UsedProgram shader, glm::mat4 proj, glm::mat4 view);
+  void drawLines(glow::UsedProgram shader, glm::mat4 proj, glm::mat4 view);
 
   // test
   //btDefaultMotionState* boxMotionState = nullptr;
