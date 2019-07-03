@@ -70,6 +70,13 @@ struct Mech : SM {
   double scale = 1;
   std::vector<glm::mat4> bones;
 
+  // Small
+  static int nextGoal;
+  static int currentWay;
+  static const int timeNeeded;
+  static int reachGoalInTicks;
+  static glm::vec3 lastPosition;
+
 
   std::shared_ptr<btCapsuleShape> collision;
   std::shared_ptr<btDefaultMotionState> motionState;

@@ -12,6 +12,7 @@ uniform mat4 uInvView;
 uniform mat4 uView;
 uniform vec3 uLightPos;
 uniform vec3 uCamPos;
+uniform float uTime;
 
 //shadow
 uniform sampler2DRectShadow uTexShadow;
@@ -192,7 +193,16 @@ void main()
         else if (mode == 2){
             // disco
             color = albedo;
-            color = (color * .03 + .97 * textureLod(uSkybox, R, 4).bgr) * (1 - shadowFactor);
+            float refGrey = dot(textureLod(uSkybox, R, 4).rgb, vec3(0.21, 0.71, 0.07));
+            //float h = (sin(uTime) + 1) / 2;
+            float h = mod(uTime / 4, 1);
+            vec3 rgb = clamp(vec3(abs(h * 6 - 3) - 1,
+                               2 - abs(h * 6 - 2),
+                               2 - abs(h * 6 - 4)),
+                             0, 1);
+            color = (color * .03 + .97 * refGrey * rgb) * (1 - shadowFactor) * 3;
+
+
 
 
         }

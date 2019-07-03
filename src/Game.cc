@@ -74,6 +74,8 @@ Game *Game::instance = nullptr;
 
 #ifndef NOGUI
 Game::Game() : GlfwApp(Gui::ImGui) {}
+
+
 #else
 Game::Game() : GlfwApp(Gui::None) {}
 #endif
@@ -333,6 +335,7 @@ void Game::init() {
     mShaderMech = glow::Program::createFromFile("../data/shaders/mech");
     mShaderUI = glow::Program::createFromFile("../data/shaders/ui");
     mShaderFuse = glow::Program::createFromFile("../data/shaders/fuse");
+    mShaderLine = glow::Program::createFromFile("../data/shaders/line");
   }
 
   // Sound
@@ -351,17 +354,11 @@ void Game::init() {
     assert(soloud);
     if (soloud->getBackendString())
       glow::log() << "audio backend: " << soloud->getBackendString();
-    //bg music
+    //sounds
     {
       music.load("../data/sounds/heroic_demise_loop.ogg");
-      music.setLooping(true);
-      musicHandle = soloud->playBackground(music, 0);
-      soloud->fadeVolume(musicHandle, .7, 30);
-    }
-    // sfx
-    {
-        //placeholder
-        sfx.setText("boom");
+      //placeholder
+      sfx.setText("boom");
     }
   }
 
@@ -371,16 +368,30 @@ void Game::init() {
     dispatcher = make_unique<btCollisionDispatcher>(collisionConfiguration.get());
     overlappingPairCache = make_unique<btDbvtBroadphase>();
     solver = make_unique<btSequentialImpulseConstraintSolver>();
-    dynamicsWorld = make_unique<btDiscreteDynamicsWorld>(dispatcher.get(), overlappingPairCache.get(), solver.get(), collisionConfiguration.get());
-    dynamicsWorld->setGravity(btVector3(0, -9.81, 0));
-    bulletDebugger = make_unique<BulletDebugger>();
-    dynamicsWorld->setDebugDrawer(bulletDebugger.get());
-    dynamicsWorld->setInternalTickCallback(bulletCallbackStatic);
 
-    // "point"
     colPoint = make_shared<btSphereShape>(0.1);
+    colBox = make_shared<btBoxShape>(btVector3(0.5, 0.5, 0.5)); // half extend
 
+   }
 
+  initPhase1();
+
+}
+
+void Game::initPhaseBoth()
+{
+    soloud->stopAll();
+
+    //bullet
+    {
+        dynamicsWorld = make_unique<btDiscreteDynamicsWorld>(dispatcher.get(), overlappingPairCache.get(), solver.get(), collisionConfiguration.get());
+        dynamicsWorld->setGravity(btVector3(0, -9.81, 0));
+        bulletDebugger = make_unique<BulletDebugger>();
+        dynamicsWorld->setDebugDrawer(bulletDebugger.get());
+        dynamicsWorld->setInternalTickCallback(bulletCallbackStatic);
+    }
+    //Entity
+    ex.entities.reset();
     // mechs
     {
         //player
@@ -419,7 +430,7 @@ void Game::init() {
     m.floatOffset = 0.01;
     m.collision = make_shared<btCapsuleShape>(2, 2.5);
     auto groundOffset = m.collision->getHalfHeight() + m.collision->getRadius() + m.floatOffset;
-    m.meshOffset = glm::vec3(0, -groundOffset, -1.5);
+    m.meshOffset = glm::vec3(0, -groundOffset, 0); // -1.5
     m.motionState = make_shared<btDefaultMotionState>(bttransform(glm::vec3(0, groundOffset, 18.5)));
     m.rigid = make_shared<btRigidBody>(btRigidBody::btRigidBodyConstructionInfo(0, m.motionState.get(), m.collision.get()));
     m.rigid->setAngularFactor(0);
@@ -429,6 +440,11 @@ void Game::init() {
     m.rigid->setUserIndex2(0); // not rushing
     m.rigid->setUserPointer(&mechs[small]);
     dynamicsWorld->addRigidBody(m.rigid.get());
+
+    Mech::nextGoal = 1;
+    Mech::currentWay = 0;
+    Mech::reachGoalInTicks = Mech::timeNeeded;
+    Mech::lastPosition = glm::vec3(0.5, 0, 18.5);
   }
   //big
   {
@@ -454,55 +470,70 @@ void Game::init() {
   }
 }
 
-//boxes
-{
-  colBox = make_shared<btBoxShape>(btVector3(0.5, 0.5, 0.5)); // half extend
-  // create world
-  // floor
-  {
-    auto y = -colBox->getHalfExtentsWithMargin().getY(); // floor is y = 0
-    for (auto x = 0; x < CUBES_TOTAL; x++)
-      for (auto z = 0; z < CUBES_TOTAL; z++)
-        ground[x][z] = createCube(glm::vec3(x + CUBES_MIN, y, z + CUBES_MIN));
-  }
+    //boxes
+    {
 
-  // pillars
-  {
-    int i = 0;
-    for (auto x = CUBES_MIN + 15; x <= CUBES_MAX - 10; x += 20)
-      for (auto z = CUBES_MIN + 15; z <= CUBES_MAX - 10; z += 20) {
-        for (auto yBottom = 0; yBottom <= 5; yBottom++) {
-          auto y = yBottom + colBox->getHalfExtentsWithMargin().getY();
-          pillars[i].push_back(createCube(glm::vec3(x, y, z)));
-          pillars[i].push_back(createCube(glm::vec3(x + 1, y, z)));
-          pillars[i].push_back(createCube(glm::vec3(x, y, z + 1)));
-          pillars[i].push_back(createCube(glm::vec3(x + 1, y, z + 1)));
-        }
-        i++; // new pillar
+      // create world
+      // floor
+      {
+        auto y = -colBox->getHalfExtentsWithMargin().getY(); // floor is y = 0
+        for (auto x = 0; x < CUBES_TOTAL; x++)
+          for (auto z = 0; z < CUBES_TOTAL; z++)
+            ground[x][z] = createCube(glm::vec3(x + CUBES_MIN, y, z + CUBES_MIN));
       }
-  }
+
+      // pillars
+      {
+        for(int i = 0; i < 4; i++)
+            pillars[i].clear();
+        int i = 0;
+        for (auto x = CUBES_MIN + 15; x <= CUBES_MAX - 10; x += 20)
+          for (auto z = CUBES_MIN + 15; z <= CUBES_MAX - 10; z += 20) {
+            for (auto yBottom = 0; yBottom <= 5; yBottom++) {
+              auto y = yBottom + colBox->getHalfExtentsWithMargin().getY();
+              pillars[i].push_back(createCube(glm::vec3(x, y, z)));
+              pillars[i].push_back(createCube(glm::vec3(x + 1, y, z)));
+              pillars[i].push_back(createCube(glm::vec3(x, y, z + 1)));
+              pillars[i].push_back(createCube(glm::vec3(x + 1, y, z + 1)));
+            }
+            i++; // new pillar
+          }
+      }
+    }
+
+    // test mode area
+    {
+      auto entity = ex.entities.create();
+      entity.assign<ModeArea>(ModeArea{neon, {10, 0, 10}, 5});
+    }
+
+      {
+        auto entity = ex.entities.create();
+        entity.assign<ModeArea>(ModeArea{drawn, {-15, 0, -15}, 10});
+      }
+
+      {
+        auto entity = ex.entities.create();
+        entity.assign<ModeArea>(ModeArea{disco, {-15, 0, 15}, 10});
+      }
 }
-}
 
-
-
-// test mode area
+void Game::initPhase1()
 {
-  auto entity = ex.entities.create();
-  entity.assign<ModeArea>(ModeArea{neon, {10, 0, 10}, 5});
+    initPhaseBoth();
+
+    //music
+    music.setLooping(true);
+    musicHandle = soloud->playBackground(music, 0);
+    soloud->fadeVolume(musicHandle, .7, 30);
+
+
 }
 
-  {
-    auto entity = ex.entities.create();
-    entity.assign<ModeArea>(ModeArea{drawn, {-15, 0, -15}, 10});
-  }
-
-  {
-    auto entity = ex.entities.create();
-    entity.assign<ModeArea>(ModeArea{disco, {-15, 0, 15}, 10});
-  }
+void Game::initPhase2()
+{
+    initPhaseBoth();
 }
-
 
 
 void Game::bulletCallback(btDynamicsWorld *, btScalar){
@@ -521,10 +552,13 @@ void Game::bulletCallback(btDynamicsWorld *, btScalar){
             if(a->getUserIndex() & BID_ROCKET)
                 std::swap(a,b);
             if(a->getUserIndex() & BID_PLAYER)
-                mechs[player].HP -= 2;
-            if(a->getUserIndex() & BID_SMALL &&
-                    ((btRigidBody*) b)->getUserIndex2() & BID_ROCKET_HOMING)
-                ((btRigidBody*) a)->setUserIndex2(SMALL_GOTHIT); // might need to check if homing rocket?
+                mechs[player].HP -= 2;        
+            if(a->getUserIndex() & BID_SMALL){
+                if(((btRigidBody*) b)->getUserIndex2() & BID_ROCKET_HOMING)
+                     ((btRigidBody*) a)->setUserIndex2(SMALL_GOTHIT);
+                else
+                     ((btRigidBody*) b)->setUserIndex2(0);
+            }
 
 
         }
@@ -565,8 +599,10 @@ entityx::Entity Game::createRocket(const glm::vec3 &pos, const glm::vec3 &acc, r
   entity.assign<defMotionState>(motionState);
   entity.assign<Rocket>(Rocket{type, true});
   rbRocket->setUserIndex(BID_ROCKET);
-  if(type == rtype::homing)
+  if(type == rtype::homing){
       rbRocket->setUserIndex(BID_ROCKET_HOMING);
+      rbRocket->setDamping(0.2,0);
+  }
   if(type == rtype::falling){
       rbRocket->setAngularVelocity(btVector3(0, 1, 0)); // test
       rbRocket->setUserIndex(BID_ROCKET_FALLING);
@@ -635,7 +671,8 @@ void Game::update(float) {
               //steer
               //trying this ("arrival" method):
               //https://gamedev.stackexchange.com/questions/52988/implementing-a-homing-missile
-              auto a = glm::length(glcast(rigid->getGravity())); // finaly a good use for gravity...
+              //auto a = glm::length(glcast(rigid->getGravity())); // finaly a good use for gravity...
+              auto a = homingSpeed;
               auto ppos = mechs[player].getPos();
               auto rpos = ppos - pos;
               auto pvel = glcast(mechs[player].rigid->getLinearVelocity());
@@ -645,9 +682,9 @@ void Game::update(float) {
               auto eta = -v/a + sqrtf(v*v/(a*a) + 2*(glm::length(rpos))/a); // length was guessed
               auto ipos = ppos + rvel * eta; // impact, assuming player has no acc or change of dir
               auto steerdir = ipos - pos;
-              if(glm::length(steerdir) > a)
-                  steerdir = glm::normalize(steerdir) * a;
-              rigid->setGravity(btcast(steerdir));
+              //if(glm::length(steerdir) > a)
+                 // steerdir = glm::normalize(steerdir) * a;
+              rigid->setGravity(btcast(glm::normalize(steerdir) * a));
               if(pos.y <= 1){
                   btTransform trans = rigid->getWorldTransform();
                   auto p = trans.getOrigin();
@@ -664,14 +701,17 @@ void Game::update(float) {
               quat.getEulerZYX(z,y,x);
               rigid->setAngularVelocity(btVector3(x,y,z));
            }
-
-
-
-
       }
-
-
   }
+
+  if(mechs[player].HP <= 0){
+      if(secondPhase)
+          initPhase2();
+      else
+          initPhase1();
+      return;
+  }
+
 }
 
 //*************************************
@@ -679,6 +719,7 @@ void Game::update(float) {
 
 void Game::render(float elapsedSeconds) {
   // render game variable timestep
+    drawTime += elapsedSeconds;
 
   // camera update here because it should be coupled tightly to rendering!
   updateCamera(elapsedSeconds);
@@ -747,6 +788,7 @@ void Game::render(float elapsedSeconds) {
         GLOW_SCOPED(depthMask, GL_TRUE);
         GLOW_SCOPED(depthFunc, GL_LESS);
         drawMech(mShaderMech->use(), proj, view);
+        drawLines(mShaderLine->use(), proj, view);
         // Render Bullet Debug
         if (mDebugBullet) {
           GLOW_SCOPED(disable, GL_DEPTH_TEST);
@@ -830,6 +872,7 @@ void Game::render(float elapsedSeconds) {
           shader.setUniform("uZNear", mCamera->getNearClippingPlane());
           shader.setUniform("uZFar", mCamera->getFarClippingPlane());
           shader.setUniform("uCamPos", mCamera->getPosition());
+          shader.setUniform("uTime", drawTime);
           //from glow samples
           shader.setUniform("uLightPos", mLightPos);
           shader.setUniform("uTexShadowSize", (float)mShadowMapSize);
@@ -871,8 +914,11 @@ void Game::drawMech(glow::UsedProgram shader, glm::mat4 proj, glm::mat4 view) {
     shader.setUniform("uProj", proj);
     shader.setUniform("uView", view);
     //shader.setTexture("uTexMode", mBufferMode);
-  for (auto &m : mechs)
-    m.draw(shader);
+  mechs[player].draw(shader);
+  if(!secondPhase)
+      mechs[small].draw(shader);
+  else
+      mechs[big].draw(shader);
 }
 
 void Game::drawCubes(glow::UsedProgram shader, glm::mat4 proj, glm::mat4 view) {
@@ -958,7 +1004,8 @@ void Game::drawRockets(glow::UsedProgram shader, glm::mat4 proj, glm::mat4 view)
     default:
         ;
     }
-    model = rotate(model, glm::normalize(glcast(rigid->getLinearVelocity())));
+    if(RocketHandle->type != rtype::homing)
+        model = rotate(model, glm::normalize(glcast(rigid->getLinearVelocity())));
 
     models[(int)(RocketHandle->type)].push_back(model);
   }
@@ -976,21 +1023,44 @@ void Game::drawRockets(glow::UsedProgram shader, glm::mat4 proj, glm::mat4 view)
   }
 }
 
+glm::vec3 HSV2RGB(float h, float s, float v){
+    //based on:
+    //https://stackoverflow.com/questions/3018313/algorithm-to-convert-rgb-to-hsv-and-hsv-to-rgb-in-range-0-255-for-both
+     auto rgb = saturate(glm::vec3(abs(h * 6 - 3) - 1, //
+                        2 - abs(h * 6 - 2), //
+                        2 - abs(h * 6 - 4)));
+
+    return glm::vec3(((rgb - glm::vec3(1.)) * s + glm::vec3(1.)) * v);
+}
+
 void Game::drawLines(glow::UsedProgram shader, glm::mat4 proj, glm::mat4 view)
 {
-    shader.setUniform("uProj", proj);
-    shader.setUniform("uView", view);
 
   auto ab = mVALine->getAttributeBuffer("position");
   static bool init = false;
   if(!init){
+      vector<LineVertex> lines(spherePoints.size());
       random_shuffle(spherePoints.begin(), spherePoints.end());
-
-
-
+      static mt19937_64 rng;
+      uniform_real_distribution<double> unif(0, 1);
+      for(int i = 0; i < spherePoints.size(); i+=2){
+          lines[i] = LineVertex({spherePoints[i], HSV2RGB(unif(rng), 1, 1)});
+          lines[i+1] = LineVertex({spherePoints[i+1], HSV2RGB(unif(rng), 1, 1)});
+      }
+      ab->bind().setData(lines);
+      init = true;
    }
 
-  //rotate around center...
+  // TODO rotate around center...
+  auto area = entityx::ComponentHandle<ModeArea>();
+  for (auto entity : ex.entities.entities_with_components(area))
+    if (area->mode == disco){
+        auto a = *area.get();
+        auto model = glm::translate(glm::mat4(), a.pos);
+        model = scale(model, glm::vec3(a.radius));
+        shader.setUniform("uProjViewModel", proj * view * model);
+        mVALine->bind().draw();
+    }
 
 }
 
@@ -1018,6 +1088,7 @@ void Game::onGui() {
       ImGui::SliderFloat("Fall", &jumpGravityFall, -1, -30);
       ImGui::SliderFloat("Damping", &damping, 0.1, 1.0);
       ImGui::SliderFloat("MoveForce", &moveForce, 3, 20);
+      ImGui::SliderFloat("HomingSpeed", &homingSpeed, .1, 10);
       ImGui::Unindent();
     }
     ImGui::Text("FXAA:");

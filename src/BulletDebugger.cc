@@ -9,7 +9,7 @@
 using namespace glow;
 
 BulletDebugger::BulletDebugger() {
-  mLineShader = Program::createFromFile("../data/shaders/line");
+  mLineShader = Program::createFromFile("../data/shaders/bullet");
 }
 
 BulletDebugger::~BulletDebugger() {}

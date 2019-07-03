@@ -27,6 +27,12 @@ SharedAssimpModel Mech::mesh;
 //main cannon (L): (-0.97,4.8,4.1)
 //second cannon (L): (-1.32,4.52,3.5)
 
+int Mech::nextGoal = 1;
+int Mech::currentWay = 0;
+const int Mech::timeNeeded = 3 * 60;
+int Mech::reachGoalInTicks = timeNeeded;
+glm::vec3 Mech::lastPosition = glm::vec3(0.5, 0, 18.5);
+
 void Mech::setAnimation(Mech::animation ab, Mech::animation at, double bt, double tt) {
   animations[0] = ab;
   animationTop = at;
@@ -260,6 +266,13 @@ void Mech::controlPlayer(int) {
       m.rigid->setLinearVelocity(btSpeed);
       m.walkAnimation(btSpeed.length() / maxSpeed);
 
+      // pushed away by small
+      auto spos = g->mechs[small].getPos();
+      auto small2Player = (playerPos - spos) * glm::vec3(1,0,1);
+      if(length(small2Player) < 3)
+          m.rigid->applyCentralImpulse(btcast(normalize(small2Player) * 20));
+
+
       // close to ground?
       bool closeToGround = false;
       float ground = 0; // valid if closeToGround
@@ -376,11 +389,6 @@ void Mech::runSmall(int t) {
   }
 
   auto groundOffset = glm::vec3(0, m.collision->getHalfHeight() + m.collision->getRadius() + m.floatOffset, 0);
-  static int nextGoal = 1;
-  static int currentWay = 0;
-  static const int timeNeeded = 3 * 60;
-  static int reachGoalInTicks = timeNeeded; //
-  static glm::vec3 lastPosition = glm::vec3(0.5, 0, 18.5) + groundOffset;
   auto pos = m.getPos();
 
   // one waypoint to another are 18 steps
@@ -492,10 +500,13 @@ void Mech::runSmall(int t) {
                 m.moveDir = glm::rotate(m.moveDir, angle / 20, glm::vec3(0,1,0));
 
             // up and down
+            auto trans = m.rigid->getWorldTransform();
             if(ticks >= 15 && ticks < 30)
-                m.setPosition(m.getPos() + glm::vec3(0,0.1,0));
+                trans.setOrigin(trans.getOrigin() + btVector3(0,.1,0));
             if(ticks >= 30 && ticks < 45)
-                m.setPosition(m.getPos() - glm::vec3(0,0.1,0));
+                trans.setOrigin(trans.getOrigin() - btVector3(0,.1,0));
+            m.motionState->setWorldTransform(trans);
+            m.rigid->setActivationState(DISABLE_DEACTIVATION);
 
             //stop
             if(ticks >= ticksNeeded){

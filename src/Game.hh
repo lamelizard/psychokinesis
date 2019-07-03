@@ -76,6 +76,8 @@ private:
   float jumpGravityFall = -18;
   float damping = .95;
   float moveForce = 15;
+  float homingSpeed = 4;
+  bool secondPhase = false;
   glm::vec4 vec4out = {};
 
   std::vector<glm::vec3> spherePoints;
@@ -97,6 +99,7 @@ private:
   glm::ivec3 debugAnimations = {0,0,0};
   glm::vec3 debugAnimationTimes = {0,0,0};
   float debugAnimationAngle = 0;
+  float drawTime = 0;
 
   // gfx objects
 private:
@@ -209,13 +212,13 @@ private:
   void drawRockets(glow::UsedProgram shader, glm::mat4 proj, glm::mat4 view);
   void drawLines(glow::UsedProgram shader, glm::mat4 proj, glm::mat4 view);
 
-  // test
-  //btDefaultMotionState* boxMotionState = nullptr;
-
 
   // ctor
 public:
   Game();
+  void initPhaseBoth();
+  void initPhase1();
+  void initPhase2();
 
   // events
 public:
