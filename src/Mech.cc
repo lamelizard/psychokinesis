@@ -7,6 +7,7 @@
 
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
+#include <glm/gtx/rotate_vector.hpp>
 
 #include <glow/common/log.hh>
 #include <glow/objects/Program.hh>
@@ -185,7 +186,7 @@ void Mech::controlPlayer(int) {
     // handle slowdown
     {
       static bool musicSlow = true;
-      if (playerModes.count(neon)) {
+      if (playerModes.count(drawn)) {
         //maxSpeed = 3;
         m.rigid->setLinearFactor(btVector3(.7, .7, .7));
         if (!musicSlow) {
@@ -212,6 +213,8 @@ void Mech::controlPlayer(int) {
                                                gamepadState.buttons[GLFW_GAMEPAD_BUTTON_B] || //
                                                gamepadState.buttons[GLFW_GAMEPAD_BUTTON_X] || //
                                                gamepadState.buttons[GLFW_GAMEPAD_BUTTON_Y]));
+      if(playerModes.count(neon))
+          jumpPressed = true;
 
       // reldir = dir without camera
       glm::vec3 relDir;
@@ -250,6 +253,18 @@ void Mech::controlPlayer(int) {
 
       m.viewDir = camForward;
       auto force = (relDir.x * camRight + relDir.z * camForward) * g->moveForce;
+      // disco:
+      {
+          static float discoAlpha = 0;
+          static float discoRot = 0;
+          if(playerModes.count(disco))
+              discoAlpha = min(discoAlpha + .005f, 1.f);
+          else
+              discoAlpha = max(discoAlpha - .01f, 0.f);
+          discoRot = fmod(discoRot + .001, M_PI * 2);
+          m.viewDir = glm::rotateY(m.viewDir, discoRot * discoAlpha);
+          force = glm::rotateY(force, discoRot * discoAlpha);
+      }
       if (glm::length(force) > 0.001) {
         m.moveDir = glm::normalize(force);
         m.rigid->applyCentralForce(btcast(force));
@@ -279,7 +294,7 @@ void Mech::controlPlayer(int) {
       float closeToGroundBorder = m.floatOffset * 1.2;
       vector<float> results;
       for(int angle = -3; angle < 3; angle += 1){
-        auto from = bulPos - btVector3(sin(angle)*.3, m.collision->getHalfHeight() + m.collision->getRadius() + .01, cos(angle)*.3); //heigth is notthe height...
+        auto from = bulPos - btVector3(sin(angle)*.3, m.collision->getHalfHeight() + m.collision->getRadius() + .01, cos(angle)*.3); //heigth is not the height...
         if (from.y() <= 0.01 && from.y() > -0.01)                                                          //stuck slighlty in ground...
           from.setY(0.01);
         auto to = from - btVector3(0, closeToGroundBorder, 0);

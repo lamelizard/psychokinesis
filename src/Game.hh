@@ -191,7 +191,7 @@ private:
   std::shared_ptr<btSphereShape> colPoint;
   void bulletCallback(btDynamicsWorld*, btScalar);
   static void bulletCallbackStatic(btDynamicsWorld* w, btScalar c){instance->bulletCallback(w,c);}
-  entityx::Entity createCube(const glm::ivec3 &pos);
+  entityx::Entity createCube(const glm::ivec3 &pos, bool moves = false);
   entityx::Entity createRocket(const glm::vec3 &pos, const glm::vec3 &vel, rtype type);
 
 

@@ -56,6 +56,7 @@ using namespace std;
 
 struct Cube {
   glm::ivec3 pos;
+  bool destroyable = false; // floor
 };
 
 struct LineVertex {
@@ -516,6 +517,8 @@ void Game::initPhaseBoth()
         auto entity = ex.entities.create();
         entity.assign<ModeArea>(ModeArea{disco, {-15, 0, 15}, 10});
       }
+    // test rocket
+    createRocket(glm::vec3(-23,10,-23), glm::vec3(0,-1,0), rtype::falling);
 }
 
 void Game::initPhase1()
@@ -554,7 +557,7 @@ void Game::bulletCallback(btDynamicsWorld *, btScalar){
             if(a->getUserIndex() & BID_PLAYER)
                 mechs[player].HP -= 2;        
             if(a->getUserIndex() & BID_SMALL){
-                if(((btRigidBody*) b)->getUserIndex2() & BID_ROCKET_HOMING)
+                if(((btRigidBody*) b)->getUserIndex() == BID_ROCKET_HOMING)
                      ((btRigidBody*) a)->setUserIndex2(SMALL_GOTHIT);
                 else
                      ((btRigidBody*) b)->setUserIndex2(0);
@@ -568,15 +571,17 @@ void Game::bulletCallback(btDynamicsWorld *, btScalar){
     }
 }
 
-entityx::Entity Game::createCube(const glm::ivec3 &pos) {
+entityx::Entity Game::createCube(const glm::ivec3 &pos, bool moves) {
   auto motionState = make_shared<btDefaultMotionState>(bttransform(glm::vec3(pos.x, (float)pos.y - colBox->getHalfExtentsWithMargin().getY(), pos.z))); // y = 0 is floor
-  auto rbCube = make_shared<btRigidBody>(btRigidBody::btRigidBodyConstructionInfo(0., motionState.get(), colBox.get(), btVector3(0, 0, 0)));
+  auto rbCube = make_shared<btRigidBody>(btRigidBody::btRigidBodyConstructionInfo(moves ? 1. : 0., motionState.get(), colBox.get(), btVector3(0, 0, 0)));
   dynamicsWorld->addRigidBody(rbCube.get());
+  const auto des = set<int>{-24,25,-23,24,-14,15,-13,14,-4,5,-3,4};
+  auto destructible = des.count(pos.x) && des.count(pos.z);
 
   auto entity = ex.entities.create();
   entity.assign<SharedbtRigidBody>(rbCube);
   entity.assign<defMotionState>(motionState);
-  entity.assign<Cube>(Cube{pos});
+  entity.assign<Cube>(Cube{pos, destructible});
   rbCube->setUserIndex(BID_CUBE);
   static_assert(sizeof(void *) == sizeof(uint64_t), "oh...");
   rbCube->setUserPointer((void *)entity.id().id()); // lost any sense of what I learned 'bout good code
@@ -616,7 +621,7 @@ void Game::update(float) {
   // update game in 60 Hz fixed timestep, most of the time
   setUpdateRate(updateRate);
 
-
+  //update mechs
   for (auto &m : mechs){
     //activate to be sure
        m.rigid->activate();
@@ -625,7 +630,9 @@ void Game::update(float) {
   }
 
   //update physics
-  dynamicsWorld->stepSimulation( 0.01666666666, 10);
+  dynamicsWorld->stepSimulation(1. / 60., 10);
+
+
 
   //explode Rockets, steer Rockets
   {
@@ -637,7 +644,12 @@ void Game::update(float) {
           motionState->getWorldTransform(trans);
           auto pos = getWorldPos(trans);
 
-          if(rigid->getUserIndex2() == 1)
+          if(length(getWorldPos(rigid->getWorldTransform())) > 200){
+              //remove far away rockets
+              dynamicsWorld->removeRigidBody(rigid);
+              eRocket.destroy();
+          }
+          else if(rigid->getUserIndex2() == 1)
           {
               //BOOM?
               if(rocket->real){
@@ -662,6 +674,20 @@ void Game::update(float) {
                             rigidHit->applyForce(dir*strength, closest.m_hitPointWorld - rigidHit->getWorldTransform().getOrigin());
                             //rigidHit->applyCentralForce(dir * strength);
                         }
+                      }
+                  }
+                  //destroy the world
+                  if(rigid->getUserIndex() == BID_ROCKET_FALLING){
+                      auto cubeHandle = entityx::ComponentHandle<Cube>();
+                      for (entityx::Entity entity : ex.entities.entities_with_components(cubeHandle)) {
+                          auto c = cubeHandle.get();
+                          if(c->destroyable /*&& length(glm::vec3(c->pos) - getWorldPos(rigid->getWorldTransform())) < 5*/){
+                              //destroy and create moving one
+                              auto body = entity.component<SharedbtRigidBody>().get()->get();
+                              dynamicsWorld->removeRigidBody(body);
+                              createCube(c->pos, true);
+                              entity.destroy();
+                          }
                       }
                   }
               }
@@ -704,6 +730,21 @@ void Game::update(float) {
       }
   }
 
+  //the dice have been thrown... and may not fall
+  {
+      auto cubeHandle = entityx::ComponentHandle<Cube>();
+      for (entityx::Entity entity : ex.entities.entities_with_components(cubeHandle))
+          if(cubeHandle.get()->destroyable){
+              auto body = entity.component<SharedbtRigidBody>().get()->get();
+              //auto motionState = entity.component<defMotionState>().get->get();
+              auto pos = getWorldPos(body->getWorldTransform());
+              if(pos.y < 10)
+                body->applyCentralForce(btVector3(0,20,0));
+          }
+
+  }
+
+  //reinit if HP
   if(mechs[player].HP <= 0){
       if(secondPhase)
           initPhase2();
@@ -720,6 +761,8 @@ void Game::update(float) {
 void Game::render(float elapsedSeconds) {
   // render game variable timestep
     drawTime += elapsedSeconds;
+
+    //dynamicsWorld->stepSimulation( elapsedSeconds); // I want
 
   // camera update here because it should be coupled tightly to rendering!
   updateCamera(elapsedSeconds);
@@ -1001,11 +1044,14 @@ void Game::drawRockets(glow::UsedProgram shader, glm::mat4 proj, glm::mat4 view)
     case rtype::forward:
         model = glm::scale(model, glm::vec3(.5));
         break;
+    case rtype::falling:
+        model = rotate(model, glm::vec3(0,0,1), glm::vec3(0,-1,0));
     default:
         ;
     }
     if(RocketHandle->type != rtype::homing)
         model = rotate(model, glm::normalize(glcast(rigid->getLinearVelocity())));
+
 
     models[(int)(RocketHandle->type)].push_back(model);
   }
@@ -1054,12 +1100,12 @@ void Game::drawLines(glow::UsedProgram shader, glm::mat4 proj, glm::mat4 view)
   // TODO rotate around center...
   auto area = entityx::ComponentHandle<ModeArea>();
   for (auto entity : ex.entities.entities_with_components(area))
-    if (area->mode == disco){
+    if (area->mode == neon){
         auto a = *area.get();
         auto model = glm::translate(glm::mat4(), a.pos);
         model = scale(model, glm::vec3(a.radius));
         shader.setUniform("uProjViewModel", proj * view * model);
-        mVALine->bind().draw();
+        mVALine->bind().draw(500 / max(30 - (int)a.radius, 1)); // bigger -> more lines (in 30 steps)
     }
 
 }
