@@ -42,7 +42,7 @@
 #include "conversion.hh"
 
 
-//#define NOGUI
+#define NOGUI
 
 GLOW_SHARED(class, btRigidBody);
 GLOW_SHARED(class, btMotionState);
@@ -57,11 +57,17 @@ using namespace std;
 struct Cube {
   glm::ivec3 pos;
   bool destroyable = false; // floor
+  bool moves = false;
 };
 
 struct LineVertex {
   glm::vec3 pos;
   glm::vec3 color;
+};
+
+struct ExplVertex {
+  glm::vec3 pos;
+  glm::vec3 normal;
 };
 
 struct Rocket {
@@ -325,6 +331,30 @@ void Game::init() {
                                {&LineVertex::color, "color"}});
     mVALine = glow::VertexArray::create(abLines, GL_LINES);
     mVALine->setObjectLabel("Line va");
+    //Explosion
+    {
+        auto abExpl = glow::ArrayBuffer::create();
+        abExpl->setObjectLabel("Explosion ab");
+        abExpl->defineAttributes({{&ExplVertex::pos, "position"}, //
+                                   {&ExplVertex::normal, "normal"}});
+        auto sSize = spherePoints.size() - (spherePoints.size() % 3);
+        vector<ExplVertex> ver(sSize);
+        for(int i = 0; i < sSize; i+=3){
+            ver[i].pos = spherePoints[i];
+            ver[i+1].pos = spherePoints[i+1];
+            ver[i+2].pos = spherePoints[i+2];
+            auto n = normalize(cross(ver[i+1].pos - ver[i].pos, ver[i+2].pos - ver[i].pos));
+            ver[i].normal = n;
+            ver[i+1].normal = n;
+            ver[i+2].normal = n;
+        }
+        abExpl->bind().setData(ver);
+        mVAExplosion = glow::VertexArray::create(abExpl, GL_TRIANGLES);
+        mVAExplosion->setObjectLabel("Explosion va");
+    }
+
+
+
 
 
 
@@ -337,6 +367,7 @@ void Game::init() {
     mShaderUI = glow::Program::createFromFile("../data/shaders/ui");
     mShaderFuse = glow::Program::createFromFile("../data/shaders/fuse");
     mShaderLine = glow::Program::createFromFile("../data/shaders/line");
+    mShaderExplosion = glow::Program::createFromFile("../data/shaders/explosion");
   }
 
   // Sound
@@ -357,9 +388,20 @@ void Game::init() {
       glow::log() << "audio backend: " << soloud->getBackendString();
     //sounds
     {
-      music.load("../data/sounds/heroic_demise_loop.ogg");
+      const string snddir = "../data/sounds/";
+      music.load((snddir + "heroic_demise_loop.ogg").c_str());
       //placeholder
-      sfx.setText("boom");
+      sfxBootUp.setText("");
+      sfxExpl1.load((snddir + "explosion2.wav").c_str());
+      sfxExpl1.mVolume = .7;
+      sfxExpl2.load((snddir + "explosion2.wav").c_str());
+      sfxExpl2.mVolume = .7;
+      sfxShot.load((snddir + "Shot.wav").c_str());
+      sfxStep.load((snddir + "FootSteps.wav").c_str());
+      sfxStep.mVolume = .3;
+
+      intro.setText("You put your mind into a machine? I will have you know your emotions are hackable now.");
+      introShort.setText("Your emotions are hackable now.");
     }
   }
 
@@ -518,7 +560,7 @@ void Game::initPhaseBoth()
         entity.assign<ModeArea>(ModeArea{disco, {-15, 0, 15}, 10});
       }
     // test rocket
-    createRocket(glm::vec3(-23,10,-23), glm::vec3(0,-1,0), rtype::falling);
+    //createRocket(glm::vec3(-23,10,-23), glm::vec3(0,-1,0), rtype::falling);
 }
 
 void Game::initPhase1()
@@ -529,7 +571,12 @@ void Game::initPhase1()
     music.setLooping(true);
     musicHandle = soloud->playBackground(music, 0);
     soloud->fadeVolume(musicHandle, .7, 30);
-
+    static bool firstRun = true;
+    if(firstRun)
+        soloud->playBackground(intro, 1);
+    else
+        soloud->playBackground(introShort, 1);
+    firstRun = false;
 
 }
 
@@ -575,13 +622,27 @@ entityx::Entity Game::createCube(const glm::ivec3 &pos, bool moves) {
   auto motionState = make_shared<btDefaultMotionState>(bttransform(glm::vec3(pos.x, (float)pos.y - colBox->getHalfExtentsWithMargin().getY(), pos.z))); // y = 0 is floor
   auto rbCube = make_shared<btRigidBody>(btRigidBody::btRigidBodyConstructionInfo(moves ? 1. : 0., motionState.get(), colBox.get(), btVector3(0, 0, 0)));
   dynamicsWorld->addRigidBody(rbCube.get());
-  const auto des = set<int>{-24,25,-23,24,-14,15,-13,14,-4,5,-3,4};
-  auto destructible = des.count(pos.x) && des.count(pos.z);
+  bool destructible = false;
+  if(!pos.y)
+  { // destructible?
+      glm::ivec3 p = pos;
+      p.x = p.x < 1 ? -p.x + 1 : p.x;
+      p.z = p.z < 1 ? -p.z + 1 : p.z;
+      // not symmetrical
+      destructible = (p.x >= 24 || //
+                      p.z >= 24 || //
+                      ((p.x == 17 || p.x == 16 || p.x == 5 || p.x == 4) //
+                       && (p.z <= 17 && p.z >= 4)) || //
+                      ((p.z == 17 || p.z == 16 || p.z == 5 || p.z == 4) //
+                       && (p.x <= 17 && p.x >= 4)) //
+                      );
+      // const auto des = set<int>{25,24,15,14,5,4};
+  }
 
   auto entity = ex.entities.create();
   entity.assign<SharedbtRigidBody>(rbCube);
   entity.assign<defMotionState>(motionState);
-  entity.assign<Cube>(Cube{pos, destructible});
+  entity.assign<Cube>(Cube{pos, destructible, moves});
   rbCube->setUserIndex(BID_CUBE);
   static_assert(sizeof(void *) == sizeof(uint64_t), "oh...");
   rbCube->setUserPointer((void *)entity.id().id()); // lost any sense of what I learned 'bout good code
@@ -629,6 +690,17 @@ void Game::update(float) {
        m.updateLook();
   }
 
+  //cheat into the second quest
+  //why doesn't it work?
+  if((isKeyPressed(GLFW_KEY_Z) ||
+      isKeyPressed(GLFW_KEY_Y)) &&
+     //isKeyPressed(GLFW_KEY_E) &&
+     //isKeyPressed(GLFW_KEY_L) &&
+     //isKeyPressed(GLFW_KEY_D) &&
+     isKeyPressed(GLFW_KEY_A)){
+     mechs[small].HP = 3;
+  }
+
   //update physics
   dynamicsWorld->stepSimulation(1. / 60., 10);
 
@@ -655,7 +727,11 @@ void Game::update(float) {
               if(rocket->real){
                   //BOOM!
                   //Sound for not real inside mode? unlikely
-                  soloud->play3d(sfx, pos.x,pos.y,pos.z); // change
+                  if(rigid->getUserIndex() != BID_ROCKET_FALLING)
+                    soloud->play3d(sfxExpl1, pos.x,pos.y,pos.z);
+                  else
+                    soloud->play3d(sfxExpl2, pos.x,pos.y,pos.z);
+                  explosions.push_back(Explosion{pos, 0});
                   //boom
                   for(const auto& point :spherePoints){
                       auto from = btcast(pos);
@@ -681,7 +757,7 @@ void Game::update(float) {
                       auto cubeHandle = entityx::ComponentHandle<Cube>();
                       for (entityx::Entity entity : ex.entities.entities_with_components(cubeHandle)) {
                           auto c = cubeHandle.get();
-                          if(c->destroyable /*&& length(glm::vec3(c->pos) - getWorldPos(rigid->getWorldTransform())) < 5*/){
+                          if(c->destroyable && !c->moves && length(glm::vec3(c->pos) - getWorldPos(rigid->getWorldTransform())) < 5){
                               //destroy and create moving one
                               auto body = entity.component<SharedbtRigidBody>().get()->get();
                               dynamicsWorld->removeRigidBody(body);
@@ -736,10 +812,15 @@ void Game::update(float) {
       for (entityx::Entity entity : ex.entities.entities_with_components(cubeHandle))
           if(cubeHandle.get()->destroyable){
               auto body = entity.component<SharedbtRigidBody>().get()->get();
-              //auto motionState = entity.component<defMotionState>().get->get();
               auto pos = getWorldPos(body->getWorldTransform());
-              if(pos.y < 10)
-                body->applyCentralForce(btVector3(0,20,0));
+              //It's magic, I ain't gotta explain it
+              if(pos.y < 7){
+                  body->applyCentralForce(btVector3(0,15,0));
+                  if(body->getLinearVelocity().getY() < -5)
+                      body->applyCentralForce(btVector3(0,5,0));
+              }
+
+
           }
 
   }
@@ -778,8 +859,12 @@ void Game::render(float elapsedSeconds) {
   glm::mat4 shadowViewProj = shadowProj* shadowView;
 
   //update animations
-  for (auto &m : mechs)
-    m.updateTime(elapsedSeconds);
+  for (auto &m : mechs){
+      auto t1 = m.animationsTime[1];
+       m.updateTime(elapsedSeconds);
+      m.didStep = m.mesh->MechdidStep(t1, m.animationsTime[1]);
+  }
+
 
   // Shadow
   {
@@ -793,6 +878,7 @@ void Game::render(float elapsedSeconds) {
       drawCubes(mShaderCubePrepass->use(), shadowProj, shadowView);
       drawRockets(mShaderCubePrepass->use(), shadowProj, shadowView);
       drawMech(mShaderMech->use(), shadowProj, shadowView);
+      drawExplosion(mShaderExplosion->use(), shadowProj, shadowView, elapsedSeconds);
   }
 
   // Depth
@@ -806,6 +892,7 @@ void Game::render(float elapsedSeconds) {
     drawCubes(mShaderCubePrepass->use(), proj, view);
     drawRockets(mShaderCubePrepass->use(), proj, view);
     //drawMech(mShaderMech->use(), proj, view);
+    drawExplosion(mShaderExplosion->use(), proj, view);
     if (mDebugBullet) {
       dynamicsWorld->debugDrawWorld();
       bulletDebugger->draw(proj * view);
@@ -826,6 +913,7 @@ void Game::render(float elapsedSeconds) {
 
     drawCubes(mShaderCube->use(), proj, view);
     drawRockets(mShaderCube->use(), proj, view);
+    drawExplosion(mShaderExplosion->use(), proj, view);
     {
         GLOW_SCOPED(enable, GL_CULL_FACE);
         GLOW_SCOPED(depthMask, GL_TRUE);
@@ -1110,6 +1198,31 @@ void Game::drawLines(glow::UsedProgram shader, glm::mat4 proj, glm::mat4 view)
 
 }
 
+void Game::drawExplosion(glow::UsedProgram shader, glm::mat4 proj, glm::mat4 view, float dT)
+{
+    const auto explosionTime = .3;
+    const auto explosionParts = 8;
+    const auto explosionRadius = 1.;
+    list<Explosion> keepList;
+    while(!explosions.empty()){
+        Explosion e = explosions.back();
+        explosions.pop_back();
+        e.time += dT;
+        if(e.time > explosionTime)
+            continue;
+        int part = min((int)((e.time * explosionParts) / explosionTime),7);
+        auto model = glm::translate(glm::mat4(), e.pos);
+        auto r = explosionRadius * e.time / explosionTime;
+        model = scale(model, glm::vec3(r));
+        shader.setUniform("uProjView", proj * view);
+        shader.setUniform("uModel", model);
+        mVAExplosion->bind().drawRange(part * 60, part * 60 + 59);
+        keepList.push_back(e);
+    }
+    explosions = keepList;
+}
+
+
 // Update the GUI
 void Game::onGui() {
 #ifndef NOGUI
@@ -1126,6 +1239,10 @@ void Game::onGui() {
       //ImGui::SliderFloat3("UI", (float*)&mUIPos, 0.0f, 1.0f);
     }
     ImGui::Text(((string)"Out: " + to_string(vec4out.x) + " " + to_string(vec4out.y)).c_str());
+    auto ppos = mechs[player].getPos();
+    auto py = ppos.y - mechs[player].collision->getHalfHeight() - mechs[player].collision->getRadius();
+    ImGui::Text(((string)"Y: " + to_string(py) + ", Y-f:" + to_string(py - mechs[player].floatOffset)).c_str());
+    ImGui::Text(((string)"P: " + to_string(mechs[player].HP) + ", S:" + to_string(mechs[small].HP)).c_str());
     ImGui::Text("Controll:");
     {
       ImGui::Indent();

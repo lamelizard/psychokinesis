@@ -120,7 +120,23 @@ void AssimpModel::draw(const glow::UsedProgram &shader, double t, bool loop, con
 }
 
 int AssimpModel::getMechBoneID(const std::string &name){
- return boneIDOfName[name];
+    return boneIDOfName[name];
+}
+
+bool AssimpModel::MechdidStep(double t1, double t2)
+{
+    auto animation = animations["WalkInPlace"];
+    auto dur = animation->mDuration;
+    assert(animation->mTicksPerSecond > 0);
+    auto ticks1 = fmod(t1 * animation->mTicksPerSecond, dur);
+    auto ticks2 = fmod(t2 * animation->mTicksPerSecond, dur);
+
+    //just guessing
+    if(ticks2 < ticks1)
+        return true;
+    if(ticks1 < dur / 2 && ticks2 > dur / 2)
+        return true;
+    return false;
 }
 
 SharedVertexArray AssimpModel::getVA(){

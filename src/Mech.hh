@@ -69,6 +69,7 @@ struct Mech : SM {
   double floatOffset; // from bottom
   double scale = 1;
   std::vector<glm::mat4> bones;
+  bool didStep = false; // make sound if it makes sense
 
   // Small
   static int nextGoal;

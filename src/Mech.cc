@@ -294,9 +294,9 @@ void Mech::controlPlayer(int) {
       float closeToGroundBorder = m.floatOffset * 1.2;
       vector<float> results;
       for(int angle = -3; angle < 3; angle += 1){
-        auto from = bulPos - btVector3(sin(angle)*.3, m.collision->getHalfHeight() + m.collision->getRadius() + .01, cos(angle)*.3); //heigth is not the height...
-        if (from.y() <= 0.01 && from.y() > -0.01)                                                          //stuck slighlty in ground...
-          from.setY(0.01);
+        auto from = bulPos - btVector3(sin(angle)*.3, m.collision->getHalfHeight() + m.collision->getRadius(), cos(angle)*.3); //heigth is not the height...
+        if (from.y() <= 0.05 && from.y() > -0.01)                                                          //stuck slighlty in ground...
+          from.setY(0.1);
         auto to = from - btVector3(0, closeToGroundBorder, 0);
         g->dynamicsWorld->getDebugDrawer()->drawLine(from, to, btVector4(1, 0, 0, 1));
         auto closest = btCollisionWorld::ClosestRayResultCallback(from, to);
@@ -327,6 +327,9 @@ void Mech::controlPlayer(int) {
           m.rigid->setWorldTransform(t);
           // no y-movement anymore!
           m.rigid->setLinearFactor(btVector3(1, 0, 1));
+          //sound
+          if(m.didStep)
+              g->soloud->play3d(g->sfxStep, o.x(), o.y(), o.z(), 0,0,0, .07);
         }
         // jump
         if (!g->mJumps && jumpPressed) {
@@ -359,7 +362,7 @@ void Mech::startSmall(int t) {
     m.setAnimation(getup, none);
   if (t == 6 * 60) {
     auto pos = m.getPos();
-    g->soloud->play3d(g->sfx, pos.x, pos.y, pos.z);
+    g->soloud->play3d(g->sfxBootUp, pos.x, pos.y, pos.z);
   }
 
   if (t > 6 * 60 + 68 + 60) { //getup finished + 1s
@@ -380,7 +383,7 @@ void Mech::startPlayer(int t) {
   }
   if (t == 2 * 60) {
     m.animationsFaktor[0] = 1;
-    g->soloud->play3d(g->sfx, pos.x, pos.y, pos.z);
+    g->soloud->play3d(g->sfxBootUp, pos.x, pos.y, pos.z);
   }
 
   if (t > 2 * 60 + 68) { //getup finished
@@ -446,7 +449,14 @@ void Mech::runSmall(int t) {
   if (t % (60 + ((m.HP) * 15)) == 0) {
     auto dir = glm::normalize(p.getPos() - pos);
     g->createRocket(pos + (dir * 3), dir * 4, rtype::forward); // 4?
+    g->soloud->play3d(g->sfxShot, pos.x,pos.y,pos.z);
   }
+
+  //move somewhere else
+  //falling
+  if(m.HP < 4) // start at 5
+      if (t % (60 + ((m.HP) * 30)) == 0)
+        g->createRocket(p.getPos() + glm::vec3(0,10,0), glm::vec3(0,-1,0), rtype::falling);
 
   //walk
   auto way = ways[currentWay];

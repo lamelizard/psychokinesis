@@ -13,6 +13,7 @@
 #include "BulletDebugger.hh"
 
 #include <soloud.h>
+#include <soloud_wav.h>
 #include <soloud_wavstream.h>
 #include <soloud_speech.h>
 
@@ -29,6 +30,11 @@ struct ModeArea {
   Mode mode = normal;
   glm::vec3 pos;
   float radius;
+};
+
+struct Explosion{
+  glm::vec3 pos;
+  float time = 0;
 };
 
 //rockettype
@@ -113,6 +119,7 @@ private:
   glow::SharedProgram mShaderMode;
   glow::SharedProgram mShaderUI;
   glow::SharedProgram mShaderLine;
+  glow::SharedProgram mShaderExplosion;
 
   // meshes
   glow::SharedVertexArray mMeshQuad;
@@ -120,6 +127,7 @@ private:
   glow::SharedVertexArray mMeshSphere;
   glow::SharedVertexArray mMeshRocket[NUM_ROCKET_TYPES];
   glow::SharedVertexArray mVALine;
+  glow::SharedVertexArray mVAExplosion;
 
   // mech
   glow::SharedProgram mShaderMech;
@@ -169,6 +177,8 @@ private:
 
   std::vector<glow::SharedTextureRectangle> mTargets;
 
+  std::list<Explosion> explosions;
+
 
   // Sound
 private:
@@ -176,7 +186,13 @@ private:
       std::unique_ptr<SoLoud::Soloud, void (*)(SoLoud::Soloud *)>(nullptr, [](SoLoud::Soloud *) {});
   SoLoud::WavStream music;
   SoLoud::handle musicHandle;
-  SoLoud::Speech sfx;
+  SoLoud::Speech sfxBootUp;
+  SoLoud::Wav sfxExpl1;
+  SoLoud::Wav sfxExpl2;
+  SoLoud::Wav sfxShot;
+  SoLoud::Wav sfxStep;
+  SoLoud::Speech intro;
+  SoLoud::Speech introShort;
 
   // EntityX
 private:
@@ -211,7 +227,7 @@ private:
   void drawCubes(glow::UsedProgram shader, glm::mat4 proj, glm::mat4 view);
   void drawRockets(glow::UsedProgram shader, glm::mat4 proj, glm::mat4 view);
   void drawLines(glow::UsedProgram shader, glm::mat4 proj, glm::mat4 view);
-
+  void drawExplosion(glow::UsedProgram shader, glm::mat4 proj, glm::mat4 view, float dT = 0);
 
   // ctor
 public:
