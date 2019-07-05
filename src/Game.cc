@@ -797,7 +797,7 @@ void Game::update(float) {
               }
               //rotate
               auto rotAxis = -normalize(cross(vel, glm::vec3(0,1,0)));
-              btQuaternion quat(btcast(rotAxis), min(2.5, pow(length(vel) / 4, 2))); // make this look better
+              btQuaternion quat(btcast(rotAxis), min(2.5, (double)pow(length(vel) / 4, 2))); // make this look better
               vec4out.x = quat.getAngle();
               float x, y, z;
               quat.getEulerZYX(z,y,x);

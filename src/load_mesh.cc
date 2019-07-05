@@ -62,7 +62,7 @@ glow::SharedVertexArray load_mesh_from_obj(const std::string &filename, bool int
         t[cnt] = texcoord[h];
         ++cnt;
 
-        if (cnt > 3)
+        if (cnt > 2)
           break;
       }
 
