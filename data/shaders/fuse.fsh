@@ -25,6 +25,7 @@ uniform float uZFar;
 
 
 in vec2 vPosition;
+in vec3 vDiscoColor;
 
 out vec3 fColor;
 
@@ -38,7 +39,7 @@ float zOf(ivec2 uv)
 // from glow samples (modified)
 bool isEdge(ivec2 uv)
 {
-    float OutlineNormal = 1;
+    float OutlineNormal = 2.;
     float depthFactor = 1;
 
     vec3 n = texelFetch(uTexNormal, uv).xyz;
@@ -122,9 +123,11 @@ void main()
         vec3 N2 = texelFetch(uTexNormal, uv + ivec2(-1,0)).xyz;
         vec3 N3 = texelFetch(uTexNormal, uv + ivec2(0,1)).xyz;
         vec3 N4 = texelFetch(uTexNormal, uv + ivec2(0,-1)).xyz;
-        if(abs(dot(N,N1)) + abs(dot(N,N2)) + abs(dot(N,N3)) + abs(dot(N,N4)) < .5){
+        if(N != vec3(0.,0.,0.) && abs(dot(N,N1)) + abs(dot(N,N2)) + abs(dot(N,N3)) + abs(dot(N,N4)) < .5){
             uv += ivec2(0,1);
             N = N3;
+            //fColor = vec3(1.,0.,0.);
+            //return;
         }
         vec3 albedo = texelFetch(uTexColor, uv).rgb;
 
@@ -145,10 +148,6 @@ void main()
 #else
         float shadowFactor = 1.;
 #endif
-        //negative shadow possible!!! -> shadowfactor > 1! COOL!
-        // Yes, hardware PCF works:
-        //if(shadowFactor != .0 && shadowFactor != 1.)
-           //albedo = vec3(1,0,0);
         shadowFactor *= 1 - length(shadowPos.xy) / sqrt(2);
 
 
@@ -181,47 +180,57 @@ void main()
             color += lightColor * shadingSpecularGGX(N, V, L, max(0.01, Roughness), specular); // ggx
             color += reflectivity * reflection; // reflection
 
-            //color = color* .05 + .95 *reflection.bgr; //VERY COOL, USE THIS!!!
-
         }
         else if (mode == 1){
            // ~Neon
            float inten[5] = float[5](.0f, .5f, .7f, 1.f, 1.f); // use sin(time)!!!
            color = albedo;
+           // 4^3 colors
            color = vec3(inten[int(color.r * 4)], inten[int(color.g * 4)], inten[int(color.b * 4)]);
         }
         else if (mode == 2){
-            // disco
-            color = albedo;
-            float refGrey = dot(textureLod(uSkybox, R, 4).rgb, vec3(0.21, 0.71, 0.07));
-            //float h = (sin(uTime) + 1) / 2;
-            float h = mod(uTime / 4, 1);
-            vec3 rgb = clamp(vec3(abs(h * 6 - 3) - 1,
-                               2 - abs(h * 6 - 2),
-                               2 - abs(h * 6 - 4)),
-                             0, 1);
-            color = (color * .03 + .97 * refGrey * rgb) * (1 - shadowFactor) * 3;
-
-
-
-
-        }
-        else if (mode == 3){
+            // drawn
+            // idea:
             //http://www.thomaseichhorn.de/npr-sketch-shader-vvvv/
+
+            //noise
+            //https://www.shadertoy.com/view/4djSRW
+#define ITERATIONS 2
+            float noise = 0.0;
+            for (int t = 0; t < ITERATIONS; t++)
+            {
+                 float v = float(t+1)*.152;
+                 vec2 pos = (gl_FragCoord.xy * v + 0 /*mod(uTime, 10.f)*/ * 1500. + 50.0);
+                 vec3 p3  = fract(vec3(pos.xyx) * .1031);
+                 p3 += dot(p3, p3.yzx + 19.19);
+                 noise += fract((p3.x + p3.y) * p3.z);
+            }
+            noise = noise / float(ITERATIONS);
+            //noise = clamp(noise *2, .0, 1.);
 
             vec3 paper = texture(uTexPaper, vPosition).rgb;
             //vec3 noise = texture(uTexNoise1, vPosition * 4.).rgb;
             //float grey = dot(albedo, vec3(0.21, 0.71, 0.07));
 
             color  = vec3(.7,.7,.7);// * (max(dot(n, l), 0.) * shadowFactor * 0.9 + 0.1);
-            float dFactor = clamp(zOf(uv) / 50., .1, 1.);
+            float dFactor = clamp((zOf(uv) -3) / 10., .1, 1.);
 
-            //color = color * dFactor*(1-noise.r) + noise * (1-dFactor*(1-noise.r));
+            color = color * ((1-dFactor) * noise + dFactor);
             color *= paper;
+
             if(isEdge(uv))
                 color *= dFactor; // black outline fades away in the distance
             //color  = vec3(.7,.7,.7) * shadowFactor;
+            //color = vec3(noise);
         }
+        else if (mode == 3){
+            // disco
+            float refGrey = dot(textureLod(uSkybox, R, 4).rgb, vec3(0.21, 0.71, 0.07));
+            color = (albedo * .03 + .97 * refGrey * vDiscoColor) * (1 - shadowFactor) * 3;
+
+
+        }
+
     }
     else // sky, from rtglive
     {

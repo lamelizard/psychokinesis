@@ -24,12 +24,19 @@ https://www.textures.com/faq-license.html
 
 "Spiked Ball" (modified) made by azzajess and licenced under CC BY 4.0 (CC Attribution)
 https://sketchfab.com/3d-models/spiked-ball-b03e6a597b794953977c7d60c27492bd
+https://creativecommons.org/licenses/by/4.0/
 
 "bomb" (modified) made by lostsoundzz and licenced under CC BY 4.0 (CC Attribution)
 https://sketchfab.com/3d-models/bomb-45e0eb9afc694a808fc847332b759bc0
+https://creativecommons.org/licenses/by/4.0/
 
 some shader code (marked and modified) licenced under MIT
 https://graphics.rwth-aachen.de:9000/Glow/glow-samples
+
+some noise shader code (modified) by Dave_Hoskins and released under CC BY-SA 4.0
+https://www.shadertoy.com/view/4djSRW
+https://creativecommons.org/licenses/by-sa/4.0/
+
 
 multiple soundeffects from Sonnis GDC
 https://sonniss.com/gdc-bundle-license/

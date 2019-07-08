@@ -14,7 +14,6 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 # some dependencies want to build as shared libs
 set(BUILD_SHARED_LIBS ON CACHE BOOL " " FORCE)
 
-
 # ==============================================================================
 # Set bin dir
 if(CMAKE_BUILD_TYPE STREQUAL "")
@@ -142,6 +141,30 @@ file(GLOB_RECURSE SOURCES
 if(${CMAKE_VERSION} VERSION_GREATER "3.8.0")
     source_group(TREE ${CMAKE_CURRENT_SOURCE_DIR} FILES ${SOURCES})
 endif()
+
+#strip
+if ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "GNU")
+    set(CMAKE_C_FLAGS_RELEASE "${CMAKE_C_FLAGS_RELEASE} -s")
+    set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -s")
+endif()
+
+#IPO/LTO
+if(NOT "${CMAKE_VERSION}" VERSION_LESS 3.9)
+  cmake_policy(SET CMP0069 NEW)
+  include(CheckIPOSupported)
+      check_ipo_supported(RESULT HAVE_IPO OUTPUT IPO_OUTPUT LANGUAGES C CXX)
+      message(STATUS "IPO: ${IPO_OUTPUT}")
+      if(HAVE_IPO)
+          OPTION(FGE_USE_IPO "interprocedural optimization (IPO/LTO)" OFF)
+              IF(FGE_USE_IPO)
+                      SET(CMAKE_INTERPROCEDURAL_OPTIMIZATION TRUE)
+                      message(STATUS "IPO is used and has never been tested")
+              ELSE(FGE_USE_IPO)
+                      message(STATUS "IPO is not used")
+              ENDIF(FGE_USE_IPO)
+      endif()
+endif(NOT "${CMAKE_VERSION}" VERSION_LESS 3.9)
+
 add_executable(${PROJECT_NAME} ${SOURCES})
 
 # Add src/ inc dir

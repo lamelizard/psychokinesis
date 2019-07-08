@@ -22,8 +22,8 @@
 enum Mode {
   normal = 0,
   neon = 1,
-  disco = 2,
-  drawn = 3
+  drawn = 2,
+  disco = 3
 };
 
 struct ModeArea {
@@ -106,6 +106,10 @@ private:
   glm::vec3 debugAnimationTimes = {0,0,0};
   float debugAnimationAngle = 0;
   float drawTime = 0;
+  int mShadowFactor = 2;
+  int mCurrentShadowFactor = 2;
+  float mSSAAFactor = 1;
+  float mCurrentSSAAFactor = 1;
 
   // gfx objects
 private:
@@ -150,6 +154,7 @@ private:
   glow::SharedTexture2D mTexNoise1;
 
   // Shadow
+  int mMaxShadowSize = 0;
   glow::SharedTextureRectangle mBufferShadow;
   glow::SharedFramebuffer mFramebufferShadow;
 

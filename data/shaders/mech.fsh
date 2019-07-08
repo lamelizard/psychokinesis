@@ -2,6 +2,8 @@ uniform sampler2D uTexAlbedo;
 uniform sampler2D uTexNormal;
 uniform sampler2D uTexMaterial;
 
+uniform bool uBlink;
+
 in vec3 vWorldPos;
 in vec3 vNormal;
 in vec3 vTangent;
@@ -35,6 +37,10 @@ void main()
     fMaterial = vec2(material.x, 1 - material.y);
 
     // read color texture
-    vec3 albedo = texture(uTexAlbedo, vTexCoord).rgb;
-    fAlbedo = albedo;
+    if(!uBlink)
+        fAlbedo = texture(uTexAlbedo, vTexCoord).rgb;
+    else
+        fAlbedo = vec3(1.,1.,1.);
+
+
 }

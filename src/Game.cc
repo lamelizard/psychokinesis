@@ -125,14 +125,13 @@ void Game::init() {
   {
     mCamera = glow::camera::Camera::create();
     mCamera->setFarPlane(200);
-    mCamera->setLookAt({.5, 3, -15}, {.5, 7, -10});
+    mCamera->setLookAt({.5, 3, -13}, {.5, 1.5, -10});
 
     // shadow
     {
         // probably should resize as well but what size?
-        int maxSize = 0;
-        glGetIntegerv(GL_MAX_TEXTURE_SIZE, &maxSize);
-        mShadowMapSize = maxSize / 2; // heuristic
+        glGetIntegerv(GL_MAX_TEXTURE_SIZE, &mMaxShadowSize);
+        mShadowMapSize = mMaxShadowSize / mCurrentShadowFactor;
         mBufferShadow = glow::TextureRectangle::create(mShadowMapSize, mShadowMapSize, GL_DEPTH_COMPONENT32F);
         mBufferShadow->bind().setWrap(GL_CLAMP_TO_BORDER, GL_CLAMP_TO_BORDER);
         mBufferShadow->bind().setCompareMode(GL_COMPARE_REF_TO_TEXTURE);
@@ -443,6 +442,7 @@ void Game::initPhaseBoth()
     Mech &m = mechs[player];
     m.type = player;
     m.HP = MAX_HEALTH;
+    m.blink = 5;
     m.setAction(Mech::startPlayer);
     m.moveDir = glm::vec3(-.1, 0, 1.1);
     m.viewDir = glm::vec3(0, 0, 1.1);
@@ -466,6 +466,7 @@ void Game::initPhaseBoth()
     Mech &m = mechs[small];
     m.type = small;
     m.HP = 5;
+    m.blink = 5;
     m.setAction(Mech::startSmall);
     m.moveDir = glm::vec3(0, 0, -1);
     m.viewDir = glm::vec3(0, 0, -1);
@@ -494,6 +495,7 @@ void Game::initPhaseBoth()
     Mech &m = mechs[big];
     m.type = big;
     m.HP = 5;
+    m.blink = 5;
     m.setAction(Mech::emptyAction);
     m.moveDir = glm::vec3(0, 0, -1);
     m.viewDir = glm::vec3(0, 0, -1);
@@ -602,7 +604,11 @@ void Game::bulletCallback(btDynamicsWorld *, btScalar){
             if(a->getUserIndex() & BID_ROCKET)
                 std::swap(a,b);
             if(a->getUserIndex() & BID_PLAYER)
-                mechs[player].HP -= 2;        
+                if(mechs[player].blink > 1){
+                mechs[player].HP -= 2;
+                mechs[player].blink = 0;
+            }
+
             if(a->getUserIndex() & BID_SMALL){
                 if(((btRigidBody*) b)->getUserIndex() == BID_ROCKET_HOMING)
                      ((btRigidBody*) a)->setUserIndex2(SMALL_GOTHIT);
@@ -842,6 +848,18 @@ void Game::update(float) {
 void Game::render(float elapsedSeconds) {
   // render game variable timestep
     drawTime += elapsedSeconds;
+
+    // Change display settings
+    if(mCurrentSSAAFactor != mSSAAFactor){
+        onResize(getWindowWidth(), getWindowHeight());
+        glow::log(glow::LogLevel::Info) << "SSAA: " << to_string(mCurrentSSAAFactor);
+    }
+    if(mCurrentShadowFactor != mShadowFactor){
+        mShadowMapSize = mMaxShadowSize / mShadowFactor;
+        mCurrentShadowFactor = mShadowFactor;
+        mBufferShadow->bind().resize(mShadowMapSize, mShadowMapSize);
+        glow::log(glow::LogLevel::Info) << "Shadows: " << to_string(mShadowMapSize) << "^2";
+    }
 
     //dynamicsWorld->stepSimulation( elapsedSeconds); // I want
 
@@ -1085,16 +1103,14 @@ void Game::drawCubes(glow::UsedProgram shader, glm::mat4 proj, glm::mat4 view) {
       static_assert(sizeof(AttMat) == sizeof(glm::mat4x4), "bwah");
       trans.getOpenGLMatrix(glm::value_ptr(modelCube));
     }
-    modelCube *= glm::scale(glm::vec3(0.5)); // cube.obj has size 2, +0001 to close gaps -> they are no gaps but z fighting
-    //scale down in an mode
-    //TODO change mode
+    modelCube = glm::scale(modelCube, glm::vec3(0.5)); // cube.obj has size 2, +0001 to close gaps -> they are no gaps but z fighting
+    //scale down in a mode
     {
       auto trans = translation(modelCube);
       for (const auto &area : scaleAreas) {
         auto distanceFactor = (glm::distance(area.pos, trans) / area.radius);
         if (distanceFactor < 1)
-          //modelCube *= glm::scale(glm::vec3(distanceFactor * 0.02 + 0.95));
-            modelCube *= glm::scale(glm::vec3(0.95));
+             modelCube = glm::scale(modelCube, glm::vec3(0.95));
       }
     }
     models.push_back(modelCube);
@@ -1281,6 +1297,11 @@ void Game::onGui() {
 
 // Called when window is resized
 void Game::onResize(int w, int h) {
+  // SSAA
+  w *= mSSAAFactor;
+  h *= mSSAAFactor;
+  mCurrentSSAAFactor = mSSAAFactor;
+
   // camera viewport size is important for correct projection matrix
   mCamera->setViewportSize(w, h);
 
@@ -1294,11 +1315,29 @@ bool Game::onKey(int key, int scancode, int action, int mods) {
   // handle imgui and more
   glow::glfw::GlfwApp::onKey(key, scancode, action, mods);
 
-  // fullscreen = Alt + Enter
-  //TODO seems like vsync is of in fullscreen
-  if (action == GLFW_PRESS && key == GLFW_KEY_ENTER)
-    if (isKeyPressed(GLFW_KEY_LEFT_ALT) || isKeyPressed(GLFW_KEY_RIGHT_ALT))
-      toggleFullscreen();
+  // Alt +
+  if(action == GLFW_PRESS && (isKeyPressed(GLFW_KEY_LEFT_ALT) || isKeyPressed(GLFW_KEY_RIGHT_ALT)))
+      switch(key){
+      case GLFW_KEY_ENTER:
+          // TODO seems like vsync is of in fullscreen
+          toggleFullscreen();
+          break;
+      case GLFW_KEY_F:
+          mFreeCamera = !mFreeCamera;
+          break;
+      case GLFW_KEY_A:
+          mSSAAFactor += .5;
+          if(mSSAAFactor > 2)
+              mSSAAFactor = 1;
+          break;
+      case GLFW_KEY_S:
+          mShadowFactor *= 2;
+          if(mShadowFactor > 4)
+              mShadowFactor = 1;
+          break;
+      default:
+          ;
+     }
 
   return false;
 }
@@ -1355,6 +1394,12 @@ void Game::updateCamera(float elapsedSeconds) {
     mCamera->handle.move(rel_move);
       mCamera->update(elapsedSeconds);
   } else {
+      // 1 looks good for cinematic
+      //mCamera->handle.sensitivity.distance = 100;
+      //mCamera->handle.sensitivity.position = 100;
+      //mCamera->handle.sensitivity.rotation = 100;
+      //mCamera->handle.sensitivity.target = 100;
+
       GLFWgamepadstate gamepadState;
       bool hasController = glfwJoystickIsGamepad(GLFW_JOYSTICK_1) && glfwGetGamepadState(GLFW_JOYSTICK_1, &gamepadState);
 #ifdef NOGUI

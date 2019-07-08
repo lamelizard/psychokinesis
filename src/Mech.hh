@@ -62,6 +62,7 @@ struct Mech : SM {
 
   mechType type;
   int HP;
+  float blink = 5; // used to blink
   glm::vec3 drawPos;
   glm::vec3 moveDir;
   glm::vec3 viewDir;

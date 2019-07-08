@@ -79,6 +79,7 @@ void Mech::updateTime(double delta) {
   animationsTime[0] += delta * animationsFaktor[0];
   animationsTime[1] += delta * animationsFaktor[1];
   animationTimeTop += delta * 1; // lame
+  blink += delta;
 }
 
 void Mech::updateLook()
@@ -108,6 +109,7 @@ void Mech::draw(glow::UsedProgram &shader) {
   model = glm::scale(model, glm::vec3(scale));
   //model = glm::translate(model, meshOffset);
 
+  shader.setUniform("uBlink", (blink < 1 && fmod(blink, .2) > .1));
   shader.setUniform("uModel", model);
   shader.setTexture("uTexAlbedo", texAlbedo);
   shader.setTexture("uTexNormal", texNormal);
@@ -162,6 +164,7 @@ void Mech::controlPlayer(int) {
   if (playerPos.y < -.5) {
     //should change action here
     m.HP--;
+    m.blink = 0;
     m.setPosition(glm::vec3(0, 2, -10));    
   }
 
@@ -403,6 +406,7 @@ void Mech::runSmall(int t) {
   auto &p = g->mechs[player];
   if (m.rigid->getUserIndex2() == SMALL_GOTHIT) {
     m.HP--;
+    m.blink = 0;
     m.rigid->setUserIndex2(SMALL_NONE);
   }
 
