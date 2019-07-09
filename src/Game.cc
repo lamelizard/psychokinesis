@@ -147,7 +147,7 @@ void Game::init() {
     // fusion
     {
       //mTargets.push_back(mBufferFuse = glow::Texture2D::create(1, 1, GL_RGB16F)); // need sampler2D for fxaa
-      mBufferFuse = glow::Texture2D::create(1, 1, GL_RGB16F);
+      mBufferFuse = glow::Texture2D::create(1, 1, GL_RGBA16F);
       mBufferFuse->bind().setMinFilter(GL_LINEAR); // disable mipmaps
       mFramebufferFuse = glow::Framebuffer::create("fColor", mBufferFuse);
     }

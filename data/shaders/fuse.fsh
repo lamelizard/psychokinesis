@@ -27,7 +27,7 @@ uniform float uZFar;
 in vec2 vPosition;
 in vec3 vDiscoColor;
 
-out vec3 fColor;
+out vec4 fColor;
 
 // from glow samples (modified)
 float zOf(ivec2 uv)
@@ -245,6 +245,7 @@ void main()
         color = texture(uSkybox, dir).rgb * 0.1;
     }
 
-    fColor = color;
+    fColor.xyz = color;
+    fColor.w = sqrt(dot(color, vec3(0.299, 0.587, 0.114)));//luma for fxaa
 
 }

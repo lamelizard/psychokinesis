@@ -1,6 +1,7 @@
 #include "assimpModel.hh"
 
 #include <cmath>
+#include <cstring>
 #include <fstream>
 #include <functional>
 #include <exception>
@@ -212,8 +213,20 @@ std::vector<glm::mat4> AssimpModel::getMechBones(const std::string &abaS, const 
        aiVector3D position = positions[0] * (1 - ba) + positions[1] * ba;
        aiQuaternion::Interpolate(rotation, rotations[0], rotations[1], ba);
 
-       // TODO t
+       // Top
+       /*
+       if(anims[2] &&
+           strcmp(thisNode->mName.C_Str(), "BigCanon01_L") == 0 || //
+           strcmp(thisNode->mName.C_Str(), "BigCanon01_R") == 0 || //
+           strcmp(thisNode->mName.C_Str(), "BigCanon02_L") == 0 || //
+           strcmp(thisNode->mName.C_Str(), "BigCanon02_R") == 0){
+           aiQuaternion rot; // used?
+           aiVector3D pos;
+           transforms[2].DecomposeNoScaling(rotation, position);
+       }
+       */
 
+       //custom rotation
        if(thisNode->mName == aiString("Body"))
            rotation = rotation * aiQuaternion(aiVector3D(1,0,0), angle);
 

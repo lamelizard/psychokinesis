@@ -467,6 +467,8 @@ void Mech::runSmall(int t) {
     auto dir = glm::normalize(p.getPos() - cpos);
     g->createRocket(cpos, dir * 10, rtype::forward); // 4?
     g->soloud->play3d(g->sfxShot, cpos.x,cpos.y,cpos.z);
+    //m.animationTop = sbigA;
+    //m.animationTimeTop = 0;
   }
 
   //move somewhere else
@@ -535,7 +537,6 @@ void Mech::runSmall(int t) {
                 m.animationsFaktor[0] = -1.5;
             if(ticks == 50)
                 m.animationsFaktor[0] = 1.5;
-
 
             //rotate
             if(ticks >= 20 && ticks < 40)
