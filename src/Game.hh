@@ -190,12 +190,15 @@ private:
   std::unique_ptr<SoLoud::Soloud, void (*)(SoLoud::Soloud *)> soloud = //
       std::unique_ptr<SoLoud::Soloud, void (*)(SoLoud::Soloud *)>(nullptr, [](SoLoud::Soloud *) {});
   SoLoud::WavStream music;
+  SoLoud::WavStream music2;
   SoLoud::handle musicHandle;
-  SoLoud::Speech sfxBootUp;
+  SoLoud::Wav sfxBootUp;
   SoLoud::Wav sfxExpl1;
   SoLoud::Wav sfxExpl2;
   SoLoud::Wav sfxShot;
   SoLoud::Wav sfxStep;
+  SoLoud::Wav sfxLand;
+  SoLoud::Wav sfxFall;
   SoLoud::Speech intro;
   SoLoud::Speech introShort;
 

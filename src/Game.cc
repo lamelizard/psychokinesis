@@ -75,6 +75,7 @@ struct Rocket {
   bool real = true;
   bool explode = false;
   bool willSplit = false; // see banjo-tooie final boss
+  //SoLoud::handle = 0;
 };
 
 Game *Game::instance = nullptr;
@@ -387,8 +388,10 @@ void Game::init() {
     {
       const string snddir = "../data/sounds/";
       music.load((snddir + "heroic_demise_loop.ogg").c_str());
+      music2.load((snddir + "spaceBoss.ogg").c_str());
       //placeholder
-      sfxBootUp.setText("");
+      sfxBootUp.load((snddir + "bootup.wav").c_str());
+      sfxBootUp.mVolume = .8;
       sfxExpl1.load((snddir + "explosion2.wav").c_str());
       sfxExpl1.mVolume = .7;
       sfxExpl2.load((snddir + "explosion2.wav").c_str());
@@ -396,6 +399,9 @@ void Game::init() {
       sfxShot.load((snddir + "Shot.wav").c_str());
       sfxStep.load((snddir + "FootSteps.wav").c_str());
       sfxStep.mVolume = .3;
+      //sfxLand.load((snddir + "land.wav").c_str());
+      sfxLand.load((snddir + "FootSteps.wav").c_str());
+      sfxFall.load((snddir + "fall.wav").c_str());
 
       intro.setText("You put your mind into a machine? I will have you know your emotions are hackable now.");
       introShort.setText("Your emotions are hackable now.");

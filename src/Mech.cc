@@ -193,8 +193,22 @@ void Mech::controlPlayer(int) {
     auto maxSpeed = 5;
     m.rigid->setLinearFactor(btVector3(1, 1, 1));
     m.rigid->setGravity(btVector3(0, -9.81, 0));
-    // handle slowdown
+
     {
+        // music neon
+        {
+          static bool musicWobbly = false;
+          if (playerModes.count(neon)) {
+            if (!musicWobbly) {
+              musicWobbly = true;
+              g->soloud->oscillateRelativePlaySpeed(g->musicHandle, .98, 1.02, 1);
+            }
+          } else if (musicWobbly) {
+            musicWobbly = false;
+            g->soloud->fadeRelativePlaySpeed(g->musicHandle, 1, 2);
+          }
+        }
+      // handle slowdown
       static bool musicSlow = true;
       if (playerModes.count(drawn)) {
         //maxSpeed = 3;
@@ -207,6 +221,7 @@ void Mech::controlPlayer(int) {
         musicSlow = false;
         g->soloud->fadeRelativePlaySpeed(g->musicHandle, 1, 2);
       }
+
     }
 
 
@@ -346,11 +361,21 @@ void Mech::controlPlayer(int) {
           g->mJumps = true;
           m.rigid->setLinearFactor(btVector3(1, 1, 1));
           m.rigid->applyCentralForce(btVector3(0, 500, 0));
-          m.setAnimation(runjump, none, 0);
-          m.animationsFaktor[0] = .1;
+          m.setAnimation(getup, runjump, none, max(.5, min(1., (double)btSpeed.length() / maxSpeed)), 0, 0, 0);
+          m.animationsFaktor[0] = 0;
+          m.animationsFaktor[1] = 1.8;
         }
-      } else
-        m.rigid->setLinearFactor(btVector3(1, 1, 1));
+      } else { // !close to ground
+          m.rigid->setLinearFactor(btVector3(1, 1, 1));
+          if(m.animations[1] == runjump){
+              m.animationAlpha = max(.5, min(1., (double)btSpeed.length() / maxSpeed));
+              if(m.animationsTime[1] > 24./30.){
+                  m.animationsTime[1] = 24./30.;
+                  m.animationsFaktor[1] = 0;
+              }
+          }
+      }
+
       //gravity according to jump
       //https://www.youtube.com/watch?v=7KiK0Aqtmzc
       if (g->mJumps) {
@@ -395,7 +420,7 @@ void Mech::startPlayer(int t) {
   }
   if (t == 2 * 60) {
     m.animationsFaktor[0] = 1;
-    g->soloud->play3d(g->sfxBootUp, pos.x, pos.y, pos.z);
+    g->soloud->play3d(g->sfxBootUp, pos.x, pos.y, pos.z, 0,0,0,.15);
   }
 
   if (t > 2 * 60 + 68) { //getup finished
@@ -542,8 +567,11 @@ void Mech::runSmall(int t) {
                 m.animationsFaktor[0] = 0;
 
             //landing
-            if(ticks == 45)
+            if(ticks == 45){
+                auto pos = m.rigid->getWorldTransform().getOrigin();
                 m.animationsFaktor[0] = -1.5;
+                g->soloud->play3d(g->sfxLand, pos.x(), pos.y(), pos.z());
+            }
             if(ticks == 50)
                 m.animationsFaktor[0] = 1.5;
 
@@ -575,6 +603,8 @@ void Mech::runSmall(int t) {
   auto nextStepPos = lastPosition + (futurePos - lastPosition) * smooth;
   auto speed = glm::length(pos - nextStepPos) * 5 - .1; // factor to make it look right
   m.walkAnimation(speed);
+  if(m.didStep)
+      g->soloud->play3d(g->sfxStep, pos.x, pos.y, pos.z, 0,0,0, .3);
   //auto nextStepPos = glm::smoothstep(lastPosition, futurePos, glm::vec3((timeNeeded - reachGoalInTicks) / timeNeeded));
   m.moveDir = glm::normalize(futurePos - pos);
   m.viewDir = glm::normalize(p.getPos() - pos);
