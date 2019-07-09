@@ -107,6 +107,9 @@ struct Mech : SM {
   void draw(glow::UsedProgram &shader);
   glm::vec3 getPos();
   void setPosition(glm::vec3);
+  float getAngleMove();
+  float getAngleView();
+  glm::mat4 getModelMatrix();
 
   //actions
   static void emptyAction(int);

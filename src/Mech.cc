@@ -82,35 +82,42 @@ void Mech::updateTime(double delta) {
   blink += delta;
 }
 
-void Mech::updateLook()
-{
+void Mech::updateLook(){
     drawPos = getPos(); // fix position
 }
 
-void Mech::draw(glow::UsedProgram &shader) {
-  glm::mat4 model;
-  model = glm::translate(model, drawPos);
-  //rotate
-  float angleView = 0;
-  {
-    //auto angle = glm::angle(moveDir, glm::vec3(0, 0, 1));
+float Mech::getAngleMove(){
     moveDir = normalize(moveDir); // ?
     auto angleMove = acos(dot(moveDir, glm::vec3(0,0,1)));
     if(moveDir.x < 0)
         angleMove = -angleMove;
+    return angleMove;
+}
+
+float Mech::getAngleView(){
+    //auto angle = glm::angle(moveDir, glm::vec3(0, 0, 1));
     viewDir = normalize(viewDir);
-    angleView = acos(dot(viewDir, glm::vec3(0,0,1)));
+    auto angleView = acos(dot(viewDir, glm::vec3(0,0,1)));
     if(viewDir.x < 0)
         angleView = -angleView;
-    angleView -= angleMove;//relative
-    model = glm::rotate(model, angleMove, glm::vec3(0, 1, 0));
-  }
-  model = glm::translate(model, meshOffset);
-  model = glm::scale(model, glm::vec3(scale));
-  //model = glm::translate(model, meshOffset);
+    angleView -= getAngleMove();//relative
+    return angleView;
+}
 
+glm::mat4 Mech::getModelMatrix(){
+    glm::mat4 model;
+    model = glm::translate(model, drawPos);
+    //rotate
+      model = glm::rotate(model, getAngleMove(), glm::vec3(0, 1, 0));
+    model = glm::translate(model, meshOffset);
+    model = glm::scale(model, glm::vec3(scale));
+    //model = glm::translate(model, meshOffset);
+    return model;
+}
+
+void Mech::draw(glow::UsedProgram &shader) {
   shader.setUniform("uBlink", (blink < 1 && fmod(blink, .2) > .1));
-  shader.setUniform("uModel", model);
+  shader.setUniform("uModel", getModelMatrix());
   shader.setTexture("uTexAlbedo", texAlbedo);
   shader.setTexture("uTexNormal", texNormal);
   shader.setTexture("uTexMaterial", texMaterial);
@@ -119,7 +126,7 @@ void Mech::draw(glow::UsedProgram &shader) {
   //mesh->draw(shader, animationsTime[0], loops[animations[0]], names[animations[0]]);
   auto g = Game::instance;
   if(!g->DebugingAnimations)
-        bones = mesh->getMechBones(names[animations[0]], names[animations[1]], names[animationTop], animationAlpha, animationsTime[0], animationsTime[1], animationTimeTop, angleView);
+        bones = mesh->getMechBones(names[animations[0]], names[animations[1]], names[animationTop], animationAlpha, animationsTime[0], animationsTime[1], animationTimeTop, getAngleView());
   else
         bones = mesh->getMechBones(names[(animation)g->debugAnimations[0]], names[(animation)g->debugAnimations[1]], names[(animation)g->debugAnimations[2]], //
                 g->debugAnimationAlpha, g->debugAnimationTimes[0], g->debugAnimationTimes[1], g->debugAnimationTimes[2], g->debugAnimationAngle);
@@ -259,12 +266,12 @@ void Mech::controlPlayer(int) {
       // disco:
       {
           static float discoAlpha = 0;
-          static float discoRot = 0;
+          static float discoRot = M_PI / 2;
           if(playerModes.count(disco))
-              discoAlpha = min(discoAlpha + .005f, 1.f);
+              discoAlpha = min(discoAlpha + .02f, 1.f);
           else
-              discoAlpha = max(discoAlpha - .01f, 0.f);
-          discoRot = fmod(discoRot + .001, M_PI * 2);
+              discoAlpha = max(discoAlpha - .02f, 0.f);
+          //discoRot = fmod(discoRot + .001, M_PI * 2);
           m.viewDir = glm::rotateY(m.viewDir, discoRot * discoAlpha);
           force = glm::rotateY(force, discoRot * discoAlpha);
       }
@@ -450,10 +457,16 @@ void Mech::runSmall(int t) {
                                              {0.5, 0, 0.5}}};
 
   //rocket
-  if (t % (60 + ((m.HP) * 15)) == 0) {
-    auto dir = glm::normalize(p.getPos() - pos);
-    g->createRocket(pos + (dir * 3), dir * 4, rtype::forward); // 4?
-    g->soloud->play3d(g->sfxShot, pos.x,pos.y,pos.z);
+  if (t % (60 + ((m.HP) * 15)) == 0 && m.bones.size()) {
+      glm::vec3 cpos;
+      if(rand() % 2 == 0)
+          //ARG UNITY: z = -y, y = z, +.2 offset?
+          cpos = glm::vec3(m.getModelMatrix() * (m.bones[mesh->getMechBoneID("BigCanon01_L")] * glm::vec4(-0.97,4.1 + .2,-4.8,1.)));
+      else
+          cpos = glm::vec3(m.getModelMatrix() * (m.bones[mesh->getMechBoneID("BigCanon01_R")] * glm::vec4(0.97,4.1 + .2,-4.8,1.)));
+    auto dir = glm::normalize(p.getPos() - cpos);
+    g->createRocket(cpos, dir * 10, rtype::forward); // 4?
+    g->soloud->play3d(g->sfxShot, cpos.x,cpos.y,cpos.z);
   }
 
   //move somewhere else
