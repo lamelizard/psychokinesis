@@ -118,6 +118,7 @@ struct Mech : SM {
   static void startSmall(int);
   static void startBig(int);
   static void runSmall(int);
+  static void dieSmall(int);
 };
 
 

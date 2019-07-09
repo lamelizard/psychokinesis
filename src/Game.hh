@@ -237,6 +237,7 @@ private:
   // ctor
 public:
   Game();
+  void resetPhase();
   void initPhaseBoth();
   void initPhase1();
   void initPhase2();

@@ -32,7 +32,7 @@ int Mech::nextGoal = 1;
 int Mech::currentWay = 0;
 const int Mech::timeNeeded = 3 * 60;
 int Mech::reachGoalInTicks = timeNeeded;
-glm::vec3 Mech::lastPosition = glm::vec3(0.5, 0, 18.5);
+glm::vec3 Mech::lastPosition = glm::vec3(0.5, 4.51, 18.5);
 
 void Mech::setAnimation(Mech::animation ab, Mech::animation at, double bt, double tt) {
   animations[0] = ab;
@@ -289,7 +289,6 @@ void Mech::controlPlayer(int) {
         btSpeed = btSpeed.normalize() * maxSpeed;
       btSpeed.setY(ySpeed);
       m.rigid->setLinearVelocity(btSpeed);
-      m.walkAnimation(btSpeed.length() / maxSpeed);
 
       // pushed away by small
       auto spos = g->mechs[small].getPos();
@@ -340,12 +339,15 @@ void Mech::controlPlayer(int) {
           //sound
           if(m.didStep)
               g->soloud->play3d(g->sfxStep, o.x(), o.y(), o.z(), 0,0,0, .07);
+          m.walkAnimation(btSpeed.length() / maxSpeed); // walk
         }
         // jump
         if (!g->mJumps && jumpPressed) {
           g->mJumps = true;
           m.rigid->setLinearFactor(btVector3(1, 1, 1));
           m.rigid->applyCentralForce(btVector3(0, 500, 0));
+          m.setAnimation(runjump, none, 0);
+          m.animationsFaktor[0] = .1;
         }
       } else
         m.rigid->setLinearFactor(btVector3(1, 1, 1));
@@ -376,7 +378,7 @@ void Mech::startSmall(int t) {
   }
 
   if (t > 6 * 60 + 68 + 60) { //getup finished + 1s
-    m.setAnimation(run, none);
+    //m.setAnimation(run, none);
     m.setAction(runSmall);
   }
 }
@@ -397,7 +399,7 @@ void Mech::startPlayer(int t) {
   }
 
   if (t > 2 * 60 + 68) { //getup finished
-    m.setAnimation(startWalk, none);
+    //m.setAnimation(startWalk, none);
     m.animationsFaktor[0] = 0;
     m.setAction(controlPlayer);
   }
@@ -417,8 +419,23 @@ void Mech::runSmall(int t) {
     m.rigid->setUserIndex2(SMALL_NONE);
   }
 
+  if(m.HP <= 1){
+      m.setAction(dieSmall);
+      return;
+  }
+
   auto groundOffset = glm::vec3(0, m.collision->getHalfHeight() + m.collision->getRadius() + m.floatOffset, 0);
   auto pos = m.getPos();
+
+  // if we want to shot:
+  glm::vec3 cpos;
+  if(rand() % 2 == 0)
+      //ARG UNITY: z = -y, y = z, +.2 offset?
+      cpos = glm::vec3(m.getModelMatrix() * (m.bones[mesh->getMechBoneID("BigCanon01_L")] * glm::vec4(-0.97,4.1 + .2,-4.8,1.)));
+  else
+      cpos = glm::vec3(m.getModelMatrix() * (m.bones[mesh->getMechBoneID("BigCanon01_R")] * glm::vec4(0.97,4.1 + .2,-4.8,1.)));
+  auto shotDir = glm::normalize(p.getPos() - cpos);
+
 
   // one waypoint to another are 18 steps
   static const vector<glm::vec3> ways[4] = {{{0.5, 0, 18.5},
@@ -457,15 +474,8 @@ void Mech::runSmall(int t) {
                                              {0.5, 0, 0.5}}};
 
   //rocket
-  if (t % (60 + ((m.HP) * 15)) == 0 && m.bones.size()) {
-      glm::vec3 cpos;
-      if(rand() % 2 == 0)
-          //ARG UNITY: z = -y, y = z, +.2 offset?
-          cpos = glm::vec3(m.getModelMatrix() * (m.bones[mesh->getMechBoneID("BigCanon01_L")] * glm::vec4(-0.97,4.1 + .2,-4.8,1.)));
-      else
-          cpos = glm::vec3(m.getModelMatrix() * (m.bones[mesh->getMechBoneID("BigCanon01_R")] * glm::vec4(0.97,4.1 + .2,-4.8,1.)));
-    auto dir = glm::normalize(p.getPos() - cpos);
-    g->createRocket(cpos, dir * 10, rtype::forward); // 4?
+  if (t % (60 + ((m.HP) * 15)) == 0 && m.bones.size()) { 
+    g->createRocket(cpos, shotDir * 10, rtype::forward); // 4?
     g->soloud->play3d(g->sfxShot, cpos.x,cpos.y,cpos.z);
     //m.animationTop = sbigA;
     //m.animationTimeTop = 0;
@@ -486,15 +496,14 @@ void Mech::runSmall(int t) {
     nextGoal++;
     if (nextGoal == way.size())
       nextGoal = 0;
+    lastPosition = futurePos;
     if (futurePos == glm::vec3{0.5, 0, 0.5} + groundOffset) {
       if (currentWay < 5 - m.HP)
         currentWay++;
       else {
         //homing rocket
-        auto &p = g->mechs[player];
-        auto dir = glm::normalize(p.getPos() - pos);
-        auto entity = g->createRocket(pos - glm::vec3(0, 1, 0) + (dir * 3), dir * 4, rtype::homing); // y-1 since else likely to hit ground  //TODO higher acc? and constraints to limeit velocity -> better homing
-        if (m.HP > 3) {                                                                                // wait to be easier
+        auto entity = g->createRocket(cpos, shotDir * 4, rtype::homing);
+        if (m.HP > 3) { // wait to be easier
           //TODO need default animation...
           m.setAction([entity](int t) {
             if (!entity.valid())
@@ -553,8 +562,8 @@ void Mech::runSmall(int t) {
 
             //stop
             if(ticks >= ticksNeeded){
-                m.setAnimation(run, none);
-                m.animationsFaktor[0] = 1;
+                //m.setAnimation(run, none);
+                //m.animationsFaktor[0] = 1;
                 m.setAction(runSmall);
             }
         });
@@ -562,7 +571,11 @@ void Mech::runSmall(int t) {
     }
   }
 
-  auto nextStepPos = pos + ((futurePos - pos) * (1. / reachGoalInTicks));
+  auto smooth = glm::smoothstep(0.,1. , (double)(timeNeeded - reachGoalInTicks) / timeNeeded);
+  auto nextStepPos = lastPosition + (futurePos - lastPosition) * smooth;
+  auto speed = glm::length(pos - nextStepPos) * 5 - .1; // factor to make it look right
+  m.walkAnimation(speed);
+  //auto nextStepPos = glm::smoothstep(lastPosition, futurePos, glm::vec3((timeNeeded - reachGoalInTicks) / timeNeeded));
   m.moveDir = glm::normalize(futurePos - pos);
   m.viewDir = glm::normalize(p.getPos() - pos);
   assert(m.rigid->isKinematicObject());
@@ -575,4 +588,11 @@ void Mech::runSmall(int t) {
   m.motionState->setWorldTransform(trans);
   m.rigid->setActivationState(DISABLE_DEACTIVATION);
   reachGoalInTicks--;
+}
+
+void Mech::dieSmall(int){
+    auto g = Game::instance;
+    auto &m = g->mechs[small];
+
+    g->initPhase2();
 }

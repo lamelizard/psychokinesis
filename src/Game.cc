@@ -42,7 +42,7 @@
 #include "conversion.hh"
 
 
-#define NOGUI
+//#define NOGUI
 
 GLOW_SHARED(class, btRigidBody);
 GLOW_SHARED(class, btMotionState);
@@ -81,8 +81,6 @@ Game *Game::instance = nullptr;
 
 #ifndef NOGUI
 Game::Game() : GlfwApp(Gui::ImGui) {}
-
-
 #else
 Game::Game() : GlfwApp(Gui::None) {}
 #endif
@@ -416,8 +414,15 @@ void Game::init() {
 
    }
 
-  initPhase1();
+  resetPhase();
 
+}
+
+void Game::resetPhase(){
+    if(secondPhase)
+        initPhase2();
+    else
+        initPhase1();
 }
 
 void Game::initPhaseBoth()
@@ -475,7 +480,7 @@ void Game::initPhaseBoth()
     m.collision = make_shared<btCapsuleShape>(2, 2.5);
     auto groundOffset = m.collision->getHalfHeight() + m.collision->getRadius() + m.floatOffset;
     m.meshOffset = glm::vec3(0, -groundOffset, 0); // -1.5
-    m.motionState = make_shared<btDefaultMotionState>(bttransform(glm::vec3(0, groundOffset, 18.5)));
+    m.motionState = make_shared<btDefaultMotionState>(bttransform(glm::vec3(0.5, groundOffset, 18.5)));
     m.rigid = make_shared<btRigidBody>(btRigidBody::btRigidBodyConstructionInfo(0, m.motionState.get(), m.collision.get()));
     m.rigid->setAngularFactor(0);
     m.rigid->setCustomDebugColor(btVector3(255, 1, 1));
@@ -488,7 +493,7 @@ void Game::initPhaseBoth()
     Mech::nextGoal = 1;
     Mech::currentWay = 0;
     Mech::reachGoalInTicks = Mech::timeNeeded;
-    Mech::lastPosition = glm::vec3(0.5, 0, 18.5);
+    Mech::lastPosition = glm::vec3(0.5, groundOffset, 18.5);
   }
   //big
   {
@@ -579,12 +584,27 @@ void Game::initPhase1()
     else
         soloud->playBackground(introShort, 1);
     firstRun = false;
-
 }
 
 void Game::initPhase2()
 {
     initPhaseBoth();
+    secondPhase = true;
+    mechs[small].setAction(Mech::emptyAction);
+    mechs[big].setAction(Mech::startBig);
+    {
+        btTransform trans;
+        trans.setIdentity();
+        trans.setOrigin(btVector3(0,-500,0));
+        //m.rigid->setWorldTransform(trans);
+        mechs[small].motionState->setWorldTransform(trans);
+        mechs[small].rigid->setActivationState(DISABLE_DEACTIVATION);
+        trans.setOrigin(btVector3(0.5,-50,30));
+        mechs[big].motionState->setWorldTransform(trans);
+        mechs[big].rigid->setActivationState(DISABLE_DEACTIVATION);
+    }
+
+
 }
 
 
@@ -688,23 +708,40 @@ void Game::update(float) {
   // update game in 60 Hz fixed timestep, most of the time
   setUpdateRate(updateRate);
 
+
+  //cheat into the second quest
+  static bool cheatWasPressed = false;
+  if((isKeyPressed(GLFW_KEY_Z) ||
+      isKeyPressed(GLFW_KEY_Y)) &&
+     isKeyPressed(GLFW_KEY_E) &&
+     isKeyPressed(GLFW_KEY_L) &&
+     isKeyPressed(GLFW_KEY_D) &&
+     isKeyPressed(GLFW_KEY_A)){
+      if(!cheatWasPressed)
+          initPhase2();
+      cheatWasPressed = true;
+  } else
+    cheatWasPressed = false;
+
+  //cheat hit
+  static bool cheat2WasPressed = false;
+  if(isKeyPressed(GLFW_KEY_1) &&
+     isKeyPressed(GLFW_KEY_2)){
+      if(!cheat2WasPressed){
+           mechs[small].HP--;
+           mechs[small].blink = 0;
+     }
+      cheat2WasPressed = true;
+  } else
+    cheat2WasPressed = false;
+
+
   //update mechs
   for (auto &m : mechs){
     //activate to be sure
        m.rigid->activate();
        m.tick();
        m.updateLook();
-  }
-
-  //cheat into the second quest
-  //why doesn't it work?
-  if((isKeyPressed(GLFW_KEY_Z) ||
-      isKeyPressed(GLFW_KEY_Y)) &&
-     //isKeyPressed(GLFW_KEY_E) &&
-     //isKeyPressed(GLFW_KEY_L) &&
-     //isKeyPressed(GLFW_KEY_D) &&
-     isKeyPressed(GLFW_KEY_A)){
-     mechs[small].HP = 3;
   }
 
   //update physics
