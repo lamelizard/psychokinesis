@@ -159,7 +159,11 @@ std::vector<glm::mat4> AssimpModel::getMechBones(const std::string &abaS, const 
          at = animations[atS];
 
      bool lba = true;
-     if(abaS ==  "DefaultToWalk" || abaS == "Hit" || abaS ==  "SleepToDefault"){
+     if(abaS ==  "DefaultToWalk" || //
+             abaS == "Hit" || //
+             abaS ==  "SleepToDefault" || //
+             abaS == "ShootBigCanon_A" || //
+             abaS == "ShootBigCanon_B"){
      //    ba = 0; //TODO add back later maybe?
          lba = false;
      }

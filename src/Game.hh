@@ -84,6 +84,7 @@ private:
   float moveForce = 15;
   float homingSpeed = 4;
   bool secondPhase = false;
+  bool fin = false;
   glm::vec4 vec4out = {};
 
   std::vector<glm::vec3> spherePoints;
@@ -204,6 +205,7 @@ private:
   SoLoud::Speech introShort;
   SoLoud::Speech intro2;
   SoLoud::Speech introShort2;
+  SoLoud::Speech speechHeat;
   SoLoud::Speech outro;
 
   // EntityX

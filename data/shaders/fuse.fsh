@@ -13,6 +13,7 @@ uniform mat4 uView;
 uniform vec3 uLightPos;
 uniform vec3 uCamPos;
 uniform float uTime;
+uniform float uSkyFactor;
 
 //shadow
 uniform sampler2DRectShadow uTexShadow;
@@ -111,6 +112,7 @@ void main()
     
     vec3 color = vec3(0,0,0);
     float depth = texture(uTexDepth, gl_FragCoord.xy).x;
+    vec3 worldPos = vec3(0,0,0); // valid if depth < 1
 
     if (depth < 1) // opaque
     {
@@ -136,7 +138,7 @@ void main()
         vec4 clipSpacePosition = vec4(vPosition * 2.0 - 1.0, depth * 2. - 1., 1.0);
         vec4 viewSpacePosition = uInvProj * clipSpacePosition;
         viewSpacePosition /= viewSpacePosition.w;
-        vec3 worldPos = (uInvView * viewSpacePosition).xyz;
+        worldPos = (uInvView * viewSpacePosition).xyz;
 
         //shadow, glow samples
         vec4 shadowPos = uShadowViewProjMatrix * vec4(worldPos, 1.0);
@@ -232,7 +234,8 @@ void main()
         }
 
     }
-    else // sky, from rtglive
+    //else // sky, from rtglive
+    if(depth == 1 || worldPos.y < - .5)
     {
         vec4 viewNear = uInvProj * vec4(vPosition * 2 - 1, 0, 1);
         vec4 viewFar = uInvProj * vec4(vPosition * 2 - 1, 1, 1);
@@ -241,8 +244,14 @@ void main()
         vec4 worldNear = uInvView * viewNear;
         vec4 worldFar = uInvView * viewFar;
         vec3 dir = worldFar.xyz - worldNear.xyz;
+        vec3 skycolor = texture(uSkybox, dir).rgb * uSkyFactor;
+        if(depth == 1)
+            color = skycolor;
+        else{
+            float alpha = clamp((worldPos.y+.5)/-9.5,0.,1.); // linear  // smoothstep(-.5, -15., worldPos.y);
+            color = alpha * skycolor + (1 - alpha) * color;
+        }
 
-        color = texture(uSkybox, dir).rgb * 0.1;
     }
 
     fColor.xyz = color;

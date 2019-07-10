@@ -4,6 +4,7 @@
 #include <cassert>
 #include <set>
 #include <algorithm>
+#include <utility>
 
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
@@ -148,7 +149,7 @@ glm::vec3 Mech::getPos() {
 
 void Mech::setPosition(glm::vec3 pos) {
   
-  assert(!rigid->isKinematicObject());
+  //assert(!rigid->isKinematicObject());//works???
   rigid->setLinearVelocity(btVector3(0, 0, 0));
   rigid->clearForces();
   btTransform transform;
@@ -434,17 +435,178 @@ void Mech::startPlayer(int t) {
 }
 
 void Mech::startBig(int t) {
-  assert(0);
   auto g = Game::instance;
   auto &m = g->mechs[big];
-  m.scale = 8.5;
-  m.setPosition(glm::vec3(.5, -36 - (1./3. * (300-t)), 60));
-  if(t == 0)
-    m.setAnimation(sbigA, none);
-
-  if(t == 300){
-      m.setAction(emptyAction);
+  auto &p = g->mechs[player];
+  if(t == 0){
+      m.scale = 8.5;
+      m.setAnimation(sbigA, none);
   }
+  m.viewDir = glm::vec3(0,0,-1);//normalize((p.getPos() - m.getPos()) * glm::vec3(1,0,1));
+  m.moveDir = glm::vec3(0,0,-1);
+  m.setPosition(glm::vec3(.5, -40 - (1./3. * (300-t)), 60));
+  if(t == 300){
+      m.HP = -1;
+      m.setAction(runBig);
+  }
+}
+
+enum bigAct{
+    shootArc,
+    shootHoming,
+    noneAct
+};
+
+void Mech::runBig(int t) {
+    auto g = Game::instance;
+    auto &m = g->mechs[big];
+    auto &p = g->mechs[player];
+
+    static const int acttime = 360;
+    static const auto dl = normalize(glm::vec3(1,0,-1));
+    static const auto dr = normalize(glm::vec3(-1,0,-1));
+    static const auto df = glm::vec3(0,0,-1);
+
+    // if we want to shoot:
+    auto cpos1 = glm::vec3(m.getModelMatrix() * (m.bones[mesh->getMechBoneID("BigCanon01_L")] * glm::vec4(-0.97,4.1 + .2,-4.8,1.)));
+    auto cpos2 = glm::vec3(m.getModelMatrix() * (m.bones[mesh->getMechBoneID("BigCanon01_R")] * glm::vec4(0.97,4.1 + .2,-4.8,1.)));
+
+
+    if(m.HP > 3)
+        if (t % (60 + ((m.HP) * 30)) == 0)
+          g->createRocket(p.getPos() + glm::vec3(0,10,0), glm::vec3(0,-1,0), rtype::falling);
+
+    static int tnow = 0;
+    tnow++;
+    static const vector<pair<bigAct, int>> actionList = {
+      {noneAct, 1},
+      {shootArc, 1},
+      {shootArc, 2},
+      {shootHoming, 1},
+      {shootArc, 1},
+      {shootArc, 2},
+      {shootHoming, 2},
+      {noneAct, 1},
+      {shootHoming, 1},
+      {noneAct, 1},
+      {shootArc, 3},
+      {shootArc, 1},
+      {shootArc, 2},
+      {noneAct, 1},
+      {shootHoming, 3},
+      {shootHoming, 3},
+      {noneAct, 1},
+      {noneAct, 1},
+      {shootHoming, 3},
+      {shootArc, 3},
+      {shootArc, 3},
+      {shootArc, 3},
+    };
+    static bigAct thisAct = noneAct;
+    static int attr = 1;
+
+    if(t == 0)
+      m.HP = -1;
+    if(t % acttime == 0){
+        m.viewDir = df;
+        m.HP++;
+        tnow = 0;
+        if(m.HP >= actionList.size()){
+            m.setAction(dieBig);
+            return;
+        }else{
+            thisAct = actionList[m.HP].first;
+            attr = actionList[m.HP].second;
+                g->createRocket(cpos1, m.viewDir * 12, rtype::forward);
+                g->soloud->play3d(g->sfxShot, cpos1.x, cpos1.y, cpos1.z);
+                g->createRocket(cpos2, m.viewDir * 12, rtype::forward);
+                g->soloud->play3d(g->sfxShot, cpos2.x, cpos2.y, cpos2.z);
+                m.setAnimation(sbigA, none);
+                m.animationsFaktor[0] = 1;
+                if(m.HP == actionList.size() - 5)
+                    g->soloud->play(g->speechHeat);
+                if(m.HP > actionList.size() - 6)
+                    m.blink = 0;
+        }
+    }
+
+    switch(thisAct) {
+     case shootArc:
+        static auto startDir = glm::vec3();
+        if(tnow < 60){
+            float a = 1 - (float)(59 - tnow) / 59.;
+            m.viewDir = rotateY(df, angle(df, dl) * (-a));
+        }else if (tnow < 180) {
+            float a = 1 - (float)(120 - (tnow - 60)) / 120.;
+            m.viewDir = rotateY(dl, angle(dl, dr) * a);
+            if(tnow % 5 == 0){
+                g->createRocket(cpos1, m.viewDir * 12, rtype::forward);
+                g->soloud->play3d(g->sfxShot, cpos1.x, cpos1.y, cpos1.z);
+                m.setAnimation(sbigA, none);
+                m.animationsFaktor[0] = 2;
+            }
+            }else if (tnow < 300) {
+                float a = 1 - (float)(120 - (tnow - 180)) / 120.;
+                m.viewDir = rotateY(dr, angle(dr, dl) * (-a));
+                if(tnow % 5 == 0){
+                    if(attr & 1){
+                        g->createRocket(cpos1, m.viewDir * 12, rtype::forward);
+                        g->soloud->play3d(g->sfxShot, cpos1.x, cpos1.y, cpos1.z, 0, 0, 0, .5);
+                    }
+                    if(attr & 2){
+                        g->createRocket(cpos2, m.viewDir * 12, rtype::forward);
+                        g->soloud->play3d(g->sfxShot, cpos2.x, cpos2.y, cpos2.z, 0, 0, 0, .5);
+                    }
+                   //m.setAnimation(sbigA, none);
+                   //m.animationsFaktor[0] = 2;
+                }
+        }else if(tnow < 360){
+            float a = 1 - (float)(60 - (tnow - 300)) / 59.;
+            m.viewDir = rotateY(dl, angle(dl, df) * a);
+        }
+
+        break;
+      case shootHoming:
+        if(tnow == 60){
+            if(attr & 1){
+                g->createRocket(cpos1, m.viewDir * 4, rtype::homing);
+                g->soloud->play3d(g->sfxShot, cpos1.x, cpos1.y, cpos1.z);
+            }
+            if(attr & 2){
+                g->createRocket(cpos2, m.viewDir * 4, rtype::homing);
+                g->soloud->play3d(g->sfxShot, cpos2.x, cpos2.y, cpos2.z);
+            }
+           m.setAnimation(sbigA, none);
+           m.animationsFaktor[0] = 1;
+        }
+        break;
+    default:
+        ;
+    }
+
+
+}
+
+void Mech::dieBig(int t){
+    auto g = Game::instance;
+    auto &m = g->mechs[big];
+    // stop music
+    if(t == 0){
+        g->soloud->fadeVolume(g->musicHandle, 0, 5);
+        m.setAnimation(hit, none);
+        m.animationsFaktor[0] = .3;
+    }
+    if(m.blink > 1)
+        m.blink = 0;
+    if(t > 240)
+       m.setPosition(glm::vec3(.5, -40 - (1./3. * (60-(t-240))), 60));
+
+    if(t > 300){
+        // fin
+        g->fin = true;
+        m.setAction(emptyAction);
+        g->soloud->play(g->outro);
+    }
 }
 
 void Mech::runSmall(int t) {
@@ -465,7 +627,7 @@ void Mech::runSmall(int t) {
   auto groundOffset = glm::vec3(0, m.collision->getHalfHeight() + m.collision->getRadius() + m.floatOffset, 0);
   auto pos = m.getPos();
 
-  // if we want to shot:
+  // if we want to shoot:
   glm::vec3 cpos;
   if(rand() % 2 == 0)
       //ARG UNITY: z = -y, y = z, +.2 offset?
@@ -522,7 +684,7 @@ void Mech::runSmall(int t) {
   //move somewhere else
   //falling
   if(m.HP < 4) // start at 5
-      if (t % (60 + ((m.HP) * 30)) == 0)
+      if (t % (180 + ((m.HP) * 30)) == 0)
         g->createRocket(p.getPos() + glm::vec3(0,10,0), glm::vec3(0,-1,0), rtype::falling);
 
   //walk
@@ -642,7 +804,8 @@ void Mech::dieSmall(int t){
     if(m.blink > 1)
         m.blink = 0;
     //explode
-    auto p = m.getPos() + g->spherePoints[rand() % 400] * 2;
+    auto pos = glm::vec3(m.getModelMatrix() * (m.bones[mesh->getMechBoneID("Body")] * glm::vec4(0,0,0,1.))) - m.meshOffset;
+    auto p = pos + (glm::vec3(2,4,2) * g->spherePoints[rand() % 400]);
     g->explosions.push_back({p, 0});
     if(t % 10 == 0)
       g->soloud->play3d(g->sfxExpl1, p.x,p.y,p.z, 0,0,0,.5);

@@ -42,7 +42,7 @@
 #include "conversion.hh"
 
 
-//#define NOGUI
+#define NOGUI
 
 GLOW_SHARED(class, btRigidBody);
 GLOW_SHARED(class, btMotionState);
@@ -407,6 +407,7 @@ void Game::init() {
       introShort.setText("Your emotions are hackable now.");
       intro2.setText("This was not even my final robot! Meet your destruction.");
       introShort2.setText("Meet your destruction.");
+      speechHeat.setText("Stop this. My robot overheats.");
       outro.setText("This was a lame lizard project. Thank you for playing.");
     }
   }
@@ -728,7 +729,7 @@ void Game::update(float) {
   setUpdateRate(updateRate);
 
 
-  //cheat into the second quest
+  //cheat into the second quest // nearly never works???
   static bool cheatWasPressed = false;
   if((isKeyPressed(GLFW_KEY_Z) ||
       isKeyPressed(GLFW_KEY_Y)) &&
@@ -747,8 +748,14 @@ void Game::update(float) {
   if(isKeyPressed(GLFW_KEY_1) &&
      isKeyPressed(GLFW_KEY_2)){
       if(!cheat2WasPressed){
-           mechs[small].HP--;
-           mechs[small].blink = 0;
+          if(!secondPhase){
+              mechs[small].HP--;
+              mechs[small].blink = 0;
+          } else {
+              mechs[big].HP++;
+              mechs[big].blink = 0;
+          }
+
      }
       cheat2WasPressed = true;
   } else
@@ -1073,6 +1080,7 @@ void Game::render(float elapsedSeconds) {
           shader.setUniform("uZFar", mCamera->getFarClippingPlane());
           shader.setUniform("uCamPos", mCamera->getPosition());
           shader.setUniform("uTime", drawTime);
+          shader.setUniform("uSkyFactor", (secondPhase?1.f:.1f));
           //from glow samples
           shader.setUniform("uLightPos", mLightPos);
           shader.setUniform("uTexShadowSize", (float)mShadowMapSize);
@@ -1115,10 +1123,12 @@ void Game::drawMech(glow::UsedProgram shader, glm::mat4 proj, glm::mat4 view) {
     shader.setUniform("uView", view);
     //shader.setTexture("uTexMode", mBufferMode);
   mechs[player].draw(shader);
-  if(!secondPhase)
-      mechs[small].draw(shader);
-  else
-      mechs[big].draw(shader);
+  if(!fin){ // fix odd bug?
+      if(!secondPhase)
+          mechs[small].draw(shader);
+      else
+          mechs[big].draw(shader);
+  }
 }
 
 void Game::drawCubes(glow::UsedProgram shader, glm::mat4 proj, glm::mat4 view) {
