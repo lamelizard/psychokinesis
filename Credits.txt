@@ -41,6 +41,5 @@ some noise shader code (modified) by Dave_Hoskins and released under CC BY-SA 4.
 https://www.shadertoy.com/view/4djSRW
 https://creativecommons.org/licenses/by-sa/4.0/
 
-
 multiple soundeffects from Sonnis GDC
 https://sonniss.com/gdc-bundle-license/

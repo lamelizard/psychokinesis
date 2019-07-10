@@ -308,7 +308,7 @@ void Mech::controlPlayer(int) {
       // pushed away by small
       auto spos = g->mechs[small].getPos();
       auto small2Player = (playerPos - spos) * glm::vec3(1,0,1);
-      if(length(small2Player) < 3)
+      if(!g->secondPhase && length(small2Player) < 3)
           m.rigid->applyCentralImpulse(btcast(normalize(small2Player) * 20));
 
 
@@ -417,7 +417,9 @@ void Mech::startPlayer(int t) {
   if(t == 0){
       m.setAnimation(getup, none);
       m.animationsFaktor[0] = 0;
+      g->mCameraLocked = true;
   }
+  g->mCamera->setLookAt({.5, 3, -13}, {.5, 1.5, -10});
   if (t == 2 * 60) {
     m.animationsFaktor[0] = 1;
     g->soloud->play3d(g->sfxBootUp, pos.x, pos.y, pos.z, 0,0,0,.15);
@@ -426,12 +428,23 @@ void Mech::startPlayer(int t) {
   if (t > 2 * 60 + 68) { //getup finished
     //m.setAnimation(startWalk, none);
     m.animationsFaktor[0] = 0;
+    g->mCameraLocked = false;
     m.setAction(controlPlayer);
   }
 }
 
-void Mech::startBig(int) {
+void Mech::startBig(int t) {
   assert(0);
+  auto g = Game::instance;
+  auto &m = g->mechs[big];
+  m.scale = 8.5;
+  m.setPosition(glm::vec3(.5, -36 - (1./3. * (300-t)), 60));
+  if(t == 0)
+    m.setAnimation(sbigA, none);
+
+  if(t == 300){
+      m.setAction(emptyAction);
+  }
 }
 
 void Mech::runSmall(int t) {
@@ -620,9 +633,20 @@ void Mech::runSmall(int t) {
   reachGoalInTicks--;
 }
 
-void Mech::dieSmall(int){
+void Mech::dieSmall(int t){
     auto g = Game::instance;
     auto &m = g->mechs[small];
+    // stop music
+    if(t == 0)
+        g->soloud->fadeVolume(g->musicHandle, 0, 5);
+    if(m.blink > 1)
+        m.blink = 0;
+    //explode
+    auto p = m.getPos() + g->spherePoints[rand() % 400] * 2;
+    g->explosions.push_back({p, 0});
+    if(t % 10 == 0)
+      g->soloud->play3d(g->sfxExpl1, p.x,p.y,p.z, 0,0,0,.5);
 
-    g->initPhase2();
+    if(t > 300)
+       g->initPhase2();
 }

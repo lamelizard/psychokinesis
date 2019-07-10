@@ -94,6 +94,7 @@ private:
   bool mShowWireframe = false;
   bool mShowMenu = false;
   bool mFreeCamera = false;
+  bool mCameraLocked = false;
   bool mNoAttacks = false;
   int mShadowMapSize = 16384 / 4; // urks, high
   glm::vec3 mLightPos = {0,100,0};
@@ -201,6 +202,9 @@ private:
   SoLoud::Wav sfxFall;
   SoLoud::Speech intro;
   SoLoud::Speech introShort;
+  SoLoud::Speech intro2;
+  SoLoud::Speech introShort2;
+  SoLoud::Speech outro;
 
   // EntityX
 private:

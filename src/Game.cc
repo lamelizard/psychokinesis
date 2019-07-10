@@ -405,6 +405,9 @@ void Game::init() {
 
       intro.setText("You put your mind into a machine? I will have you know your emotions are hackable now.");
       introShort.setText("Your emotions are hackable now.");
+      intro2.setText("This was not even my final robot! Meet your destruction.");
+      introShort2.setText("Meet your destruction.");
+      outro.setText("This was a lame lizard project. Thank you for playing.");
     }
   }
 
@@ -610,6 +613,16 @@ void Game::initPhase2()
         mechs[big].rigid->setActivationState(DISABLE_DEACTIVATION);
     }
 
+    soloud->stop(musicHandle);
+    music2.setLooping(true);
+    musicHandle = soloud->playBackground(music2, 0);
+    soloud->fadeVolume(musicHandle, .7, 30);
+    static bool firstRun = true;
+    if(firstRun)
+        soloud->playBackground(intro2, 1);
+    else
+        soloud->playBackground(introShort2, 1);
+    firstRun = false;
 
 }
 
@@ -875,13 +888,8 @@ void Game::update(float) {
   }
 
   //reinit if HP
-  if(mechs[player].HP <= 0){
-      if(secondPhase)
-          initPhase2();
-      else
-          initPhase1();
-      return;
-  }
+  if(mechs[player].HP <= 0)
+      resetPhase();
 
 }
 
@@ -1294,6 +1302,7 @@ void Game::onGui() {
       //ImGui::Checkbox("Show Mech", &mDrawMech);
       ImGui::Checkbox("free Camera", &mFreeCamera);
       ImGui::Checkbox("no attacks", &mNoAttacks);
+      ImGui::SliderFloat3("textvec", (float*)&mtestVec, -100, 100);
       ImGui::Unindent();
       //ImGui::SliderFloat3("UI", (float*)&mUIPos, 0.0f, 1.0f);
     }
@@ -1469,7 +1478,7 @@ void Game::updateCamera(float elapsedSeconds) {
 
     float dX = 0, dY = 0;
         //get dX, dY
-        {
+    if(!mCameraLocked){
         if (!ImGuiwantMouse) {
           auto mouse_delta = input().getLastMouseDelta() / 100.0f;
           if (mouse_delta.x < 1000){ // ???
