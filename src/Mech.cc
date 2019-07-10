@@ -454,6 +454,7 @@ void Mech::startBig(int t) {
 enum bigAct{
     shootArc,
     shootHoming,
+    shootFalling,
     noneAct
 };
 
@@ -473,8 +474,8 @@ void Mech::runBig(int t) {
 
 
     if(m.HP > 3)
-        if (t % (60 + ((m.HP) * 30)) == 0)
-          g->createRocket(p.getPos() + glm::vec3(0,10,0), glm::vec3(0,-1,0), rtype::falling);
+        if (t % (180) == 0)
+          g->createRocket(p.getPos() + glm::vec3(0,15,0), glm::vec3(0,-1,0), rtype::falling);
 
     static int tnow = 0;
     tnow++;
@@ -483,6 +484,7 @@ void Mech::runBig(int t) {
       {shootArc, 1},
       {shootArc, 2},
       {shootHoming, 1},
+      {shootFalling, 1},
       {shootArc, 1},
       {shootArc, 2},
       {shootHoming, 2},
@@ -494,9 +496,9 @@ void Mech::runBig(int t) {
       {shootArc, 2},
       {noneAct, 1},
       {shootHoming, 3},
-      {shootHoming, 3},
+      {shootHoming, 3}, 
       {noneAct, 1},
-      {noneAct, 1},
+      {shootFalling, 1},
       {shootHoming, 3},
       {shootArc, 3},
       {shootArc, 3},
@@ -579,6 +581,12 @@ void Mech::runBig(int t) {
            m.setAnimation(sbigA, none);
            m.animationsFaktor[0] = 1;
         }
+        break;
+      case shootFalling:
+        if(tnow == 0)
+            for(int x = CUBES_MIN; x <= CUBES_MAX; x+= 5)
+                for(int y = CUBES_MIN; y <= CUBES_MAX; y+=5)
+                    g->createRocket(glm::vec3(x,10 + (rand() % 5) ,y), glm::vec3(0,-1,0), rtype::falling);
         break;
     default:
         ;

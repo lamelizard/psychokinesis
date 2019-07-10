@@ -384,24 +384,32 @@ void Game::init() {
     assert(soloud);
     if (soloud->getBackendString())
       glow::log() << "audio backend: " << soloud->getBackendString();
+    soloud->setMaxActiveVoiceCount(255);
     //sounds
     {
       const string snddir = "../data/sounds/";
       music.load((snddir + "heroic_demise_loop.ogg").c_str());
+      music.setInaudibleBehavior(true, false);
       music2.load((snddir + "spaceBoss.ogg").c_str());
+      music2.setInaudibleBehavior(true, false);
       //placeholder
       sfxBootUp.load((snddir + "bootup.wav").c_str());
       sfxBootUp.mVolume = .8;
+      sfxBootUp.setInaudibleBehavior(true, false);
       sfxExpl1.load((snddir + "explosion2.wav").c_str());
       sfxExpl1.mVolume = .7;
+      sfxExpl1.setInaudibleBehavior(false, true);
       sfxExpl2.load((snddir + "explosion2.wav").c_str());
       sfxExpl2.mVolume = .7;
+      sfxExpl1.setInaudibleBehavior(false, true);
       sfxShot.load((snddir + "Shot.wav").c_str());
+      sfxShot.setInaudibleBehavior(false, true);
       sfxStep.load((snddir + "FootSteps.wav").c_str());
       sfxStep.mVolume = .3;
+      sfxStep.setInaudibleBehavior(false, true);
       //sfxLand.load((snddir + "land.wav").c_str());
       sfxLand.load((snddir + "FootSteps.wav").c_str());
-      sfxFall.load((snddir + "fall.wav").c_str());
+      sfxLand.setInaudibleBehavior(false, true);
 
       intro.setText("You put your mind into a machine? I will have you know your emotions are hackable now.");
       introShort.setText("Your emotions are hackable now.");
@@ -561,32 +569,24 @@ void Game::initPhaseBoth()
       }
     }
 
-    // test mode area
-    {
-      auto entity = ex.entities.create();
-      entity.assign<ModeArea>(ModeArea{neon, {10, 0, 10}, 5});
-    }
-
-      {
-        auto entity = ex.entities.create();
-        entity.assign<ModeArea>(ModeArea{drawn, {-15, 0, -15}, 10});
-      }
-
-      {
-        auto entity = ex.entities.create();
-        entity.assign<ModeArea>(ModeArea{disco, {-15, 0, 15}, 10});
-      }
-    // test rocket
-    //createRocket(glm::vec3(-23,10,-23), glm::vec3(0,-1,0), rtype::falling);
 }
 
 void Game::initPhase1()
 {
     initPhaseBoth();
 
+    const vector<ModeArea> areas = {
+        {neon, {15, 0, 15}, 10},
+        {drawn, {-15, 0, -15}, 10},
+        {disco, {-15, 0, 15}, 10}
+    };
+    for(auto a : areas)
+       ex.entities.create().assign<ModeArea>(a);
+
     //music
     music.setLooping(true);
     musicHandle = soloud->playBackground(music, 0);
+
     soloud->fadeVolume(musicHandle, .7, 30);
     static bool firstRun = true;
     if(firstRun)
@@ -613,6 +613,15 @@ void Game::initPhase2()
         mechs[big].motionState->setWorldTransform(trans);
         mechs[big].rigid->setActivationState(DISABLE_DEACTIVATION);
     }
+
+    const vector<ModeArea> areas = {
+        {neon, {15, 0, 15}, 13},
+        {neon, {-15, 0, -15}, 13},
+        {disco, {15, 0, -15}, 13},
+        {drawn, {-15, 0, 15}, 13}
+    };
+    for(auto a : areas)
+       ex.entities.create().assign<ModeArea>(a);
 
     soloud->stop(musicHandle);
     music2.setLooping(true);
@@ -655,12 +664,7 @@ void Game::bulletCallback(btDynamicsWorld *, btScalar){
                 else
                      ((btRigidBody*) b)->setUserIndex2(0);
             }
-
-
         }
-
-
-
     }
 }
 

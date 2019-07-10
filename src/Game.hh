@@ -200,7 +200,6 @@ private:
   SoLoud::Wav sfxShot;
   SoLoud::Wav sfxStep;
   SoLoud::Wav sfxLand;
-  SoLoud::Wav sfxFall;
   SoLoud::Speech intro;
   SoLoud::Speech introShort;
   SoLoud::Speech intro2;
