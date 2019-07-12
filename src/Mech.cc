@@ -542,10 +542,16 @@ void Mech::runBig(int t) {
             float a = 1 - (float)(120 - (tnow - 60)) / 120.;
             m.viewDir = rotateY(dl, angle(dl, dr) * a);
             if(tnow % 5 == 0){
-                g->createRocket(cpos1, m.viewDir * 12, rtype::forward);
-                g->soloud->play3d(g->sfxShot, cpos1.x, cpos1.y, cpos1.z);
-                m.setAnimation(sbigA, none);
-                m.animationsFaktor[0] = 2;
+                if(attr & 1){
+                    g->createRocket(cpos1, m.viewDir * 12, rtype::forward);
+                    g->soloud->play3d(g->sfxShot, cpos1.x, cpos1.y, cpos1.z, 0, 0, 0, .5);
+                }
+                if(attr & 2){
+                    g->createRocket(cpos2, m.viewDir * 12, rtype::forward);
+                    g->soloud->play3d(g->sfxShot, cpos2.x, cpos2.y, cpos2.z, 0, 0, 0, .5);
+                }
+                //m.setAnimation(sbigA, none);
+                //m.animationsFaktor[0] = 2;
             }
             }else if (tnow < 300) {
                 float a = 1 - (float)(120 - (tnow - 180)) / 120.;

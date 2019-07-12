@@ -28,3 +28,9 @@ settings:
 * Alt+F toggles free camera ()
 * Alt+F11 Linux Fullscreen
 * Alt+Enter Windows Fullscreen
+
+TODO:
+* close with esc
+* change boss 1 timings
+* move spheres
+* better camera
