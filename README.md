@@ -23,6 +23,7 @@ mouse + keyboard:
 * Walk with WASD/arrow keys
 * Jump with Space
 * camera with mouse / numpad
+* exit with ESC
 
 settings:
 * Alt+A changes SSAA quality
@@ -32,7 +33,6 @@ settings:
 * Alt+Enter Windows Fullscreen
 
 TODO:
-* close with esc
 * change boss 1 timings
 * move spheres
 * better camera

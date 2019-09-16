@@ -732,6 +732,9 @@ void Game::update(float) {
   // update game in 60 Hz fixed timestep, most of the time
   setUpdateRate(updateRate);
 
+  //exit on ESC (after this update)
+  if (isKeyPressed(GLFW_KEY_ESCAPE))
+    requestClose();
 
   //cheat into the second quest // nearly never works???
   static bool cheatWasPressed = false;
