@@ -14,7 +14,6 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 # some dependencies want to build as shared libs
 set(BUILD_SHARED_LIBS ON CACHE BOOL " " FORCE)
 
-
 # ==============================================================================
 # Set bin dir
 if(CMAKE_BUILD_TYPE STREQUAL "")
@@ -73,9 +72,60 @@ add_subdirectory(extern/polymesh)
 # Add GLOW Extras lib
 add_subdirectory(extern/glow-extras)
 
+# "some dependencies want to build as shared libs"
+# -> well, not anymore I guess since the following were added by me
+# needed for Bullet
+set(BUILD_SHARED_LIBS OFF CACHE BOOL " " FORCE)
+
+# Add EntityX
+option(ENTITYX_BUILD_SHARED "" OFF)
+add_subdirectory(extern/entityx EXCLUDE_FROM_ALL)
+include_directories(extern/entityx)
+
+# Add Bullet
+set(BULLET_VERSION "2.88")
+option(BUILD_BULLET3 "" OFF)
+include_directories(extern/bullet/src)
+add_subdirectory(extern/bullet/src)
+
+# Add SoLoud
+add_subdirectory(extern/soloud)
+include_directories(extern/soloud/src/include)
+
+# Add Assimp
+option(ASSIMP_BUILD_ZLIB "" ON)
+option(ASSIMP_BUILD_ASSIMP_TOOLS "" OFF)
+option(ASSIMP_BUILD_TESTS "" OFF)
+add_subdirectory(extern/assimp EXCLUDE_FROM_ALL)
+include_directories(extern/assimp/include)
+include_directories(${CMAKE_CURRENT_BINARY_DIR}/extern/assimp/include)
+
+# Threads
+find_package(Threads)
 
 # Folder grouping
-foreach(TARGET_NAME glfw ctracer glad glow glow-extras imgui lodepng stb polymesh)
+foreach(TARGET_NAME
+    glfw
+    ctracer
+    glad
+    glow
+    glow-extras
+    imgui
+    lodepng
+    stb
+    polymesh
+    entityx
+    Bullet3Common
+    BulletCollision
+    BulletDynamics
+    BulletInverseDynamics
+    BulletSoftBody
+    LinearMath
+    assimp
+	soloud
+    IrrXML
+    zlibstatic
+    )
   set_property(TARGET ${TARGET_NAME} PROPERTY FOLDER "Extern") 
 endforeach()
 
@@ -91,6 +141,30 @@ file(GLOB_RECURSE SOURCES
 if(${CMAKE_VERSION} VERSION_GREATER "3.8.0")
     source_group(TREE ${CMAKE_CURRENT_SOURCE_DIR} FILES ${SOURCES})
 endif()
+
+#strip
+if ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "GNU")
+    set(CMAKE_C_FLAGS_RELEASE "${CMAKE_C_FLAGS_RELEASE} -s")
+    set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -s")
+endif()
+
+#IPO/LTO
+if(NOT "${CMAKE_VERSION}" VERSION_LESS 3.9)
+  cmake_policy(SET CMP0069 NEW)
+  include(CheckIPOSupported)
+      check_ipo_supported(RESULT HAVE_IPO OUTPUT IPO_OUTPUT LANGUAGES C CXX)
+      message(STATUS "IPO: ${IPO_OUTPUT}")
+      if(HAVE_IPO)
+          OPTION(FGE_USE_IPO "interprocedural optimization (IPO/LTO)" OFF)
+              IF(FGE_USE_IPO)
+                      SET(CMAKE_INTERPROCEDURAL_OPTIMIZATION TRUE)
+                      message(STATUS "IPO is used and has never been tested")
+              ELSE(FGE_USE_IPO)
+                      message(STATUS "IPO is not used")
+              ENDIF(FGE_USE_IPO)
+      endif()
+endif(NOT "${CMAKE_VERSION}" VERSION_LESS 3.9)
+
 add_executable(${PROJECT_NAME} ${SOURCES})
 
 # Add src/ inc dir
@@ -103,6 +177,13 @@ target_link_libraries(${PROJECT_NAME} PUBLIC
     glow-extras
     polymesh
     imgui
+    entityx
+    BulletDynamics
+    BulletCollision
+    LinearMath
+    assimp
+    soloud
+    ${CMAKE_THREAD_LIBS_INIT}
 )
 
 # Compile flags
@@ -116,4 +197,11 @@ else()
         -Wall # useful warnings
         -Wno-unused-variable # not a useful warning
     )
+endif()
+
+# Visual Studio
+if(MSVC)
+    set_property(TARGET ${PROJECT_NAME} PROPERTY VS_DEBUGGER_WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}/bin)
+    set_property(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR} PROPERTY VS_STARTUP_PROJECT ${PROJECT_NAME})
+	add_definitions(-D_ENABLE_EXTENDED_ALIGNED_STORAGE) # fixes compilation (entityx?)
 endif()

@@ -2,3 +2,4 @@ bin
 CMakeLists.txt.user
 *.~
 .vscode
+.vs

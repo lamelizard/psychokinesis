@@ -1,10 +1,10 @@
 #include "Game.hh"
 
-int main()
-{
-    Game game;
+//top down shooter mode! funny
 
-    game.run();
+int main() {
+  Game game;
 
-    return 0;
+  game.run();
+
 }

@@ -13,4 +13,4 @@
 ///
 /// by default, computed vertex tangents are interpolated from face tangents,
 /// for flat shaded objects (e.g. cube) this flag should be set to false
-glow::SharedVertexArray load_mesh_from_obj(std::string const& filename, bool interpolate_tangents = true);
+glow::SharedVertexArray load_mesh_from_obj(std::string const &filename, bool interpolate_tangents = true);
