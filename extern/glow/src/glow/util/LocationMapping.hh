@@ -1,6 +1,7 @@
 #pragma once
 
 #include <vector>
+#include <string>
 
 #include <glow/common/non_copyable.hh>
 #include <glow/common/shared.hh>
