@@ -99,26 +99,26 @@ void Game::init() {
 
   setTitle("Psychokinesis - I know how you'll feel"); // N.I. ?
 
-  // start assimp logging
+// start assimp logging
+#ifndef NDEBUG
   Assimp::DefaultLogger::create();
+#endif
 
   // sphere
   {
-      spherePoints.reserve(500);
-      if(spherePoints.empty()){
-          std::uniform_real_distribution<double> dist(0.0, 1.0);
-          std::mt19937 gen (87234587123648); // just guessing
-          for(int i = 0; i < 500; i++){
-              double t =  6.28318530718 * dist(gen);
-              double p = acos(1 - 2 * dist(gen));
-              spherePoints.push_back({
-                                       sin(p)*cos(t), //
-                                       sin(p)*sin(t), //
-                                       cos(p)
-                                     });
-          }
+    spherePoints.reserve(500);
+    if (spherePoints.empty()) {
+      std::uniform_real_distribution<double> dist(0.0, 1.0);
+      std::mt19937 gen(87234587123648); // just guessing
+      for (int i = 0; i < 500; i++) {
+        double t = 6.28318530718 * dist(gen);
+        double p = acos(1 - 2 * dist(gen));
+        spherePoints.push_back({sin(p) * cos(t), //
+                                sin(p) * sin(t), //
+                                cos(p)});
       }
-}
+    }
+  }
 
   // create gfx resources
   {
@@ -128,13 +128,13 @@ void Game::init() {
 
     // shadow
     {
-        // probably should resize as well but what size?
-        glGetIntegerv(GL_MAX_TEXTURE_SIZE, &mMaxShadowSize);
-        mShadowMapSize = mMaxShadowSize / mCurrentShadowFactor;
-        mBufferShadow = glow::TextureRectangle::create(mShadowMapSize, mShadowMapSize, GL_DEPTH_COMPONENT32F);
-        mBufferShadow->bind().setWrap(GL_CLAMP_TO_BORDER, GL_CLAMP_TO_BORDER);
-        mBufferShadow->bind().setCompareMode(GL_COMPARE_REF_TO_TEXTURE);
-        mFramebufferShadow = glow::Framebuffer::createDepthOnly(mBufferShadow);
+      // probably should resize as well but what size?
+      glGetIntegerv(GL_MAX_TEXTURE_SIZE, &mMaxShadowSize);
+      mShadowMapSize = mMaxShadowSize / mCurrentShadowFactor;
+      mBufferShadow = glow::TextureRectangle::create(mShadowMapSize, mShadowMapSize, GL_DEPTH_COMPONENT32F);
+      mBufferShadow->bind().setWrap(GL_CLAMP_TO_BORDER, GL_CLAMP_TO_BORDER);
+      mBufferShadow->bind().setCompareMode(GL_COMPARE_REF_TO_TEXTURE);
+      mFramebufferShadow = glow::Framebuffer::createDepthOnly(mBufferShadow);
     }
 
     // depth
@@ -153,10 +153,10 @@ void Game::init() {
 
     // mode
     {
-        //can't blend integers?
+      //can't blend integers?
       //mTargets.push_back(mBufferMode = glow::TextureRectangle::create(1, 1, GL_R8I)); // GL_RED_INTEGER misses implementation in glow?
-        mTargets.push_back(mBufferMode = glow::TextureRectangle::create(1, 1, GL_R16F));
-        mFramebufferMode = glow::Framebuffer::create("fMode", mBufferMode, mGBufferDepth);
+      mTargets.push_back(mBufferMode = glow::TextureRectangle::create(1, 1, GL_R16F));
+      mFramebufferMode = glow::Framebuffer::create("fMode", mBufferMode, mGBufferDepth);
     }
 
     // GBuffer
@@ -168,12 +168,13 @@ void Game::init() {
       auto fix = glow::TextureRectangle::create(1, 1, GL_R16F);
       mTargets.push_back(fix);
       mFramebufferGBuffer = glow::Framebuffer::create(
-          {{"fAlbedo", mGBufferAlbedo},
+          {
+              {"fAlbedo", mGBufferAlbedo},
 
-           {"fMaterial", mGBufferMaterial},
-           {"fNormal", mGBufferNormal},
-           {"fFIXMYBUG", fix} // WHY DOES THIS LINE FIX the last rectangle
-                  },
+              {"fMaterial", mGBufferMaterial},
+              {"fNormal", mGBufferNormal},
+              {"fFIXMYBUG", fix} // WHY DOES THIS LINE FIX the last rectangle
+          },
           mGBufferDepth);
     }
 
@@ -331,26 +332,25 @@ void Game::init() {
     mVALine->setObjectLabel("Line va");
     //Explosion
     {
-        auto abExpl = glow::ArrayBuffer::create();
-        abExpl->setObjectLabel("Explosion ab");
-        abExpl->defineAttributes({{&ExplVertex::pos, "position"}, //
-                                   {&ExplVertex::normal, "normal"}});
-        auto sSize = spherePoints.size() - (spherePoints.size() % 3);
-        vector<ExplVertex> ver(sSize);
-        for(int i = 0; i < sSize; i+=3){
-            ver[i].pos = spherePoints[i];
-            ver[i+1].pos = spherePoints[i+1];
-            ver[i+2].pos = spherePoints[i+2];
-            auto n = normalize(cross(ver[i+1].pos - ver[i].pos, ver[i+2].pos - ver[i].pos));
-            ver[i].normal = n;
-            ver[i+1].normal = n;
-            ver[i+2].normal = n;
-        }
-        abExpl->bind().setData(ver);
-        mVAExplosion = glow::VertexArray::create(abExpl, GL_TRIANGLES);
-        mVAExplosion->setObjectLabel("Explosion va");
+      auto abExpl = glow::ArrayBuffer::create();
+      abExpl->setObjectLabel("Explosion ab");
+      abExpl->defineAttributes({{&ExplVertex::pos, "position"}, //
+                                {&ExplVertex::normal, "normal"}});
+      auto sSize = spherePoints.size() - (spherePoints.size() % 3);
+      vector<ExplVertex> ver(sSize);
+      for (int i = 0; i < sSize; i += 3) {
+        ver[i].pos = spherePoints[i];
+        ver[i + 1].pos = spherePoints[i + 1];
+        ver[i + 2].pos = spherePoints[i + 2];
+        auto n = normalize(cross(ver[i + 1].pos - ver[i].pos, ver[i + 2].pos - ver[i].pos));
+        ver[i].normal = n;
+        ver[i + 1].normal = n;
+        ver[i + 2].normal = n;
+      }
+      abExpl->bind().setData(ver);
+      mVAExplosion = glow::VertexArray::create(abExpl, GL_TRIANGLES);
+      mVAExplosion->setObjectLabel("Explosion va");
     }
-
 
 
 
@@ -429,243 +429,233 @@ void Game::init() {
 
     colPoint = make_shared<btSphereShape>(0.1);
     colBox = make_shared<btBoxShape>(btVector3(0.5, 0.5, 0.5)); // half extend
-
-   }
+  }
 
   resetPhase();
-
 }
 
-void Game::resetPhase(){
-    if(secondPhase)
-        initPhase2();
-    else
-        initPhase1();
+void Game::resetPhase() {
+  if (secondPhase)
+    initPhase2();
+  else
+    initPhase1();
 }
 
-void Game::initPhaseBoth()
-{
-    soloud->stopAll();
+void Game::initPhaseBoth() {
+  soloud->stopAll();
 
-    //bullet
-    {
-        dynamicsWorld = make_unique<btDiscreteDynamicsWorld>(dispatcher.get(), overlappingPairCache.get(), solver.get(), collisionConfiguration.get());
-        dynamicsWorld->setGravity(btVector3(0, -9.81, 0));
-        bulletDebugger = make_unique<BulletDebugger>();
-        dynamicsWorld->setDebugDrawer(bulletDebugger.get());
-        dynamicsWorld->setInternalTickCallback(bulletCallbackStatic);
-    }
-    //Entity
-    ex.entities.reset();
-    // mechs
-    {
-        //player
-        // starting to hardcode everything, assuming that I don't ever need to change stuff
-        {
-    Mech &m = mechs[player];
-    m.type = player;
-    m.HP = MAX_HEALTH;
-    m.blink = 5;
-    m.setAction(Mech::startPlayer);
-    m.moveDir = glm::vec3(-.1, 0, 1.1);
-    m.viewDir = glm::vec3(0, 0, 1.1);
-    m.scale = .2;
-    m.floatOffset = 0.25;
-    m.collision = make_shared<btCapsuleShape>(0.4, 0.5);
-    auto groundOffset = m.collision->getHalfHeight() + m.collision->getRadius() + m.floatOffset;
-    m.meshOffset = glm::vec3(0, -groundOffset, 0); // -.3
-    m.motionState = make_shared<btDefaultMotionState>(bttransform(glm::vec3(0, groundOffset, -10)));
-    m.rigid = make_shared<btRigidBody>(btRigidBody::btRigidBodyConstructionInfo(1.f, m.motionState.get(), m.collision.get()));
-    m.rigid->setAngularFactor(0);
-    m.rigid->setCustomDebugColor(btVector3(255, 1, 1));
-    m.rigid->setUserIndex(BID_PLAYER);
-    m.rigid->setUserIndex2(0);
-    m.rigid->setUserPointer(&mechs[player]);
-    dynamicsWorld->addRigidBody(m.rigid.get());
-  }
-
-  //small
+  //bullet
   {
-    Mech &m = mechs[small];
-    m.type = small;
-    m.HP = 5;
-    m.blink = 5;
-    m.setAction(Mech::startSmall);
-    m.moveDir = glm::vec3(0, 0, -1);
-    m.viewDir = glm::vec3(0, 0, -1);
-    m.scale = 1;
-    m.floatOffset = 0.01;
-    m.collision = make_shared<btCapsuleShape>(2, 2.5);
-    auto groundOffset = m.collision->getHalfHeight() + m.collision->getRadius() + m.floatOffset;
-    m.meshOffset = glm::vec3(0, -groundOffset, 0); // -1.5
-    m.motionState = make_shared<btDefaultMotionState>(bttransform(glm::vec3(0.5, groundOffset, 18.5)));
-    m.rigid = make_shared<btRigidBody>(btRigidBody::btRigidBodyConstructionInfo(0, m.motionState.get(), m.collision.get()));
-    m.rigid->setAngularFactor(0);
-    m.rigid->setCustomDebugColor(btVector3(255, 1, 1));
-    m.rigid->setCollisionFlags(m.rigid->getCollisionFlags() | btCollisionObject::CF_KINEMATIC_OBJECT);
-    m.rigid->setUserIndex(BID_SMALL);
-    m.rigid->setUserIndex2(0); // not rushing
-    m.rigid->setUserPointer(&mechs[small]);
-    dynamicsWorld->addRigidBody(m.rigid.get());
-
-    Mech::nextGoal = 1;
-    Mech::currentWay = 0;
-    Mech::reachGoalInTicks = Mech::timeNeeded;
-    Mech::lastPosition = glm::vec3(0.5, groundOffset, 18.5);
+    dynamicsWorld = make_unique<btDiscreteDynamicsWorld>(dispatcher.get(), overlappingPairCache.get(), solver.get(), collisionConfiguration.get());
+    dynamicsWorld->setGravity(btVector3(0, -9.81, 0));
+    bulletDebugger = make_unique<BulletDebugger>();
+    dynamicsWorld->setDebugDrawer(bulletDebugger.get());
+    dynamicsWorld->setInternalTickCallback(bulletCallbackStatic);
   }
-  //big
+  //Entity
+  ex.entities.reset();
+  // mechs
   {
-    Mech &m = mechs[big];
-    m.type = big;
-    m.HP = 5;
-    m.blink = 5;
-    m.setAction(Mech::emptyAction);
-    m.moveDir = glm::vec3(0, 0, -1);
-    m.viewDir = glm::vec3(0, 0, -1);
-    m.scale = 30;
-    m.floatOffset = 0.01;
-    m.collision = make_shared<btCapsuleShape>(0.1, 0.1); //no collisions
-    m.meshOffset = glm::vec3(0);
-    m.motionState = make_shared<btDefaultMotionState>(bttransform(glm::vec3(0, -500, 0)));
-    m.rigid = make_shared<btRigidBody>(btRigidBody::btRigidBodyConstructionInfo(0, m.motionState.get(), m.collision.get()));
-    m.rigid->setAngularFactor(0);
-    m.rigid->setCustomDebugColor(btVector3(255, 1, 1));
-    m.rigid->setCollisionFlags(m.rigid->getCollisionFlags() | btCollisionObject::CF_KINEMATIC_OBJECT);
-    m.rigid->setUserIndex(BID_BIG);
-    m.rigid->setUserIndex2(0);
-    m.rigid->setUserPointer(&mechs[big]);
-    dynamicsWorld->addRigidBody(m.rigid.get());
+      //player
+      // starting to hardcode everything, assuming that I don't ever need to change stuff
+      {
+          Mech &m = mechs[player];
+  m.type = player;
+  m.HP = MAX_HEALTH;
+  m.blink = 5;
+  m.setAction(Mech::startPlayer);
+  m.moveDir = glm::vec3(-.1, 0, 1.1);
+  m.viewDir = glm::vec3(0, 0, 1.1);
+  m.scale = .2;
+  m.floatOffset = 0.25;
+  m.collision = make_shared<btCapsuleShape>(0.4, 0.5);
+  auto groundOffset = m.collision->getHalfHeight() + m.collision->getRadius() + m.floatOffset;
+  m.meshOffset = glm::vec3(0, -groundOffset, 0); // -.3
+  m.motionState = make_shared<btDefaultMotionState>(bttransform(glm::vec3(0, groundOffset, -10)));
+  m.rigid = make_shared<btRigidBody>(btRigidBody::btRigidBodyConstructionInfo(1.f, m.motionState.get(), m.collision.get()));
+  m.rigid->setAngularFactor(0);
+  m.rigid->setCustomDebugColor(btVector3(255, 1, 1));
+  m.rigid->setUserIndex(BID_PLAYER);
+  m.rigid->setUserIndex2(0);
+  m.rigid->setUserPointer(&mechs[player]);
+  dynamicsWorld->addRigidBody(m.rigid.get());
+}
+
+//small
+{
+  Mech &m = mechs[small];
+  m.type = small;
+  m.HP = 5;
+  m.blink = 5;
+  m.setAction(Mech::startSmall);
+  m.moveDir = glm::vec3(0, 0, -1);
+  m.viewDir = glm::vec3(0, 0, -1);
+  m.scale = 1;
+  m.floatOffset = 0.01;
+  m.collision = make_shared<btCapsuleShape>(2, 2.5);
+  auto groundOffset = m.collision->getHalfHeight() + m.collision->getRadius() + m.floatOffset;
+  m.meshOffset = glm::vec3(0, -groundOffset, 0); // -1.5
+  m.motionState = make_shared<btDefaultMotionState>(bttransform(glm::vec3(0.5, groundOffset, 18.5)));
+  m.rigid = make_shared<btRigidBody>(btRigidBody::btRigidBodyConstructionInfo(0, m.motionState.get(), m.collision.get()));
+  m.rigid->setAngularFactor(0);
+  m.rigid->setCustomDebugColor(btVector3(255, 1, 1));
+  m.rigid->setCollisionFlags(m.rigid->getCollisionFlags() | btCollisionObject::CF_KINEMATIC_OBJECT);
+  m.rigid->setUserIndex(BID_SMALL);
+  m.rigid->setUserIndex2(0); // not rushing
+  m.rigid->setUserPointer(&mechs[small]);
+  dynamicsWorld->addRigidBody(m.rigid.get());
+
+  Mech::nextGoal = 1;
+  Mech::currentWay = 0;
+  Mech::reachGoalInTicks = Mech::timeNeeded;
+  Mech::lastPosition = glm::vec3(0.5, groundOffset, 18.5);
+}
+//big
+{
+  Mech &m = mechs[big];
+  m.type = big;
+  m.HP = 5;
+  m.blink = 5;
+  m.setAction(Mech::emptyAction);
+  m.moveDir = glm::vec3(0, 0, -1);
+  m.viewDir = glm::vec3(0, 0, -1);
+  m.scale = 30;
+  m.floatOffset = 0.01;
+  m.collision = make_shared<btCapsuleShape>(0.1, 0.1); //no collisions
+  m.meshOffset = glm::vec3(0);
+  m.motionState = make_shared<btDefaultMotionState>(bttransform(glm::vec3(0, -500, 0)));
+  m.rigid = make_shared<btRigidBody>(btRigidBody::btRigidBodyConstructionInfo(0, m.motionState.get(), m.collision.get()));
+  m.rigid->setAngularFactor(0);
+  m.rigid->setCustomDebugColor(btVector3(255, 1, 1));
+  m.rigid->setCollisionFlags(m.rigid->getCollisionFlags() | btCollisionObject::CF_KINEMATIC_OBJECT);
+  m.rigid->setUserIndex(BID_BIG);
+  m.rigid->setUserIndex2(0);
+  m.rigid->setUserPointer(&mechs[big]);
+  dynamicsWorld->addRigidBody(m.rigid.get());
+}
+}
+
+//boxes
+{
+  // create world
+  // floor
+  {
+    auto y = -colBox->getHalfExtentsWithMargin().getY(); // floor is y = 0
+    for (auto x = 0; x < CUBES_TOTAL; x++)
+      for (auto z = 0; z < CUBES_TOTAL; z++)
+        ground[x][z] = createCube(glm::vec3(x + CUBES_MIN, y, z + CUBES_MIN));
   }
-}
 
-    //boxes
-    {
-
-      // create world
-      // floor
-      {
-        auto y = -colBox->getHalfExtentsWithMargin().getY(); // floor is y = 0
-        for (auto x = 0; x < CUBES_TOTAL; x++)
-          for (auto z = 0; z < CUBES_TOTAL; z++)
-            ground[x][z] = createCube(glm::vec3(x + CUBES_MIN, y, z + CUBES_MIN));
-      }
-
-      // pillars
-      {
-        for(int i = 0; i < 4; i++)
-            pillars[i].clear();
-        int i = 0;
-        for (auto x = CUBES_MIN + 15; x <= CUBES_MAX - 10; x += 20)
-          for (auto z = CUBES_MIN + 15; z <= CUBES_MAX - 10; z += 20) {
-            for (auto yBottom = 0; yBottom <= 5; yBottom++) {
-              auto y = yBottom + colBox->getHalfExtentsWithMargin().getY();
-              pillars[i].push_back(createCube(glm::vec3(x, y, z)));
-              pillars[i].push_back(createCube(glm::vec3(x + 1, y, z)));
-              pillars[i].push_back(createCube(glm::vec3(x, y, z + 1)));
-              pillars[i].push_back(createCube(glm::vec3(x + 1, y, z + 1)));
-            }
-            i++; // new pillar
-          }
-      }
-    }
-
-}
-
-void Game::initPhase1()
-{
-    initPhaseBoth();
-
-    const vector<ModeArea> areas = {
-        {neon, {15, 0, 15}, 10},
-        {drawn, {-15, 0, -15}, 10},
-        {disco, {-15, 0, 15}, 10}
-    };
-    for(auto a : areas)
-       ex.entities.create().assign<ModeArea>(a);
-
-    //music
-    music.setLooping(true);
-    musicHandle = soloud->playBackground(music, 0);
-
-    soloud->fadeVolume(musicHandle, .7, 30);
-    static bool firstRun = true;
-    if(firstRun)
-        soloud->playBackground(intro, 1);
-    else
-        soloud->playBackground(introShort, 1);
-    firstRun = false;
-}
-
-void Game::initPhase2()
-{
-    initPhaseBoth();
-    secondPhase = true;
-    mechs[small].setAction(Mech::emptyAction);
-    mechs[big].setAction(Mech::startBig);
-    {
-        btTransform trans;
-        trans.setIdentity();
-        trans.setOrigin(btVector3(0,-500,0));
-        //m.rigid->setWorldTransform(trans);
-        mechs[small].motionState->setWorldTransform(trans);
-        mechs[small].rigid->setActivationState(DISABLE_DEACTIVATION);
-        trans.setOrigin(btVector3(0.5,-50,30));
-        mechs[big].motionState->setWorldTransform(trans);
-        mechs[big].rigid->setActivationState(DISABLE_DEACTIVATION);
-    }
-
-    const vector<ModeArea> areas = {
-        {neon, {15, 0, 15}, 13},
-        {neon, {-15, 0, -15}, 13},
-        {disco, {15, 0, -15}, 13},
-        {drawn, {-15, 0, 15}, 13}
-    };
-    for(auto a : areas)
-       ex.entities.create().assign<ModeArea>(a);
-
-    soloud->stop(musicHandle);
-    music2.setLooping(true);
-    musicHandle = soloud->playBackground(music2, 0);
-    soloud->fadeVolume(musicHandle, .7, 30);
-    static bool firstRun = true;
-    if(firstRun)
-        soloud->playBackground(intro2, 1);
-    else
-        soloud->playBackground(introShort2, 1);
-    firstRun = false;
-
-}
-
-
-void Game::bulletCallback(btDynamicsWorld *, btScalar){
-    int numManifolds = dynamicsWorld->getDispatcher()->getNumManifolds();
-    for (int i = 0; i < numManifolds; i++) {
-        btPersistentManifold *contactManifold = dynamicsWorld->getDispatcher()->getManifoldByIndexInternal(i);
-        auto *a = contactManifold->getBody0();
-        auto *b = contactManifold->getBody1();
-        bool hasRocket = false;
-        for(auto o : {a,b})
-            if(o->getUserIndex() & BID_ROCKET){
-               ((btRigidBody*) o)->setUserIndex2(1);
-                hasRocket = true;
-            }
-        if(hasRocket){
-            if(a->getUserIndex() & BID_ROCKET)
-                std::swap(a,b);
-            if(a->getUserIndex() & BID_PLAYER)
-                if(mechs[player].blink > 1){
-                mechs[player].HP -= 2;
-                mechs[player].blink = 0;
-            }
-
-            if(a->getUserIndex() & BID_SMALL){
-                if(((btRigidBody*) b)->getUserIndex() == BID_ROCKET_HOMING)
-                     ((btRigidBody*) a)->setUserIndex2(SMALL_GOTHIT);
-                else
-                     ((btRigidBody*) b)->setUserIndex2(0);
-            }
+  // pillars
+  {
+    for (int i = 0; i < 4; i++)
+      pillars[i].clear();
+    int i = 0;
+    for (auto x = CUBES_MIN + 15; x <= CUBES_MAX - 10; x += 20)
+      for (auto z = CUBES_MIN + 15; z <= CUBES_MAX - 10; z += 20) {
+        for (auto yBottom = 0; yBottom <= 5; yBottom++) {
+          auto y = yBottom + colBox->getHalfExtentsWithMargin().getY();
+          pillars[i].push_back(createCube(glm::vec3(x, y, z)));
+          pillars[i].push_back(createCube(glm::vec3(x + 1, y, z)));
+          pillars[i].push_back(createCube(glm::vec3(x, y, z + 1)));
+          pillars[i].push_back(createCube(glm::vec3(x + 1, y, z + 1)));
         }
+        i++; // new pillar
+      }
+  }
+}
+}
+
+void Game::initPhase1() {
+  initPhaseBoth();
+
+  const vector<ModeArea> areas = {
+      {neon, {15, 0, 15}, 10},
+      {drawn, {-15, 0, -15}, 10},
+      {disco, {-15, 0, 15}, 10}};
+  for (auto a : areas)
+    ex.entities.create().assign<ModeArea>(a);
+
+  //music
+  music.setLooping(true);
+  musicHandle = soloud->playBackground(music, 0);
+
+  soloud->fadeVolume(musicHandle, .7, 30);
+  static bool firstRun = true;
+  if (firstRun)
+    soloud->playBackground(intro, 1);
+  else
+    soloud->playBackground(introShort, 1);
+  firstRun = false;
+}
+
+void Game::initPhase2() {
+  initPhaseBoth();
+  secondPhase = true;
+  mechs[small].setAction(Mech::emptyAction);
+  mechs[big].setAction(Mech::startBig);
+  {
+    btTransform trans;
+    trans.setIdentity();
+    trans.setOrigin(btVector3(0, -500, 0));
+    //m.rigid->setWorldTransform(trans);
+    mechs[small].motionState->setWorldTransform(trans);
+    mechs[small].rigid->setActivationState(DISABLE_DEACTIVATION);
+    trans.setOrigin(btVector3(0.5, -50, 30));
+    mechs[big].motionState->setWorldTransform(trans);
+    mechs[big].rigid->setActivationState(DISABLE_DEACTIVATION);
+  }
+
+  const vector<ModeArea> areas = {
+      {neon, {15, 0, 15}, 13},
+      {neon, {-15, 0, -15}, 13},
+      {disco, {15, 0, -15}, 13},
+      {drawn, {-15, 0, 15}, 13}};
+  for (auto a : areas)
+    ex.entities.create().assign<ModeArea>(a);
+
+  soloud->stop(musicHandle);
+  music2.setLooping(true);
+  musicHandle = soloud->playBackground(music2, 0);
+  soloud->fadeVolume(musicHandle, .7, 30);
+  static bool firstRun = true;
+  if (firstRun)
+    soloud->playBackground(intro2, 1);
+  else
+    soloud->playBackground(introShort2, 1);
+  firstRun = false;
+}
+
+
+void Game::bulletCallback(btDynamicsWorld *, btScalar) {
+  int numManifolds = dynamicsWorld->getDispatcher()->getNumManifolds();
+  for (int i = 0; i < numManifolds; i++) {
+    btPersistentManifold *contactManifold = dynamicsWorld->getDispatcher()->getManifoldByIndexInternal(i);
+    auto *a = contactManifold->getBody0();
+    auto *b = contactManifold->getBody1();
+    bool hasRocket = false;
+    for (auto o : {a, b})
+      if (o->getUserIndex() & BID_ROCKET) {
+        ((btRigidBody *)o)->setUserIndex2(1);
+        hasRocket = true;
+      }
+    if (hasRocket) {
+      if (a->getUserIndex() & BID_ROCKET)
+        std::swap(a, b);
+      if (a->getUserIndex() & BID_PLAYER)
+        if (mechs[player].blink > 1) {
+          mechs[player].HP -= 2;
+          mechs[player].blink = 0;
+        }
+
+      if (a->getUserIndex() & BID_SMALL) {
+        if (((btRigidBody *)b)->getUserIndex() == BID_ROCKET_HOMING)
+          ((btRigidBody *)a)->setUserIndex2(SMALL_GOTHIT);
+        else
+          ((btRigidBody *)b)->setUserIndex2(0);
+      }
     }
+  }
 }
 
 entityx::Entity Game::createCube(const glm::ivec3 &pos, bool moves) {
@@ -673,20 +663,19 @@ entityx::Entity Game::createCube(const glm::ivec3 &pos, bool moves) {
   auto rbCube = make_shared<btRigidBody>(btRigidBody::btRigidBodyConstructionInfo(moves ? 1. : 0., motionState.get(), colBox.get(), btVector3(0, 0, 0)));
   dynamicsWorld->addRigidBody(rbCube.get());
   bool destructible = false;
-  if(!pos.y)
-  { // destructible?
-      glm::ivec3 p = pos;
-      p.x = p.x < 1 ? -p.x + 1 : p.x;
-      p.z = p.z < 1 ? -p.z + 1 : p.z;
-      // not symmetrical
-      destructible = (p.x >= 24 || //
-                      p.z >= 24 || //
-                      ((p.x == 17 || p.x == 16 || p.x == 5 || p.x == 4) //
-                       && (p.z <= 17 && p.z >= 4)) || //
-                      ((p.z == 17 || p.z == 16 || p.z == 5 || p.z == 4) //
-                       && (p.x <= 17 && p.x >= 4)) //
-                      );
-      // const auto des = set<int>{25,24,15,14,5,4};
+  if (!pos.y) { // destructible?
+    glm::ivec3 p = pos;
+    p.x = p.x < 1 ? -p.x + 1 : p.x;
+    p.z = p.z < 1 ? -p.z + 1 : p.z;
+    // not symmetrical
+    destructible = (p.x >= 24 ||                                      //
+                    p.z >= 24 ||                                      //
+                    ((p.x == 17 || p.x == 16 || p.x == 5 || p.x == 4) //
+                     && (p.z <= 17 && p.z >= 4)) ||                   //
+                    ((p.z == 17 || p.z == 16 || p.z == 5 || p.z == 4) //
+                     && (p.x <= 17 && p.x >= 4))                      //
+    );
+    // const auto des = set<int>{25,24,15,14,5,4};
   }
 
   auto entity = ex.entities.create();
@@ -701,11 +690,11 @@ entityx::Entity Game::createCube(const glm::ivec3 &pos, bool moves) {
 }
 
 entityx::Entity Game::createRocket(const glm::vec3 &pos, const glm::vec3 &acc, rtype type) {
-    if(mNoAttacks)
-        return ex.entities.create(); // hope that doesn't break
+  if (mNoAttacks)
+    return ex.entities.create(); // hope that doesn't break
   auto motionState = make_shared<btDefaultMotionState>(bttransform(pos));
   auto rbRocket = make_shared<btRigidBody>(btRigidBody::btRigidBodyConstructionInfo(1., motionState.get(), colPoint.get()));
-  rbRocket->setLinearVelocity(btcast(glm::normalize(acc)*2));
+  rbRocket->setLinearVelocity(btcast(glm::normalize(acc) * 2));
   dynamicsWorld->addRigidBody(rbRocket.get());
   //rbRocket->setGravity(btVector3(0, 0, 0)); // after adding to world!
   rbRocket->setGravity(btcast(acc));
@@ -715,15 +704,15 @@ entityx::Entity Game::createRocket(const glm::vec3 &pos, const glm::vec3 &acc, r
   entity.assign<defMotionState>(motionState);
   entity.assign<Rocket>(Rocket{type, true});
   rbRocket->setUserIndex(BID_ROCKET);
-  if(type == rtype::homing){
-      rbRocket->setUserIndex(BID_ROCKET_HOMING);
-      rbRocket->setDamping(0.2,0);
+  if (type == rtype::homing) {
+    rbRocket->setUserIndex(BID_ROCKET_HOMING);
+    rbRocket->setDamping(0.2, 0);
   }
-  if(type == rtype::falling){
-      rbRocket->setAngularVelocity(btVector3(0, 1, 0)); // test
-      rbRocket->setUserIndex(BID_ROCKET_FALLING);
+  if (type == rtype::falling) {
+    rbRocket->setAngularVelocity(btVector3(0, 1, 0)); // test
+    rbRocket->setUserIndex(BID_ROCKET_FALLING);
   }
-  rbRocket->setUserIndex2(0);//not yet explode
+  rbRocket->setUserIndex2(0); //not yet explode
   //rbRocket->setUserPointer((void *)entity.id().id()); // doesn't work...
   return entity;
 }
@@ -738,43 +727,42 @@ void Game::update(float) {
 
   //cheat into the second quest // nearly never works???
   static bool cheatWasPressed = false;
-  if((isKeyPressed(GLFW_KEY_Z) ||
-      isKeyPressed(GLFW_KEY_Y)) &&
-     isKeyPressed(GLFW_KEY_E) &&
-     isKeyPressed(GLFW_KEY_L) &&
-     isKeyPressed(GLFW_KEY_D) &&
-     isKeyPressed(GLFW_KEY_A)){
-      if(!cheatWasPressed)
-          initPhase2();
-      cheatWasPressed = true;
+  if ((isKeyPressed(GLFW_KEY_Z) ||
+       isKeyPressed(GLFW_KEY_Y)) &&
+      isKeyPressed(GLFW_KEY_E) &&
+      isKeyPressed(GLFW_KEY_L) &&
+      isKeyPressed(GLFW_KEY_D) &&
+      isKeyPressed(GLFW_KEY_A)) {
+    if (!cheatWasPressed)
+      initPhase2();
+    cheatWasPressed = true;
   } else
     cheatWasPressed = false;
 
   //cheat hit
   static bool cheat2WasPressed = false;
-  if(isKeyPressed(GLFW_KEY_1) &&
-     isKeyPressed(GLFW_KEY_2)){
-      if(!cheat2WasPressed){
-          if(!secondPhase){
-              mechs[small].HP--;
-              mechs[small].blink = 0;
-          } else {
-              mechs[big].HP++;
-              mechs[big].blink = 0;
-          }
-
-     }
-      cheat2WasPressed = true;
+  if (isKeyPressed(GLFW_KEY_1) &&
+      isKeyPressed(GLFW_KEY_2)) {
+    if (!cheat2WasPressed) {
+      if (!secondPhase) {
+        mechs[small].HP--;
+        mechs[small].blink = 0;
+      } else {
+        mechs[big].HP++;
+        mechs[big].blink = 0;
+      }
+    }
+    cheat2WasPressed = true;
   } else
     cheat2WasPressed = false;
 
 
   //update mechs
-  for (auto &m : mechs){
+  for (auto &m : mechs) {
     //activate to be sure
-       m.rigid->activate();
-       m.tick();
-       m.updateLook();
+    m.rigid->activate();
+    m.tick();
+    m.updateLook();
   }
 
   //update physics
@@ -784,127 +772,121 @@ void Game::update(float) {
 
   //explode Rockets, steer Rockets
   {
-      auto rocket = entityx::ComponentHandle<Rocket>();
-      for (auto eRocket : ex.entities.entities_with_components(rocket)){
-          auto rigid = eRocket.component<SharedbtRigidBody>()->get();
-          auto motionState = eRocket.component<defMotionState>()->get();
-          btTransform trans;
-          motionState->getWorldTransform(trans);
-          auto pos = getWorldPos(trans);
+    auto rocket = entityx::ComponentHandle<Rocket>();
+    for (auto eRocket : ex.entities.entities_with_components(rocket)) {
+      auto rigid = eRocket.component<SharedbtRigidBody>()->get();
+      auto motionState = eRocket.component<defMotionState>()->get();
+      btTransform trans;
+      motionState->getWorldTransform(trans);
+      auto pos = getWorldPos(trans);
 
-          if(length(getWorldPos(rigid->getWorldTransform())) > 200){
-              //remove far away rockets
-              dynamicsWorld->removeRigidBody(rigid);
-              eRocket.destroy();
+      if (length(getWorldPos(rigid->getWorldTransform())) > 200) {
+        //remove far away rockets
+        dynamicsWorld->removeRigidBody(rigid);
+        eRocket.destroy();
+      } else if (rigid->getUserIndex2() == 1) {
+        //BOOM?
+        if (rocket->real) {
+          //BOOM!
+          //Sound for not real inside mode? unlikely
+          if (rigid->getUserIndex() != BID_ROCKET_FALLING)
+            soloud->play3d(sfxExpl1, pos.x, pos.y, pos.z);
+          else
+            soloud->play3d(sfxExpl2, pos.x, pos.y, pos.z);
+          explosions.push_back(Explosion{pos, 0});
+          //boom
+          for (const auto &point : spherePoints) {
+            auto from = btcast(pos);
+            auto to = btcast(pos + (point * 1.5)); //1.5m radius
+#ifndef NDEBUG
+            dynamicsWorld->getDebugDrawer()->drawLine(from, to, btVector4(1, 0, 0, 1));
+#endif
+            auto closest = btCollisionWorld::ClosestRayResultCallback(from, to);
+            dynamicsWorld->rayTest(from, to, closest);
+            if (closest.hasHit()) {
+              auto obj = closest.m_collisionObject;
+              if (!obj->isStaticObject() && !obj->isKinematicObject() && obj->getInternalType() == btCollisionObject::CO_RIGID_BODY) {
+                auto rigidHit = (btRigidBody *)obj; // pray
+                auto dir = (to - from).normalize();
+                auto strength = ((to - closest.m_hitPointWorld).length() / (to - from).length()) * 50; // 100-> get thrown through floor...
+                rigidHit->applyForce(dir * strength, closest.m_hitPointWorld - rigidHit->getWorldTransform().getOrigin());
+                //rigidHit->applyCentralForce(dir * strength);
+              }
+            }
           }
-          else if(rigid->getUserIndex2() == 1)
-          {
-              //BOOM?
-              if(rocket->real){
-                  //BOOM!
-                  //Sound for not real inside mode? unlikely
-                  if(rigid->getUserIndex() != BID_ROCKET_FALLING)
-                    soloud->play3d(sfxExpl1, pos.x,pos.y,pos.z);
-                  else
-                    soloud->play3d(sfxExpl2, pos.x,pos.y,pos.z);
-                  explosions.push_back(Explosion{pos, 0});
-                  //boom
-                  for(const auto& point :spherePoints){
-                      auto from = btcast(pos);
-                      auto to = btcast(pos + (point * 1.5));//1.5m radius
-        #ifndef NDEBUG
-                      dynamicsWorld->getDebugDrawer()->drawLine(from, to, btVector4(1, 0, 0, 1));
-        #endif
-                      auto closest = btCollisionWorld::ClosestRayResultCallback(from, to);
-                      dynamicsWorld->rayTest(from, to, closest);
-                      if (closest.hasHit()) {
-                        auto obj = closest.m_collisionObject;
-                        if(! obj->isStaticObject() && ! obj->isKinematicObject() && obj->getInternalType() == btCollisionObject::CO_RIGID_BODY){
-                            auto rigidHit = (btRigidBody *)obj; // pray
-                            auto dir = (to - from).normalize();
-                            auto strength = ((to - closest.m_hitPointWorld).length() / (to - from).length()) * 50; // 100-> get thrown through floor...
-                            rigidHit->applyForce(dir*strength, closest.m_hitPointWorld - rigidHit->getWorldTransform().getOrigin());
-                            //rigidHit->applyCentralForce(dir * strength);
-                        }
-                      }
-                  }
-                  //destroy the world
-                  if(rigid->getUserIndex() == BID_ROCKET_FALLING){
-                      auto cubeHandle = entityx::ComponentHandle<Cube>();
-                      for (entityx::Entity entity : ex.entities.entities_with_components(cubeHandle)) {
-                          auto c = cubeHandle.get();
-                          if(c->destroyable && !c->moves && length(glm::vec3(c->pos) - getWorldPos(rigid->getWorldTransform())) < 5){
-                              //destroy and create moving one
-                              auto body = entity.component<SharedbtRigidBody>().get()->get();
-                              dynamicsWorld->removeRigidBody(body);
-                              createCube(c->pos, true);
-                              entity.destroy();
-                          }
-                      }
-                  }
+          //destroy the world
+          if (rigid->getUserIndex() == BID_ROCKET_FALLING) {
+            auto cubeHandle = entityx::ComponentHandle<Cube>();
+            for (entityx::Entity entity : ex.entities.entities_with_components(cubeHandle)) {
+              auto c = cubeHandle.get();
+              if (c->destroyable && !c->moves && length(glm::vec3(c->pos) - getWorldPos(rigid->getWorldTransform())) < 5) {
+                //destroy and create moving one
+                auto body = entity.component<SharedbtRigidBody>().get()->get();
+                dynamicsWorld->removeRigidBody(body);
+                createCube(c->pos, true);
+                entity.destroy();
               }
-              dynamicsWorld->removeRigidBody(rigid);
-              eRocket.destroy();
-          }else if(rocket->type == rtype::homing){
-              //steer
-              //trying this ("arrival" method):
-              //https://gamedev.stackexchange.com/questions/52988/implementing-a-homing-missile
-              //auto a = glm::length(glcast(rigid->getGravity())); // finaly a good use for gravity...
-              auto a = homingSpeed;
-              auto ppos = mechs[player].getPos();
-              auto rpos = ppos - pos;
-              auto pvel = glcast(mechs[player].rigid->getLinearVelocity());
-              auto vel = glcast(rigid->getLinearVelocity());
-              auto rvel = pvel - vel;
-              auto v = glm::dot(-rvel, rpos);
-              auto eta = -v/a + sqrtf(v*v/(a*a) + 2*(glm::length(rpos))/a); // length was guessed
-              auto ipos = ppos + rvel * eta; // impact, assuming player has no acc or change of dir
-              auto steerdir = ipos - pos;
-              //if(glm::length(steerdir) > a)
-                 // steerdir = glm::normalize(steerdir) * a;
-              rigid->setGravity(btcast(glm::normalize(steerdir) * a));
-              if(pos.y <= 1){
-                  btTransform trans = rigid->getWorldTransform();
-                  auto p = trans.getOrigin();
-                  p.setY(1);
-                  trans.setOrigin(p);
-                  rigid->setWorldTransform(trans);
-                  rigid->setLinearFactor(btVector3(1,0,1));
-              }
-              //rotate
-              auto rotAxis = -normalize(cross(vel, glm::vec3(0,1,0)));
-              btQuaternion quat(btcast(rotAxis), min(2.5, (double)pow(length(vel) / 4, 2))); // make this look better
-              vec4out.x = quat.getAngle();
-              float x, y, z;
-              quat.getEulerZYX(z,y,x);
-              rigid->setAngularVelocity(btVector3(x,y,z));
-           }
+            }
+          }
+        }
+        dynamicsWorld->removeRigidBody(rigid);
+        eRocket.destroy();
+      } else if (rocket->type == rtype::homing) {
+        //steer
+        //trying this ("arrival" method):
+        //https://gamedev.stackexchange.com/questions/52988/implementing-a-homing-missile
+        //auto a = glm::length(glcast(rigid->getGravity())); // finaly a good use for gravity...
+        auto a = homingSpeed;
+        auto ppos = mechs[player].getPos();
+        auto rpos = ppos - pos;
+        auto pvel = glcast(mechs[player].rigid->getLinearVelocity());
+        auto vel = glcast(rigid->getLinearVelocity());
+        auto rvel = pvel - vel;
+        auto v = glm::dot(-rvel, rpos);
+        auto eta = -v / a + sqrtf(v * v / (a * a) + 2 * (glm::length(rpos)) / a); // length was guessed
+        auto ipos = ppos + rvel * eta;                                            // impact, assuming player has no acc or change of dir
+        auto steerdir = ipos - pos;
+        //if(glm::length(steerdir) > a)
+        // steerdir = glm::normalize(steerdir) * a;
+        rigid->setGravity(btcast(glm::normalize(steerdir) * a));
+        if (pos.y <= 1) {
+          btTransform trans = rigid->getWorldTransform();
+          auto p = trans.getOrigin();
+          p.setY(1);
+          trans.setOrigin(p);
+          rigid->setWorldTransform(trans);
+          rigid->setLinearFactor(btVector3(1, 0, 1));
+        }
+        //rotate
+        auto rotAxis = -normalize(cross(vel, glm::vec3(0, 1, 0)));
+        btQuaternion quat(btcast(rotAxis), min(2.5, (double)pow(length(vel) / 4, 2))); // make this look better
+        vec4out.x = quat.getAngle();
+        float x, y, z;
+        quat.getEulerZYX(z, y, x);
+        rigid->setAngularVelocity(btVector3(x, y, z));
       }
+    }
   }
 
   //the dice have been thrown... and may not fall
   {
-      auto cubeHandle = entityx::ComponentHandle<Cube>();
-      for (entityx::Entity entity : ex.entities.entities_with_components(cubeHandle))
-          if(cubeHandle.get()->destroyable){
-              auto body = entity.component<SharedbtRigidBody>().get()->get();
-              auto pos = getWorldPos(body->getWorldTransform());
-              //It's magic, I ain't gotta explain it
-              if(pos.y < 7){
-                  body->applyCentralForce(btVector3(0,15,0));
-                  if(body->getLinearVelocity().getY() < -5)
-                      body->applyCentralForce(btVector3(0,5,0));
-              }
-
-
-          }
-
+    auto cubeHandle = entityx::ComponentHandle<Cube>();
+    for (entityx::Entity entity : ex.entities.entities_with_components(cubeHandle))
+      if (cubeHandle.get()->destroyable) {
+        auto body = entity.component<SharedbtRigidBody>().get()->get();
+        auto pos = getWorldPos(body->getWorldTransform());
+        //It's magic, I ain't gotta explain it
+        if (pos.y < 7) {
+          body->applyCentralForce(btVector3(0, 15, 0));
+          if (body->getLinearVelocity().getY() < -5)
+            body->applyCentralForce(btVector3(0, 5, 0));
+        }
+      }
   }
 
   //reinit if HP
-  if(mechs[player].HP <= 0)
-      resetPhase();
-
+  if (mechs[player].HP <= 0)
+    resetPhase();
 }
 
 //*************************************
@@ -912,21 +894,21 @@ void Game::update(float) {
 
 void Game::render(float elapsedSeconds) {
   // render game variable timestep
-    drawTime += elapsedSeconds;
+  drawTime += elapsedSeconds;
 
-    // Change display settings
-    if(mCurrentSSAAFactor != mSSAAFactor){
-        onResize(getWindowWidth(), getWindowHeight());
-        glow::log(glow::LogLevel::Info) << "SSAA: " << to_string(mCurrentSSAAFactor);
-    }
-    if(mCurrentShadowFactor != mShadowFactor){
-        mShadowMapSize = mMaxShadowSize / mShadowFactor;
-        mCurrentShadowFactor = mShadowFactor;
-        mBufferShadow->bind().resize(mShadowMapSize, mShadowMapSize);
-        glow::log(glow::LogLevel::Info) << "Shadows: " << to_string(mShadowMapSize) << "^2";
-    }
+  // Change display settings
+  if (mCurrentSSAAFactor != mSSAAFactor) {
+    onResize(getWindowWidth(), getWindowHeight());
+    glow::log(glow::LogLevel::Info) << "SSAA: " << to_string(mCurrentSSAAFactor);
+  }
+  if (mCurrentShadowFactor != mShadowFactor) {
+    mShadowMapSize = mMaxShadowSize / mShadowFactor;
+    mCurrentShadowFactor = mShadowFactor;
+    mBufferShadow->bind().resize(mShadowMapSize, mShadowMapSize);
+    glow::log(glow::LogLevel::Info) << "Shadows: " << to_string(mShadowMapSize) << "^2";
+  }
 
-    //dynamicsWorld->stepSimulation( elapsedSeconds); // I want
+  //dynamicsWorld->stepSimulation( elapsedSeconds); // I want
 
   // camera update here because it should be coupled tightly to rendering!
   updateCamera(elapsedSeconds);
@@ -938,30 +920,30 @@ void Game::render(float elapsedSeconds) {
   // from glow-samples
   //change parameters!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!1
   glm::mat4 shadowProj = glm::perspective(glm::pi<float>() / 5.0f, 1.0f, 80.0f, 105.0f);
-  glm::mat4 shadowView= glm::lookAt(mLightPos, glm::vec3(0.0f), glm::vec3(1, 0, 0));
-  glm::mat4 shadowViewProj = shadowProj* shadowView;
+  glm::mat4 shadowView = glm::lookAt(mLightPos, glm::vec3(0.0f), glm::vec3(1, 0, 0));
+  glm::mat4 shadowViewProj = shadowProj * shadowView;
 
   //update animations
-  for (auto &m : mechs){
-      auto t1 = m.animationsTime[1];
-       m.updateTime(elapsedSeconds);
-      m.didStep = m.mesh->MechdidStep(t1, m.animationsTime[1]);
+  for (auto &m : mechs) {
+    auto t1 = m.animationsTime[1];
+    m.updateTime(elapsedSeconds);
+    m.didStep = m.mesh->MechdidStep(t1, m.animationsTime[1]);
   }
 
 
   // Shadow
   {
-      auto fb = mFramebufferShadow->bind();
-      glClear(GL_DEPTH_BUFFER_BIT);
-      GLOW_SCOPED(enable, GL_DEPTH_TEST);
-      GLOW_SCOPED(enable, GL_CULL_FACE);
-      //GLOW_SCOPED(cullFace, GL_FRONT); // bad idea for my cubes
-      GLOW_SCOPED(depthFunc, GL_LESS);
+    auto fb = mFramebufferShadow->bind();
+    glClear(GL_DEPTH_BUFFER_BIT);
+    GLOW_SCOPED(enable, GL_DEPTH_TEST);
+    GLOW_SCOPED(enable, GL_CULL_FACE);
+    //GLOW_SCOPED(cullFace, GL_FRONT); // bad idea for my cubes
+    GLOW_SCOPED(depthFunc, GL_LESS);
 
-      drawCubes(mShaderCubePrepass->use(), shadowProj, shadowView);
-      drawRockets(mShaderCubePrepass->use(), shadowProj, shadowView);
-      drawMech(mShaderMech->use(), shadowProj, shadowView);
-      drawExplosion(mShaderExplosion->use(), shadowProj, shadowView, elapsedSeconds);
+    drawCubes(mShaderCubePrepass->use(), shadowProj, shadowView);
+    drawRockets(mShaderCubePrepass->use(), shadowProj, shadowView);
+    drawMech(mShaderMech->use(), shadowProj, shadowView);
+    drawExplosion(mShaderExplosion->use(), shadowProj, shadowView, elapsedSeconds);
   }
 
   // Depth
@@ -991,23 +973,23 @@ void Game::render(float elapsedSeconds) {
     GLOW_SCOPED(depthMask, GL_FALSE);
     GLOW_SCOPED(depthFunc, GL_EQUAL);
     GLOW_SCOPED(polygonMode, mShowWireframe ? GL_LINE : GL_FILL);
-    GLOW_SCOPED(clearColor, glm::vec3(0,0,0));
+    GLOW_SCOPED(clearColor, glm::vec3(0, 0, 0));
     glClear(GL_COLOR_BUFFER_BIT);
 
     drawCubes(mShaderCube->use(), proj, view);
     drawRockets(mShaderCube->use(), proj, view);
     drawExplosion(mShaderExplosion->use(), proj, view);
     {
-        GLOW_SCOPED(enable, GL_CULL_FACE);
-        GLOW_SCOPED(depthMask, GL_TRUE);
-        GLOW_SCOPED(depthFunc, GL_LESS);
-        drawMech(mShaderMech->use(), proj, view);
-        drawLines(mShaderLine->use(), proj, view);
-        // Render Bullet Debug
-        if (mDebugBullet) {
-          GLOW_SCOPED(disable, GL_DEPTH_TEST);
-          bulletDebugger->draw(proj * view);
-        }
+      GLOW_SCOPED(enable, GL_CULL_FACE);
+      GLOW_SCOPED(depthMask, GL_TRUE);
+      GLOW_SCOPED(depthFunc, GL_LESS);
+      drawMech(mShaderMech->use(), proj, view);
+      drawLines(mShaderLine->use(), proj, view);
+      // Render Bullet Debug
+      if (mDebugBullet) {
+        GLOW_SCOPED(disable, GL_DEPTH_TEST);
+        bulletDebugger->draw(proj * view);
+      }
     }
   }
 
@@ -1066,81 +1048,79 @@ void Game::render(float elapsedSeconds) {
 
   //screen space:
   {
-      GLOW_SCOPED(disable, GL_DEPTH_TEST);
-      GLOW_SCOPED(disable, GL_CULL_FACE);
-      //fuse
-      {
-          auto fb = mFramebufferFuse->bind();
-          auto shader = mShaderFuse->use();
-          shader.setTexture("uTexColor", mGBufferAlbedo);
-          shader.setTexture("uTexNormal", mGBufferNormal);
-          shader.setTexture("uTexMaterial", mGBufferMaterial);
-          shader.setTexture("uTexDepth", mGBufferDepth);
-          shader.setTexture("uTexMode", mBufferMode);
-          shader.setTexture("uSkybox", mSkybox);
-          shader.setTexture("uTexPaper", mTexPaper);
-          shader.setTexture("uTexNoise1", mTexNoise1);
-          shader.setUniform("uView", view);
-          shader.setUniform("uInvProj", inverse(proj));
-          shader.setUniform("uInvView", inverse(view));
-          shader.setUniform("uZNear", mCamera->getNearClippingPlane());
-          shader.setUniform("uZFar", mCamera->getFarClippingPlane());
-          shader.setUniform("uCamPos", mCamera->getPosition());
-          shader.setUniform("uTime", drawTime);
-          shader.setUniform("uSkyFactor", (secondPhase?1.f:.1f));
-          //from glow samples
-          shader.setUniform("uLightPos", mLightPos);
-          shader.setUniform("uTexShadowSize", (float)mShadowMapSize);
-          shader.setUniform("uShadowViewProjMatrix", shadowViewProj);
-          shader.setTexture("uTexShadow", mBufferShadow);
-          mMeshQuad->bind().draw();
-      }
-      // draw ui // after fxaa too pixely...
-      {
-          auto health = mechs[player].HP;
-          if(health >= 0 && health <= MAX_HEALTH)
-          {
-              auto fb = mFramebufferFuse->bind();
-              auto shader = mShaderUI->use();
-              shader.setTexture("uTexHealth", mHealthBar[health]);
-              auto model = glm::scale(glm::translate(glm::mat4(), glm::vec3(-.87, -.87, 0)), glm::vec3(.1,.1,1));
-              shader.setUniform("uModel", model);
-              mMeshQuad->bind().draw();
-          }
-       }
-      // render framebuffer content to output with small post-processing effect
-      {
-        // draw a fullscreen quad for outputting the framebuffer and applying a post-process
-        auto shader = mShaderOutput->use();
-        shader.setTexture("uTexColor", mBufferFuse);
-        shader.setUniform("uResolution", glm::vec2(mBufferFuse->getWidth(), mBufferFuse->getHeight()));
-        shader.setUniform("ufxaaQualitySubpix", fxaaQualitySubpix);
-        shader.setUniform("ufxaaQualityEdgeThreshold", fxaaQualityEdgeThreshold);
-        shader.setUniform("ufxaaQualityEdgeThresholdMin", fxaaQualityEdgeThresholdMin);
+    GLOW_SCOPED(disable, GL_DEPTH_TEST);
+    GLOW_SCOPED(disable, GL_CULL_FACE);
+    //fuse
+    {
+      auto fb = mFramebufferFuse->bind();
+      auto shader = mShaderFuse->use();
+      shader.setTexture("uTexColor", mGBufferAlbedo);
+      shader.setTexture("uTexNormal", mGBufferNormal);
+      shader.setTexture("uTexMaterial", mGBufferMaterial);
+      shader.setTexture("uTexDepth", mGBufferDepth);
+      shader.setTexture("uTexMode", mBufferMode);
+      shader.setTexture("uSkybox", mSkybox);
+      shader.setTexture("uTexPaper", mTexPaper);
+      shader.setTexture("uTexNoise1", mTexNoise1);
+      shader.setUniform("uView", view);
+      shader.setUniform("uInvProj", inverse(proj));
+      shader.setUniform("uInvView", inverse(view));
+      shader.setUniform("uZNear", mCamera->getNearClippingPlane());
+      shader.setUniform("uZFar", mCamera->getFarClippingPlane());
+      shader.setUniform("uCamPos", mCamera->getPosition());
+      shader.setUniform("uTime", drawTime);
+      shader.setUniform("uSkyFactor", (secondPhase ? 1.f : .1f));
+      //from glow samples
+      shader.setUniform("uLightPos", mLightPos);
+      shader.setUniform("uTexShadowSize", (float)mShadowMapSize);
+      shader.setUniform("uShadowViewProjMatrix", shadowViewProj);
+      shader.setTexture("uTexShadow", mBufferShadow);
+      mMeshQuad->bind().draw();
+    }
+    // draw ui // after fxaa too pixely...
+    {
+      auto health = mechs[player].HP;
+      if (health >= 0 && health <= MAX_HEALTH) {
+        auto fb = mFramebufferFuse->bind();
+        auto shader = mShaderUI->use();
+        shader.setTexture("uTexHealth", mHealthBar[health]);
+        auto model = glm::scale(glm::translate(glm::mat4(), glm::vec3(-.87, -.87, 0)), glm::vec3(.1, .1, 1));
+        shader.setUniform("uModel", model);
         mMeshQuad->bind().draw();
       }
+    }
+    // render framebuffer content to output with small post-processing effect
+    {
+      // draw a fullscreen quad for outputting the framebuffer and applying a post-process
+      auto shader = mShaderOutput->use();
+      shader.setTexture("uTexColor", mBufferFuse);
+      shader.setUniform("uResolution", glm::vec2(mBufferFuse->getWidth(), mBufferFuse->getHeight()));
+      shader.setUniform("ufxaaQualitySubpix", fxaaQualitySubpix);
+      shader.setUniform("ufxaaQualityEdgeThreshold", fxaaQualityEdgeThreshold);
+      shader.setUniform("ufxaaQualityEdgeThresholdMin", fxaaQualityEdgeThresholdMin);
+      mMeshQuad->bind().draw();
+    }
   }
 
   bulletDebugger->clearLines();
-
 }
 
 void Game::drawMech(glow::UsedProgram shader, glm::mat4 proj, glm::mat4 view) {
-    shader.setUniform("uProj", proj);
-    shader.setUniform("uView", view);
-    //shader.setTexture("uTexMode", mBufferMode);
+  shader.setUniform("uProj", proj);
+  shader.setUniform("uView", view);
+  //shader.setTexture("uTexMode", mBufferMode);
   mechs[player].draw(shader);
-  if(!fin){ // fix odd bug?
-      if(!secondPhase)
-          mechs[small].draw(shader);
-      else
-          mechs[big].draw(shader);
+  if (!fin) { // fix odd bug?
+    if (!secondPhase)
+      mechs[small].draw(shader);
+    else
+      mechs[big].draw(shader);
   }
 }
 
 void Game::drawCubes(glow::UsedProgram shader, glm::mat4 proj, glm::mat4 view) {
-    shader.setUniform("uProj", proj);
-    shader.setUniform("uView", view);
+  shader.setUniform("uProj", proj);
+  shader.setUniform("uView", view);
 
   shader.setTexture("uTexAlbedo", mTexCubeAlbedo);
   shader.setTexture("uTexNormal", mTexCubeNormal);
@@ -1178,7 +1158,7 @@ void Game::drawCubes(glow::UsedProgram shader, glm::mat4 proj, glm::mat4 view) {
       for (const auto &area : scaleAreas) {
         auto distanceFactor = (glm::distance(area.pos, trans) / area.radius);
         if (distanceFactor < 1)
-             modelCube = glm::scale(modelCube, glm::vec3(0.95));
+          modelCube = glm::scale(modelCube, glm::vec3(0.95));
       }
     }
     models.push_back(modelCube);
@@ -1212,17 +1192,16 @@ void Game::drawRockets(glow::UsedProgram shader, glm::mat4 proj, glm::mat4 view)
       trans.getOpenGLMatrix(glm::value_ptr(model));
     }
     auto rigid = *entity.component<SharedbtRigidBody>().get();
-    switch(RocketHandle->type){
+    switch (RocketHandle->type) {
     case rtype::forward:
-        model = glm::scale(model, glm::vec3(.5));
-        break;
+      model = glm::scale(model, glm::vec3(.5));
+      break;
     case rtype::falling:
-        model = rotate(model, glm::vec3(0,0,1), glm::vec3(0,-1,0));
-    default:
-        ;
+      model = rotate(model, glm::vec3(0, 0, 1), glm::vec3(0, -1, 0));
+    default:;
     }
-    if(RocketHandle->type != rtype::homing)
-        model = rotate(model, glm::normalize(glcast(rigid->getLinearVelocity())));
+    if (RocketHandle->type != rtype::homing)
+      model = rotate(model, glm::normalize(glcast(rigid->getLinearVelocity())));
 
 
     models[(int)(RocketHandle->type)].push_back(model);
@@ -1241,69 +1220,65 @@ void Game::drawRockets(glow::UsedProgram shader, glm::mat4 proj, glm::mat4 view)
   }
 }
 
-glm::vec3 HSV2RGB(float h, float s, float v){
-    //based on:
-    //https://stackoverflow.com/questions/3018313/algorithm-to-convert-rgb-to-hsv-and-hsv-to-rgb-in-range-0-255-for-both
-     auto rgb = saturate(glm::vec3(abs(h * 6 - 3) - 1, //
-                        2 - abs(h * 6 - 2), //
-                        2 - abs(h * 6 - 4)));
+glm::vec3 HSV2RGB(float h, float s, float v) {
+  //based on:
+  //https://stackoverflow.com/questions/3018313/algorithm-to-convert-rgb-to-hsv-and-hsv-to-rgb-in-range-0-255-for-both
+  auto rgb = saturate(glm::vec3(abs(h * 6 - 3) - 1, //
+                                2 - abs(h * 6 - 2), //
+                                2 - abs(h * 6 - 4)));
 
-    return glm::vec3(((rgb - glm::vec3(1.)) * s + glm::vec3(1.)) * v);
+  return glm::vec3(((rgb - glm::vec3(1.)) * s + glm::vec3(1.)) * v);
 }
 
-void Game::drawLines(glow::UsedProgram shader, glm::mat4 proj, glm::mat4 view)
-{
-
+void Game::drawLines(glow::UsedProgram shader, glm::mat4 proj, glm::mat4 view) {
   auto ab = mVALine->getAttributeBuffer("position");
   static bool init = false;
-  if(!init){
-      vector<LineVertex> lines(spherePoints.size());
-      random_shuffle(spherePoints.begin(), spherePoints.end());
-      static mt19937_64 rng;
-      uniform_real_distribution<double> unif(0, 1);
-      for(int i = 0; i < spherePoints.size(); i+=2){
-          lines[i] = LineVertex({spherePoints[i], HSV2RGB(unif(rng), 1, 1)});
-          lines[i+1] = LineVertex({spherePoints[i+1], HSV2RGB(unif(rng), 1, 1)});
-      }
-      ab->bind().setData(lines);
-      init = true;
-   }
+  if (!init) {
+    vector<LineVertex> lines(spherePoints.size());
+    random_shuffle(spherePoints.begin(), spherePoints.end());
+    static mt19937_64 rng;
+    uniform_real_distribution<double> unif(0, 1);
+    for (int i = 0; i < spherePoints.size(); i += 2) {
+      lines[i] = LineVertex({spherePoints[i], HSV2RGB(unif(rng), 1, 1)});
+      lines[i + 1] = LineVertex({spherePoints[i + 1], HSV2RGB(unif(rng), 1, 1)});
+    }
+    ab->bind().setData(lines);
+    init = true;
+  }
 
   // TODO rotate around center...
   auto area = entityx::ComponentHandle<ModeArea>();
   for (auto entity : ex.entities.entities_with_components(area))
-    if (area->mode == neon){
-        auto a = *area.get();
-        auto model = glm::translate(glm::mat4(), a.pos);
-        model = scale(model, glm::vec3(a.radius));
-        shader.setUniform("uProjViewModel", proj * view * model);
-        mVALine->bind().draw(500 / max(30 - (int)a.radius, 1)); // bigger -> more lines (in 30 steps)
+    if (area->mode == neon) {
+      auto a = *area.get();
+      auto model = glm::translate(glm::mat4(), a.pos);
+      model = scale(model, glm::vec3(a.radius));
+      shader.setUniform("uProjViewModel", proj * view * model);
+      mVALine->bind().draw(500 / max(30 - (int)a.radius, 1)); // bigger -> more lines (in 30 steps)
     }
-
 }
 
-void Game::drawExplosion(glow::UsedProgram shader, glm::mat4 proj, glm::mat4 view, float dT)
-{
-    const auto explosionTime = .3;
-    const auto explosionParts = 8;
-    const auto explosionRadius = 1.;
-    list<Explosion> keepList;
-    while(!explosions.empty()){
-        Explosion e = explosions.back();
-        explosions.pop_back();
-        e.time += dT;
-        if(e.time > explosionTime)
-            continue;
-        int part = min((int)((e.time * explosionParts) / explosionTime),7);
-        auto model = glm::translate(glm::mat4(), e.pos);
-        auto r = explosionRadius * e.time / explosionTime;
-        model = scale(model, glm::vec3(r));
-        shader.setUniform("uProjView", proj * view);
-        shader.setUniform("uModel", model);
-        mVAExplosion->bind().drawRange(part * 60, part * 60 + 59);
-        keepList.push_back(e);
-    }
-    explosions = keepList;
+void Game::drawExplosion(glow::UsedProgram shader, glm::mat4 proj, glm::mat4 view, float dT) {
+  const auto explosionTime = .3;
+  const auto explosionParts = 8;
+  const auto explosionRadius = 1.;
+  list<Explosion> keepList;
+  while (!explosions.empty()) {
+    Explosion e = explosions.back();
+    explosions.pop_back();
+    e.time += dT;
+    if (e.time > explosionTime)
+      continue;
+    int part = min((int)((e.time * explosionParts) / explosionTime), 7);
+    auto model = glm::translate(glm::mat4(), e.pos);
+    auto r = explosionRadius * e.time / explosionTime;
+    model = scale(model, glm::vec3(r));
+    shader.setUniform("uProjView", proj * view);
+    shader.setUniform("uModel", model);
+    mVAExplosion->bind().drawRange(part * 60, part * 60 + 59);
+    keepList.push_back(e);
+  }
+  explosions = keepList;
 }
 
 
@@ -1319,15 +1294,15 @@ void Game::onGui() {
       //ImGui::Checkbox("Show Mech", &mDrawMech);
       ImGui::Checkbox("free Camera", &mFreeCamera);
       ImGui::Checkbox("no attacks", &mNoAttacks);
-      ImGui::SliderFloat3("textvec", (float*)&mtestVec, -100, 100);
+      ImGui::SliderFloat3("textvec", (float *)&mtestVec, -100, 100);
       ImGui::Unindent();
       //ImGui::SliderFloat3("UI", (float*)&mUIPos, 0.0f, 1.0f);
     }
-    ImGui::Text(((string)"Out: " + to_string(vec4out.x) + " " + to_string(vec4out.y)).c_str());
+    ImGui::Text(((string) "Out: " + to_string(vec4out.x) + " " + to_string(vec4out.y)).c_str());
     auto ppos = mechs[player].getPos();
     auto py = ppos.y - mechs[player].collision->getHalfHeight() - mechs[player].collision->getRadius();
-    ImGui::Text(((string)"Y: " + to_string(py) + ", Y-f:" + to_string(py - mechs[player].floatOffset)).c_str());
-    ImGui::Text(((string)"P: " + to_string(mechs[player].HP) + ", S:" + to_string(mechs[small].HP)).c_str());
+    ImGui::Text(((string) "Y: " + to_string(py) + ", Y-f:" + to_string(py - mechs[player].floatOffset)).c_str());
+    ImGui::Text(((string) "P: " + to_string(mechs[player].HP) + ", S:" + to_string(mechs[small].HP)).c_str());
     ImGui::Text("Controll:");
     {
       ImGui::Indent();
@@ -1341,24 +1316,23 @@ void Game::onGui() {
     }
     ImGui::Text("FXAA:");
     {
-        ImGui::Indent();
-        ImGui::SliderFloat("QualitySubpix", &fxaaQualitySubpix, .5, 1);
-        ImGui::SliderFloat("QualityEdgeThreshold", &fxaaQualityEdgeThreshold, 0.333, 0.063);
-        ImGui::SliderFloat("QualityEdgeThresholdMin", &fxaaQualityEdgeThresholdMin, 0.0312, 0.0833);
-        ImGui::Unindent();
+      ImGui::Indent();
+      ImGui::SliderFloat("QualitySubpix", &fxaaQualitySubpix, .5, 1);
+      ImGui::SliderFloat("QualityEdgeThreshold", &fxaaQualityEdgeThreshold, 0.333, 0.063);
+      ImGui::SliderFloat("QualityEdgeThresholdMin", &fxaaQualityEdgeThresholdMin, 0.0312, 0.0833);
+      ImGui::Unindent();
     }
     ImGui::Text("DebugAnimations:");
     {
-        ImGui::Text(((string)"Speed: " + to_string(mechs[player].rigid->getLinearVelocity().length())).c_str());
-        ImGui::Indent();
-        ImGui::Checkbox("Yes?", &DebugingAnimations);
-        ImGui::SliderFloat("alpha", &debugAnimationAlpha, 0, 1);
-        ImGui::SliderInt3("animations", (int*)&debugAnimations, Mech::run, Mech::sbigB);
-        ImGui::SliderFloat3("times", (float*)&debugAnimationTimes, 0, 1.7);
-        ImGui::SliderFloat("angle", &debugAnimationAngle, -4, 4);
-        ImGui::Unindent();
+      ImGui::Text(((string) "Speed: " + to_string(mechs[player].rigid->getLinearVelocity().length())).c_str());
+      ImGui::Indent();
+      ImGui::Checkbox("Yes?", &DebugingAnimations);
+      ImGui::SliderFloat("alpha", &debugAnimationAlpha, 0, 1);
+      ImGui::SliderInt3("animations", (int *)&debugAnimations, Mech::run, Mech::sbigB);
+      ImGui::SliderFloat3("times", (float *)&debugAnimationTimes, 0, 1.7);
+      ImGui::SliderFloat("angle", &debugAnimationAngle, -4, 4);
+      ImGui::Unindent();
     }
-
   }
   ImGui::End();
 #endif
@@ -1377,7 +1351,7 @@ void Game::onResize(int w, int h) {
   // resize all framebuffer textures
   for (auto const &t : mTargets)
     t->bind().resize(w, h);
-  mBufferFuse->bind().resize(w,h);
+  mBufferFuse->bind().resize(w, h);
 }
 
 bool Game::onKey(int key, int scancode, int action, int mods) {
@@ -1385,28 +1359,27 @@ bool Game::onKey(int key, int scancode, int action, int mods) {
   glow::glfw::GlfwApp::onKey(key, scancode, action, mods);
 
   // Alt +
-  if(action == GLFW_PRESS && (isKeyPressed(GLFW_KEY_LEFT_ALT) || isKeyPressed(GLFW_KEY_RIGHT_ALT)))
-      switch(key){
-      case GLFW_KEY_ENTER:
-          // TODO seems like vsync is of in fullscreen
-          toggleFullscreen();
-          break;
-      case GLFW_KEY_F:
-          mFreeCamera = !mFreeCamera;
-          break;
-      case GLFW_KEY_A:
-          mSSAAFactor += .5;
-          if(mSSAAFactor > 2)
-              mSSAAFactor = 1;
-          break;
-      case GLFW_KEY_S:
-          mShadowFactor *= 2;
-          if(mShadowFactor > 4)
-              mShadowFactor = 1;
-          break;
-      default:
-          ;
-     }
+  if (action == GLFW_PRESS && (isKeyPressed(GLFW_KEY_LEFT_ALT) || isKeyPressed(GLFW_KEY_RIGHT_ALT)))
+    switch (key) {
+    case GLFW_KEY_ENTER:
+      // TODO seems like vsync is of in fullscreen
+      toggleFullscreen();
+      break;
+    case GLFW_KEY_F:
+      mFreeCamera = !mFreeCamera;
+      break;
+    case GLFW_KEY_A:
+      mSSAAFactor += .5;
+      if (mSSAAFactor > 2)
+        mSSAAFactor = 1;
+      break;
+    case GLFW_KEY_S:
+      mShadowFactor *= 2;
+      if (mShadowFactor > 4)
+        mShadowFactor = 1;
+      break;
+    default:;
+    }
 
   return false;
 }
@@ -1461,16 +1434,16 @@ void Game::updateCamera(float elapsedSeconds) {
 
     // move camera handle (position), accepts relative moves
     mCamera->handle.move(rel_move);
-      mCamera->update(elapsedSeconds);
+    mCamera->update(elapsedSeconds);
   } else {
-      // 1 looks good for cinematic
-      //mCamera->handle.sensitivity.distance = 100;
-      //mCamera->handle.sensitivity.position = 100;
-      //mCamera->handle.sensitivity.rotation = 100;
-      //mCamera->handle.sensitivity.target = 100;
+    // 1 looks good for cinematic
+    //mCamera->handle.sensitivity.distance = 100;
+    //mCamera->handle.sensitivity.position = 100;
+    //mCamera->handle.sensitivity.rotation = 100;
+    //mCamera->handle.sensitivity.target = 100;
 
-      GLFWgamepadstate gamepadState;
-      bool hasController = glfwJoystickIsGamepad(GLFW_JOYSTICK_1) && glfwGetGamepadState(GLFW_JOYSTICK_1, &gamepadState);
+    GLFWgamepadstate gamepadState;
+    bool hasController = glfwJoystickIsGamepad(GLFW_JOYSTICK_1) && glfwGetGamepadState(GLFW_JOYSTICK_1, &gamepadState);
 #ifdef NOGUI
     setCursorMode(glow::glfw::CursorMode::Disabled);
 #endif
@@ -1481,7 +1454,7 @@ void Game::updateCamera(float elapsedSeconds) {
     static glm::vec3 lastTarget = target;
     mCamera->handle.move(target - lastTarget);
     mCamera->handle.setTarget(target);
-    mCamera->handle.setTargetDistance(2 + 2* sin((lastPos - target).y));
+    mCamera->handle.setTargetDistance(2 + 2 * sin((lastPos - target).y));
     //mCamera->handle.setTargetDistance(5);
     /*{
         auto dif = (lastPos - lastTarget);
@@ -1494,37 +1467,36 @@ void Game::updateCamera(float elapsedSeconds) {
     }*/
 
     float dX = 0, dY = 0;
-        //get dX, dY
-    if(!mCameraLocked){
-        if (!ImGuiwantMouse) {
-          auto mouse_delta = input().getLastMouseDelta() / 100.0f;
-          if (mouse_delta.x < 1000){ // ???
-              dX += mouse_delta.x;
-              dY += mouse_delta.y;
-            //mCamera->handle.orbit(mouse_delta.x, mouse_delta.y);
-          }
-          //pos.y = std::max(0.1f, pos.y);
-          //mCamera->handle.setPosition(pos);
-          //mCamera->handle.move(glm::vec3(0, std::max(.0, 0.1 - pos.y), 0));
-
+    //get dX, dY
+    if (!mCameraLocked) {
+      if (!ImGuiwantMouse) {
+        auto mouse_delta = input().getLastMouseDelta() / 100.0f;
+        if (mouse_delta.x < 1000) { // ???
+          dX += mouse_delta.x;
+          dY += mouse_delta.y;
+          //mCamera->handle.orbit(mouse_delta.x, mouse_delta.y);
         }
-        if(hasController){
-            dX += limitAxis( gamepadState.axes[GLFW_GAMEPAD_AXIS_RIGHT_X]) / 15;
-            dY += limitAxis(-gamepadState.axes[GLFW_GAMEPAD_AXIS_RIGHT_Y]) / 15;
-        }
-        if(isKeyPressed(GLFW_KEY_KP_4))
-            dX -= .1f;
-        if(isKeyPressed(GLFW_KEY_KP_6))
-            dX += .1f;
-        if(isKeyPressed(GLFW_KEY_KP_8))
-            dY -= .1f;
-        if(isKeyPressed(GLFW_KEY_KP_2))
-            dY += .1f;
-        }
-     mCamera->handle.orbit(dX, dY);
+        //pos.y = std::max(0.1f, pos.y);
+        //mCamera->handle.setPosition(pos);
+        //mCamera->handle.move(glm::vec3(0, std::max(.0, 0.1 - pos.y), 0));
+      }
+      if (hasController) {
+        dX += limitAxis(gamepadState.axes[GLFW_GAMEPAD_AXIS_RIGHT_X]) / 15;
+        dY += limitAxis(-gamepadState.axes[GLFW_GAMEPAD_AXIS_RIGHT_Y]) / 15;
+      }
+      if (isKeyPressed(GLFW_KEY_KP_4))
+        dX -= .1f;
+      if (isKeyPressed(GLFW_KEY_KP_6))
+        dX += .1f;
+      if (isKeyPressed(GLFW_KEY_KP_8))
+        dY -= .1f;
+      if (isKeyPressed(GLFW_KEY_KP_2))
+        dY += .1f;
+    }
+    mCamera->handle.orbit(dX, dY);
 
 
-     mCamera->update(elapsedSeconds);
+    mCamera->update(elapsedSeconds);
     //mCamera->handle.setTargetDistance(2 + 2* sin((mCamera->getPosition() - target).y));
 
     lastTarget = target;
@@ -1534,14 +1506,14 @@ void Game::updateCamera(float elapsedSeconds) {
 
   //new camera -> new ears:
   {
-      auto pos = mCamera->getPosition();
-      auto forw = mCamera->getForwardVector();
-      auto up = mCamera->getUpVector();
-      soloud->set3dListenerParameters(
-                  pos.x, pos.y, pos.z, //
-                  forw.x, forw.y, forw.z, //
-                  up.x, up.y, up.z, //
-                  0, 0, 0);
-      soloud->update3dAudio();
+    auto pos = mCamera->getPosition();
+    auto forw = mCamera->getForwardVector();
+    auto up = mCamera->getUpVector();
+    soloud->set3dListenerParameters(
+        pos.x, pos.y, pos.z,    //
+        forw.x, forw.y, forw.z, //
+        up.x, up.y, up.z,       //
+        0, 0, 0);
+    soloud->update3dAudio();
   }
 }

@@ -32,7 +32,7 @@ struct ModeArea {
   float radius;
 };
 
-struct Explosion{
+struct Explosion {
   glm::vec3 pos;
   float time = 0;
 };
@@ -52,7 +52,7 @@ enum class rtype {
 
 
 //bullet User index:
-#define BID_NONE 
+#define BID_NONE
 #define BID_PLAYER (1 << 0)
 #define BID_SMALL (1 << 1)
 #define BID_BIG (1 << 2)
@@ -62,13 +62,13 @@ enum class rtype {
 #define BID_ROCKET_FALLING ((1 << 7) | BID_ROCKET)
 
 #define SMALL_NONE 0
-#define SMALL_RUN (1 << 0) // run at player
+#define SMALL_RUN (1 << 0)    // run at player
 #define SMALL_GOTHIT (1 << 1) // by Rocket
 
-inline double limitAxis(double a) { return a < .1 && a > -.1? 0 : a; }
+inline double limitAxis(double a) { return a < .1 && a > -.1 ? 0 : a; }
 
 class Game : public glow::glfw::GlfwApp {
-    friend class Mech;
+  friend class Mech;
   // bad
 public:
   static Game *instance;
@@ -91,21 +91,21 @@ private:
 
   // gfx settings
 private:
-  glm::vec3 mtestVec = {0,0,0};
+  glm::vec3 mtestVec = {0, 0, 0};
   bool mShowWireframe = false;
   bool mShowMenu = false;
   bool mFreeCamera = false;
   bool mCameraLocked = false;
   bool mNoAttacks = false;
   int mShadowMapSize = 16384 / 4; // urks, high
-  glm::vec3 mLightPos = {0,100,0};
+  glm::vec3 mLightPos = {0, 100, 0};
   float fxaaQualitySubpix = .75;
   float fxaaQualityEdgeThreshold = .166;
   float fxaaQualityEdgeThresholdMin = .0833;
   bool DebugingAnimations = false;
   float debugAnimationAlpha = 0;
-  glm::ivec3 debugAnimations = {0,0,0};
-  glm::vec3 debugAnimationTimes = {0,0,0};
+  glm::ivec3 debugAnimations = {0, 0, 0};
+  glm::vec3 debugAnimationTimes = {0, 0, 0};
   float debugAnimationAngle = 0;
   float drawTime = 0;
   int mShadowFactor = 2;
@@ -218,8 +218,8 @@ private:
   bool mDebugBullet = false;
   std::shared_ptr<btBoxShape> colBox;
   std::shared_ptr<btSphereShape> colPoint;
-  void bulletCallback(btDynamicsWorld*, btScalar);
-  static void bulletCallbackStatic(btDynamicsWorld* w, btScalar c){instance->bulletCallback(w,c);}
+  void bulletCallback(btDynamicsWorld *, btScalar);
+  static void bulletCallbackStatic(btDynamicsWorld *w, btScalar c) { instance->bulletCallback(w, c); }
   entityx::Entity createCube(const glm::ivec3 &pos, bool moves = false);
   entityx::Entity createRocket(const glm::vec3 &pos, const glm::vec3 &vel, rtype type);
 

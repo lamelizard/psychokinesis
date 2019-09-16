@@ -27,37 +27,36 @@ enum mechType { // got less to write if it's outside of Mech...
 
 struct Mech : SM {
   enum animation {
-      //30 tps
-    run, //24
-    runjump, // 24
-    walk, // 50
-    getup, // 34
+    //30 tps
+    run,       //24
+    runjump,   // 24
+    walk,      // 50
+    getup,     // 34
     startWalk, // 25
-    hit, // 50
-    sbigA, // 15
-    sbigB, // 15
+    hit,       // 50
+    sbigA,     // 15
+    sbigB,     // 15
     none
   };
 
   std::map<animation, bool> loops = {
-    {run,true},
-    {runjump,true},
-    {walk,true},
-    {getup,false},
-    {startWalk, false},
-    {hit,false},
+      {run, true},
+      {runjump, true},
+      {walk, true},
+      {getup, false},
+      {startWalk, false},
+      {hit, false},
   };
   std::map<animation, std::string> names = {
-    {run,"Run_InPlace"},
-    {runjump,"RunJump_InPlace"},
-    {walk,"WalkInPlace"},
-    {getup,"SleepToDefault"},
-    {startWalk, "DefaultToWalk"},
-    {hit,"Hit"},
-    {sbigA, "ShootBigCanon_A"},
-    {sbigB, "ShootBigCanon_B"},
-    {none, ""}
-  };
+      {run, "Run_InPlace"},
+      {runjump, "RunJump_InPlace"},
+      {walk, "WalkInPlace"},
+      {getup, "SleepToDefault"},
+      {startWalk, "DefaultToWalk"},
+      {hit, "Hit"},
+      {sbigA, "ShootBigCanon_A"},
+      {sbigB, "ShootBigCanon_B"},
+      {none, ""}};
 
 
   mechType type;
@@ -88,9 +87,9 @@ struct Mech : SM {
   animation animations[2] = {run, run}; // bottom, a, b
   animation animationTop = none;
   float animationAlpha = 1;
-  double animationsTime[2] = {0, 0};        // bottom, top && a, b
+  double animationsTime[2] = {0, 0}; // bottom, top && a, b
   double animationTimeTop = 0;
-  double animationsFaktor[2] = {1,1}; // don't need one for top
+  double animationsFaktor[2] = {1, 1}; // don't need one for top
   //double animationAngle = 0;
   void setAnimation(animation, animation, double bt = 0, double tt = 0);
   void setAnimation(animation, animation, animation, float ba = 1, double bta = 0, double btb = 0, double tt = 0);
@@ -122,5 +121,3 @@ struct Mech : SM {
   static void runBig(int);
   static void dieBig(int);
 };
-
-

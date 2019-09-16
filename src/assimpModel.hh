@@ -54,7 +54,7 @@ public:
   void draw();                                                // glow::Program should be active
   void draw(const glow::UsedProgram &, double time, bool loop, const std::string &animation);
   std::vector<glm::mat4> getMechBones(const std::string &aba, const std::string &abb, const std::string &at, float ba, double bta, double btb, double tt, float angle);
-  int getMechBoneID(const std::string& name);
+  int getMechBoneID(const std::string &name);
   bool MechdidStep(double t1, double t2);
   glow::SharedVertexArray getVA();
 

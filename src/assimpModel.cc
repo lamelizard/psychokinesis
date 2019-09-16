@@ -27,12 +27,12 @@ static glm::vec4 aiCast(aiColor4D const &v) {
 }
 
 static glm::mat4 aiCast(aiMatrix4x4 const &v) {
-  return glm::transpose(glm::mat4(           //
-      v.a1, v.a2, v.a3, v.a4, //
-      v.b1, v.b2, v.b3, v.b4, //
-      v.c1, v.c2, v.c3, v.c4, //
-      v.d1, v.d2, v.d3, v.d4  //
-  ));
+  return glm::transpose(glm::mat4( //
+      v.a1, v.a2, v.a3, v.a4,      //
+      v.b1, v.b2, v.b3, v.b4,      //
+      v.c1, v.c2, v.c3, v.c4,      //
+      v.d1, v.d2, v.d3, v.d4       //
+      ));
 }
 
 // mostly from glow-extras:
@@ -103,13 +103,12 @@ void AssimpModel::draw(const glow::UsedProgram &shader, double t, bool loop, con
 
     if (boneIDOfNode.count(thisNode) == 1) { // the node's a bone
       glm::mat4 boneMat = aiCast(globalInverse * /*aiMatrix4x4::RotationX(-90, aiMatrix4x4()) **/ transform * offsetOfNode[thisNode]);
-      //boneMat = glm::transpose(boneMat); 
-           for (int i = 0; i < 3; i++)// test
+      //boneMat = glm::transpose(boneMat);
+      for (int i = 0; i < 3; i++) // test
         boneMat[3][i] /= 100;
       boneArray[boneIDOfNode[thisNode]] = boneMat;
+    }
 
-    } 
-      
 
     for (auto i = 0u; i < thisNode->mNumChildren; i++)
       fillArray(thisNode->mChildren[i], transform, fillArray);
@@ -120,105 +119,103 @@ void AssimpModel::draw(const glow::UsedProgram &shader, double t, bool loop, con
   va->bind().draw();
 }
 
-int AssimpModel::getMechBoneID(const std::string &name){
-    return boneIDOfName[name];
+int AssimpModel::getMechBoneID(const std::string &name) {
+  return boneIDOfName[name];
 }
 
-bool AssimpModel::MechdidStep(double t1, double t2)
-{
-    auto animation = animations["WalkInPlace"];
-    auto dur = animation->mDuration;
-    assert(animation->mTicksPerSecond > 0);
-    auto ticks1 = fmod(t1 * animation->mTicksPerSecond, dur);
-    auto ticks2 = fmod(t2 * animation->mTicksPerSecond, dur);
+bool AssimpModel::MechdidStep(double t1, double t2) {
+  auto animation = animations["WalkInPlace"];
+  auto dur = animation->mDuration;
+  assert(animation->mTicksPerSecond > 0);
+  auto ticks1 = fmod(t1 * animation->mTicksPerSecond, dur);
+  auto ticks2 = fmod(t2 * animation->mTicksPerSecond, dur);
 
-    //just guessing
-    if(ticks2 < ticks1)
-        return true;
-    if(ticks1 < dur / 2 && ticks2 > dur / 2)
-        return true;
-    return false;
+  //just guessing
+  if (ticks2 < ticks1)
+    return true;
+  if (ticks1 < dur / 2 && ticks2 > dur / 2)
+    return true;
+  return false;
 }
 
-SharedVertexArray AssimpModel::getVA(){
-    if (!va)
-       createVertexArray();
-     assert(va);
-     return va;
+SharedVertexArray AssimpModel::getVA() {
+  if (!va)
+    createVertexArray();
+  assert(va);
+  return va;
 }
 
-std::vector<glm::mat4> AssimpModel::getMechBones(const std::string &abaS, const std::string &abbS, const std::string &atS, float ba, double bta, double btb, double tt, float angle)
-{
-     if(!abaS.length() || !abbS.length())
-         throw new std::runtime_error("");
+std::vector<glm::mat4> AssimpModel::getMechBones(const std::string &abaS, const std::string &abbS, const std::string &atS, float ba, double bta, double btb, double tt, float angle) {
+  if (!abaS.length() || !abbS.length())
+    throw new std::runtime_error("");
 
-     auto aba = animations[abaS];
-     auto abb = animations[abbS];
-     aiAnimation *at = nullptr;
-     if(atS.length())
-         at = animations[atS];
+  auto aba = animations[abaS];
+  auto abb = animations[abbS];
+  aiAnimation *at = nullptr;
+  if (atS.length())
+    at = animations[atS];
 
-     bool lba = true;
-     if(abaS ==  "DefaultToWalk" || //
-             abaS == "Hit" || //
-             abaS ==  "SleepToDefault" || //
-             abaS == "ShootBigCanon_A" || //
-             abaS == "ShootBigCanon_B"){
-     //    ba = 0; //TODO add back later maybe?
-         lba = false;
-     }
+  bool lba = true;
+  if (abaS == "DefaultToWalk" ||   //
+      abaS == "Hit" ||             //
+      abaS == "SleepToDefault" ||  //
+      abaS == "ShootBigCanon_A" || //
+      abaS == "ShootBigCanon_B") {
+    //    ba = 0; //TODO add back later maybe?
+    lba = false;
+  }
 
-     double tiba = 0, tibb = 0, tit = 0;
-     assert(aba->mTicksPerSecond > 0 && abb->mTicksPerSecond > 0 && (!at || at->mTicksPerSecond > 0));
-     tiba = bta * aba->mTicksPerSecond;
-     tibb = btb * abb->mTicksPerSecond;
-     if(at){
-         tit = tt * at->mTicksPerSecond;
-         tit = std::min(tit, at->mDuration);
-     }
-     if(lba)
-         tiba = fmod(tiba, aba->mDuration);
-     else
-         tiba = std::min(tiba, aba->mDuration);
-     tibb = fmod(tibb, abb->mDuration);
-
+  double tiba = 0, tibb = 0, tit = 0;
+  assert(aba->mTicksPerSecond > 0 && abb->mTicksPerSecond > 0 && (!at || at->mTicksPerSecond > 0));
+  tiba = bta * aba->mTicksPerSecond;
+  tibb = btb * abb->mTicksPerSecond;
+  if (at) {
+    tit = tt * at->mTicksPerSecond;
+    tit = std::min(tit, at->mDuration);
+  }
+  if (lba)
+    tiba = fmod(tiba, aba->mDuration);
+  else
+    tiba = std::min(tiba, aba->mDuration);
+  tibb = fmod(tibb, abb->mDuration);
 
 
-     std::vector<glm::mat4> boneArray(MAX_BONES);
 
-     auto globalInverse = scene->mRootNode->mTransformation; // needed?
-     globalInverse.Inverse();
+  std::vector<glm::mat4> boneArray(MAX_BONES);
 
-     aiAnimation *anims[3] = {aba, abb, at};
-     double tickss[3] = {tiba, tibb, tit};
+  auto globalInverse = scene->mRootNode->mTransformation; // needed?
+  globalInverse.Inverse();
 
-
-     const auto fillArray = [this, &boneArray, anims, tickss, ba, angle, globalInverse](aiNode *thisNode, aiMatrix4x4 parent, auto &fillArray) -> void {
-       // https://github.com/vovan4ik123/assimp-Cpp-OpenGL-skeletal-animation/blob/master/Load_3D_model_2/Model.cpp
-       auto transform = aiMatrix4x4();
-       aiMatrix4x4 transforms[3] = {transform, transform, transform};
-
-       aiVector3D scalings[3];
-       aiQuaternion rotations[3];
-       aiVector3D positions[3];
-
-       for(int i = 0; i < (anims[2]?3:2); i++) { // 3 if we have at
-           if (nodeAnimations[anims[i]].count(thisNode)) // node's animated
-             transforms[i] = this->getAnimMat(tickss[i], nodeAnimations[anims[i]][thisNode]);
-           else
-             transforms[i] = thisNode->mTransformation; // node not animated
-
-           transforms[i].Decompose(scalings[i], rotations[i], positions[i]);
-       }
+  aiAnimation *anims[3] = {aba, abb, at};
+  double tickss[3] = {tiba, tibb, tit};
 
 
-       aiQuaternion rotation;
-       aiVector3D scaling = scalings[0] * (1 - ba) + scalings[1] * ba;
-       aiVector3D position = positions[0] * (1 - ba) + positions[1] * ba;
-       aiQuaternion::Interpolate(rotation, rotations[0], rotations[1], ba);
+  const auto fillArray = [this, &boneArray, anims, tickss, ba, angle, globalInverse](aiNode *thisNode, aiMatrix4x4 parent, auto &fillArray) -> void {
+    // https://github.com/vovan4ik123/assimp-Cpp-OpenGL-skeletal-animation/blob/master/Load_3D_model_2/Model.cpp
+    auto transform = aiMatrix4x4();
+    aiMatrix4x4 transforms[3] = {transform, transform, transform};
 
-       // Top
-       /*
+    aiVector3D scalings[3];
+    aiQuaternion rotations[3];
+    aiVector3D positions[3];
+
+    for (int i = 0; i < (anims[2] ? 3 : 2); i++) {  // 3 if we have at
+      if (nodeAnimations[anims[i]].count(thisNode)) // node's animated
+        transforms[i] = this->getAnimMat(tickss[i], nodeAnimations[anims[i]][thisNode]);
+      else
+        transforms[i] = thisNode->mTransformation; // node not animated
+
+      transforms[i].Decompose(scalings[i], rotations[i], positions[i]);
+    }
+
+
+    aiQuaternion rotation;
+    aiVector3D scaling = scalings[0] * (1 - ba) + scalings[1] * ba;
+    aiVector3D position = positions[0] * (1 - ba) + positions[1] * ba;
+    aiQuaternion::Interpolate(rotation, rotations[0], rotations[1], ba);
+
+    // Top
+    /*
        if(anims[2] &&
            strcmp(thisNode->mName.C_Str(), "BigCanon01_L") == 0 || //
            strcmp(thisNode->mName.C_Str(), "BigCanon01_R") == 0 || //
@@ -230,32 +227,31 @@ std::vector<glm::mat4> AssimpModel::getMechBones(const std::string &abaS, const 
        }
        */
 
-       //custom rotation
-       if(thisNode->mName == aiString("Body"))
-           rotation = rotation * aiQuaternion(aiVector3D(1,0,0), angle);
+    //custom rotation
+    if (thisNode->mName == aiString("Body"))
+      rotation = rotation * aiQuaternion(aiVector3D(1, 0, 0), angle);
 
-       transform = parent * aiMatrix4x4(scaling, rotation, position);
-
-
-       if (boneIDOfNode.count(thisNode) == 1) { // the node's a bone
-         glm::mat4 boneMat = aiCast(globalInverse * transform * offsetOfNode[thisNode]);
-         //boneMat = glm::transpose(boneMat);
-              for (int i = 0; i < 3; i++)// test
-           boneMat[3][i] /= 100;
-         boneArray[boneIDOfNode[thisNode]] = boneMat;
-
-       }
+    transform = parent * aiMatrix4x4(scaling, rotation, position);
 
 
-       for (auto i = 0u; i < thisNode->mNumChildren; i++)
-         fillArray(thisNode->mChildren[i], transform, fillArray);
-     };
-     fillArray(scene->mRootNode, aiMatrix4x4(), fillArray);
- assert(boneIDOfNode.size() <= MAX_BONES);
+    if (boneIDOfNode.count(thisNode) == 1) { // the node's a bone
+      glm::mat4 boneMat = aiCast(globalInverse * transform * offsetOfNode[thisNode]);
+      //boneMat = glm::transpose(boneMat);
+      for (int i = 0; i < 3; i++) // test
+        boneMat[3][i] /= 100;
+      boneArray[boneIDOfNode[thisNode]] = boneMat;
+    }
 
-     return boneArray;
-     //shader.setUniform("uBones[0]", MAX_BONES, boneArray); // really, uBones[0] instead of uBones...
-     //va->bind().draw();
+
+    for (auto i = 0u; i < thisNode->mNumChildren; i++)
+      fillArray(thisNode->mChildren[i], transform, fillArray);
+  };
+  fillArray(scene->mRootNode, aiMatrix4x4(), fillArray);
+  assert(boneIDOfNode.size() <= MAX_BONES);
+
+  return boneArray;
+  //shader.setUniform("uBones[0]", MAX_BONES, boneArray); // really, uBones[0] instead of uBones...
+  //va->bind().draw();
 }
 
 
@@ -551,9 +547,9 @@ AssimpModel::AssimpModel(const std::string &filename) : filename(filename) {
     }
 
   // ONLY FOR MECH.FBX!!!
-   for (auto& w : vertexData->boneWeights)
-    if(w.x+w.y+w.z+w.w < 0.999)
-        w = glm::vec4(1,0,0,0);
+  for (auto &w : vertexData->boneWeights)
+    if (w.x + w.y + w.z + w.w < 0.999)
+      w = glm::vec4(1, 0, 0, 0);
 }
 
 // mostly from glow-extras:
