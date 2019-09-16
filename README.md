@@ -1,9 +1,11 @@
 # Psychokinesis
 
+__This source is currently broken (it may run on Linux or not, in any case it needs fixing)__
+
 ## Story
 
 Minds can be transferred into machines.
-Our enemy has taken control over a spacestationesque satellite
+Our enemy has taken control over a space-stationesque satellite
 and is currently trying to boot up the doomsday-laser.
 Of the two robots up there is one with a weak security protocol,
 we hacked it and uploaded your mind.
