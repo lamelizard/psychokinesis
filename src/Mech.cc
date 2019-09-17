@@ -416,7 +416,8 @@ void Mech::startPlayer(int t) {
     m.animationsFaktor[0] = 0;
     g->mCameraLocked = true;
   }
-  g->mCamera->setLookAt({.5, 3, -13}, {.5, 1.5, -10});
+  if (!g->mFreeCamera)
+	g->mCamera->setLookAt({.5, 3, -13}, {.5, 1.5, -10});
   if (t == 2 * 60) {
     m.animationsFaktor[0] = 1;
     g->soloud->play3d(g->sfxBootUp, pos.x, pos.y, pos.z, 0, 0, 0, .15);
