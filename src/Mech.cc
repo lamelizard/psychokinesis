@@ -411,13 +411,20 @@ void Mech::startPlayer(int t) {
   m.moveDir = glm::vec3(0, 0, 1);
   auto pos = m.getPos();
   m.setPosition(glm::vec3(pos.x, m.collision->getHalfHeight() + m.collision->getRadius() + m.floatOffset, pos.y));
+  //pos = m.getPos(); // should not break a thing
   if (t == 0) {
     m.setAnimation(getup, none);
     m.animationsFaktor[0] = 0;
     g->mCameraLocked = true;
   }
-  if (!g->mFreeCamera)
-	g->mCamera->setLookAt({.5, 3, -13}, {.5, 1.5, -10});
+  if (!g->mFreeCamera) {
+    //g->mCamera->setLookAt({.5, 3, -13}, {.5, 1.5, -10});
+    g->mRotHandle.setLookAt({0, 0, -2}, {0, 0, 0});
+    g->mRotHandle.snap();
+    //g->mCamera->handle.setLookAt(glm::vec3{0, pos.y, 1} + g->mRotHandle.getPosition(), glm::vec3{0, pos.y, 1});
+    g->mCamera->handle.setLookAt(pos + g->mRotHandle.getPosition(), pos);
+    g->mCamera->handle.snap();
+  }
   if (t == 2 * 60) {
     m.animationsFaktor[0] = 1;
     g->soloud->play3d(g->sfxBootUp, pos.x, pos.y, pos.z, 0, 0, 0, .15);

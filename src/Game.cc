@@ -124,7 +124,7 @@ void Game::init() {
   {
     mCamera = glow::camera::Camera::create();
     mCamera->setFarPlane(200);
-    mCamera->setLookAt({.5, 3, -13}, {.5, 1.5, -10});
+    //mCamera->setLookAt({.5, 3, -13}, {.5, 1.5, -10});
 
     // shadow
     {
@@ -1449,26 +1449,19 @@ void Game::updateCamera(float elapsedSeconds) {
 #endif
 
 
-    auto lastPos = mCamera->handle.getPosition();
+    //auto lastPos = mCamera->handle.getPosition();
     glm::vec3 target = glcast(mechs[player].rigid->getWorldTransform().getOrigin());
-    static glm::vec3 lastTarget = target;
-    mCamera->handle.move(target - lastTarget);
-    mCamera->handle.setTarget(target);
-    mCamera->handle.setTargetDistance(2 + 2 * sin((lastPos - target).y));
-    //mCamera->handle.setTargetDistance(5);
-    /*{
-        auto dif = (lastPos - lastTarget);
-        dif.y = 0;
-        dif = normalize(dif);
-        auto angle = acos(dot(dif, normalize((lastPos - lastTarget))));
-        if(lastPos.y < lastTarget.y)
-            angle *= -1;
-        mCamera->handle.setTargetDistance(2 + 2* sin(angle));
-    }*/
+
+    //static glm::vec3 lastTarget = target;
+    //mCamera->handle.move(target - lastTarget);
+    //mCamera->handle.setTarget(target);
+    mRotHandle.setTarget({0, 0, 0});
+    mRotHandle.setTargetDistance(2 + 2 * sin(min(max(mRotHandle.getPosition().y, -1.f), 1.f)));
+
 
     float dX = 0, dY = 0;
     //get dX, dY
-    if (!mCameraLocked) {
+    {
       if (!ImGuiwantMouse) {
         auto mouse_delta = input().getLastMouseDelta() / 100.0f;
         if (mouse_delta.x < 1000) { // ???
@@ -1492,14 +1485,12 @@ void Game::updateCamera(float elapsedSeconds) {
         dY -= .1f;
       if (isKeyPressed(GLFW_KEY_KP_2))
         dY += .1f;
+      if (!mCameraLocked)
+        mRotHandle.orbit(dX, dY);
+      mRotHandle.update(elapsedSeconds);
+      mCamera->setLookAt(target + mRotHandle.getPosition(), target);
+      mCamera->update(elapsedSeconds);
     }
-    mCamera->handle.orbit(dX, dY);
-
-
-    mCamera->update(elapsedSeconds);
-    //mCamera->handle.setTargetDistance(2 + 2* sin((mCamera->getPosition() - target).y));
-
-    lastTarget = target;
   }
 
 

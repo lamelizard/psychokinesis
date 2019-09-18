@@ -35,4 +35,3 @@ settings:
 TODO:
 * change boss 1 timings
 * move spheres
-* better camera

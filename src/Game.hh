@@ -116,6 +116,7 @@ private:
   // gfx objects
 private:
   glow::camera::SharedCamera mCamera;
+  glow::camera::Handle mRotHandle;
 
   // shaders
   glow::SharedProgram mShaderOutput;
