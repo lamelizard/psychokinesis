@@ -1,7 +1,5 @@
 # Psychokinesis
 
-__This source is currently broken (it may run on Linux or not, in any case it needs fixing)__
-
 ## Story
 
 Minds can be transferred into machines.
