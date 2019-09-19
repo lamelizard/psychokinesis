@@ -154,7 +154,6 @@ private:
   glow::SharedTexture2D mTexRocketMetallic[NUM_ROCKET_TYPES];
   glow::SharedTexture2D mTexRocketRoughness[NUM_ROCKET_TYPES];
   glow::SharedTexture2D mTexPaper;
-  glow::SharedTexture2D mTexNoise1;
 
   // Shadow
   int mMaxShadowSize = 0;

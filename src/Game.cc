@@ -204,7 +204,6 @@ void Game::init() {
       string healthBarFn = texPath + "ui/Health bar";
       string rocketFN = texPath + "rocket.";
       string paperFN = texPath + "paper.png";
-      string noise1FN = texPath + "noise_1.png";
 
       //loading async
       const auto policy = launch::async;
@@ -242,7 +241,6 @@ void Game::init() {
         rocketRoughnessData[i] = async(policy, glow::TextureData::createFromFile, rocketFN + "roughness." + to_string(i) + ".png", glow::ColorSpace::sRGB);
       }
       auto paperData = async(policy, glow::TextureData::createFromFile, paperFN, glow::ColorSpace::sRGB);
-      auto noise1Data = async(policy, glow::TextureData::createFromFile, noise1FN, glow::ColorSpace::Linear);
       //linear:
       auto mechModelData = async(launch::deferred, AssimpModel::load, mechModelFN); // WHY DOES THIS BREAK WITH ASYNC?
       //not into GL yet, could change
@@ -288,8 +286,6 @@ void Game::init() {
       }
       mTexPaper = glow::Texture2D::createFromData(paperData.get());
       mTexPaper->setObjectLabel(paperFN);
-      mTexNoise1 = glow::Texture2D::createFromData(noise1Data.get());
-      mTexNoise1->setObjectLabel(noise1FN);
 
       //mTexDefNormal = glow::Texture2D::createFromFile(texPath + "normal.png", glow::ColorSpace::Linear);
     }
@@ -1091,7 +1087,6 @@ void Game::render(float elapsedSeconds) {
       shader.setTexture("uTexMode", mBufferMode);
       shader.setTexture("uSkybox", mSkybox);
       shader.setTexture("uTexPaper", mTexPaper);
-      shader.setTexture("uTexNoise1", mTexNoise1);
       shader.setUniform("uView", view);
       shader.setUniform("uInvProj", inverse(proj));
       shader.setUniform("uInvView", inverse(view));

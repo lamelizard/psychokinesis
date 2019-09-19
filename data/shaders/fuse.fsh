@@ -5,7 +5,6 @@ uniform sampler2DRect uTexDepth;
 uniform sampler2DRect uTexMode;
 uniform samplerCube uSkybox;
 uniform sampler2D uTexPaper;
-//uniform sampler2D uTexNoise1;
 
 uniform mat4 uInvProj;
 uniform mat4 uInvView;
@@ -211,7 +210,6 @@ void main()
             //noise = clamp(noise *2, .0, 1.);
 
             vec3 paper = texture(uTexPaper, vPosition).rgb;
-            //vec3 noise = texture(uTexNoise1, vPosition * 4.).rgb;
             //float grey = dot(albedo, vec3(0.21, 0.71, 0.07));
 
             color  = vec3(.7,.7,.7);// * (max(dot(n, l), 0.) * shadowFactor * 0.9 + 0.1);
