@@ -570,9 +570,9 @@ void Game::initPhase1() {
   initPhaseBoth();
 
   const vector<ModeArea> areas = {
-      {neon, {15, 0, 15}, 10},
-      {drawn, {-15, 0, -15}, 10},
-      {disco, {-15, 0, 15}, 10}};
+      {neon, {15, 0, 15}, .1},
+      {drawn, {-15, 0, -15}, .1},
+      {disco, {-15, 0, 15}, .1}};
   for (auto a : areas)
     ex.entities.create().assign<ModeArea>(a);
 
@@ -607,10 +607,11 @@ void Game::initPhase2() {
   }
 
   const vector<ModeArea> areas = {
-      {neon, {15, 0, 15}, 13},
-      {neon, {-15, 0, -15}, 13},
-      {disco, {15, 0, -15}, 13},
-      {drawn, {-15, 0, 15}, 13}};
+      {neon, {15, 0, 15}, 14.9},
+      {neon, {-15, 0, -15}, 14.9},
+      {drawn, {15, 0, -15}, 14.9},
+      {disco, {-15, 0, 15}, 14.9},
+      {disco, {0, 0, 0}, 6.2}};
   for (auto a : areas)
     ex.entities.create().assign<ModeArea>(a);
 
@@ -630,7 +631,7 @@ void Game::initPhase2() {
 bool Game::hasHoming() {
   auto RocketHandle = entityx::ComponentHandle<Rocket>();
   auto Entities = ex.entities.entities_with_components(RocketHandle);
-  for (entityx::Entity entity : Entities) 
+  for (entityx::Entity entity : Entities)
     if (RocketHandle->type == rtype::homing)
       return true;
   return false;
@@ -891,6 +892,26 @@ void Game::update(float) {
             body->applyCentralForce(btVector3(0, 5, 0));
         }
       }
+  }
+
+  //move modeAreas
+  {
+    auto areaHandle = entityx::ComponentHandle<ModeArea>();
+    auto areaEntities = ex.entities.entities_with_components(areaHandle);
+    for (auto entity : areaEntities) {
+      if (!secondPhase) {
+        areaHandle->radius += .005;
+        if (areaHandle->radius > 10)
+          areaHandle->radius = 10;
+      } else {
+        areaHandle->pos = glm::rotateY(areaHandle->pos, .0005f);
+        if (fin) {
+          areaHandle->radius -= .05;
+          if (areaHandle->radius <= 0.001)
+            areaHandle.remove();
+        }
+      }
+    }
   }
 
   //reinit if HP
