@@ -690,12 +690,13 @@ void Mech::runSmall(int t) {
                                              {0.5, 0, 0.5}}};
 
   //rocket
-  if (t % (60 + ((m.HP) * 15)) == 0 && m.bones.size()) {
-    g->createRocket(cpos, shotDir * 10, rtype::forward); // 4?
+  if (t % (30 + ((m.HP - 1) * 30)) == 0 && m.bones.size() && glm::distance(pos, glm::vec3{0.5, 0, 0.5} + groundOffset) > 3) {
+    g->createRocket(cpos, shotDir * 10, rtype::forward);
     g->soloud->play3d(g->sfxShot, cpos.x, cpos.y, cpos.z);
     //m.animationTop = sbigA;
     //m.animationTimeTop = 0;
   }
+
 
   //move somewhere else
   //falling
@@ -706,7 +707,6 @@ void Mech::runSmall(int t) {
   //walk
   auto way = ways[currentWay];
   auto futurePos = way[nextGoal] + groundOffset;
-  // todo smoothstep the walking speed
 
   if (reachGoalInTicks == 0) {
     nextGoal++;
@@ -719,13 +719,8 @@ void Mech::runSmall(int t) {
       else {
         //homing rocket
         auto entity = g->createRocket(cpos, shotDir * 4, rtype::homing);
-        if (m.HP > 3) { // wait to be easier
-          //TODO need default animation...
-          m.setAction([entity](int t) {
-            if (!entity.valid())
-              Game::instance->mechs[small].setAction(runSmall);
-          });
-        }
+        //TODO need default animation...
+        m.setAction(waitSmall); // may get overridden
       }
     }
 
@@ -733,6 +728,7 @@ void Mech::runSmall(int t) {
     futurePos = way[nextGoal];
     reachGoalInTicks = timeNeeded;
     auto futureMoveDir = normalize(futurePos - pos);
+
 
     //jump
     auto angle = glm::angle(m.moveDir, futureMoveDir);
@@ -783,7 +779,10 @@ void Mech::runSmall(int t) {
         if (ticks >= ticksNeeded) {
           //m.setAnimation(run, none);
           //m.animationsFaktor[0] = 1;
-          m.setAction(runSmall);
+          if (Game::instance->hasHoming())
+            m.setAction(waitSmall);
+          else
+            m.setAction(runSmall);
         }
       });
       return;
@@ -809,6 +808,11 @@ void Mech::runSmall(int t) {
   m.motionState->setWorldTransform(trans);
   m.rigid->setActivationState(DISABLE_DEACTIVATION);
   reachGoalInTicks--;
+}
+
+void Mech::waitSmall(int) {
+  if (!Game::instance->hasHoming())
+    Game::instance->mechs[small].setAction(runSmall);
 }
 
 void Mech::dieSmall(int t) {

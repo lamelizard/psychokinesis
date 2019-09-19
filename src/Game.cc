@@ -627,6 +627,15 @@ void Game::initPhase2() {
 }
 
 
+bool Game::hasHoming() {
+  auto RocketHandle = entityx::ComponentHandle<Rocket>();
+  auto Entities = ex.entities.entities_with_components(RocketHandle);
+  for (entityx::Entity entity : Entities) 
+    if (RocketHandle->type == rtype::homing)
+      return true;
+  return false;
+}
+
 void Game::bulletCallback(btDynamicsWorld *, btScalar) {
   int numManifolds = dynamicsWorld->getDispatcher()->getNumManifolds();
   for (int i = 0; i < numManifolds; i++) {

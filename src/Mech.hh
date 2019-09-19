@@ -116,6 +116,7 @@ struct Mech : SM {
   static void controlPlayer(int);
   static void startSmall(int);
   static void runSmall(int);
+  static void waitSmall(int);
   static void dieSmall(int);
   static void startBig(int);
   static void runBig(int);

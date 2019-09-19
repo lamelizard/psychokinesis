@@ -214,6 +214,10 @@ private:
   entityx::Entity ground[CUBES_TOTAL][CUBES_TOTAL]; // x, z
   std::vector<entityx::Entity> pillars[4];
 
+  // helper
+public:
+  bool hasHoming();
+
   // Bullet
 private:
   bool mDebugBullet = false;
