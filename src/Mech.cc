@@ -742,6 +742,8 @@ void Mech::runSmall(int t) {
         static const auto ticksNeeded = 55;
         auto g = Game::instance;
         auto &m = g->mechs[small];
+        auto &p = g->mechs[player];
+        m.viewDir = glm::normalize(p.getPos() - m.getPos());
 
         //animate
         if (ticks == 0) {
@@ -811,8 +813,11 @@ void Mech::runSmall(int t) {
 }
 
 void Mech::waitSmall(int) {
+  auto &m = Game::instance->mechs[small];
+  auto &p = Game::instance->mechs[player];
+  m.viewDir = glm::normalize(p.getPos() - m.getPos());
   if (!Game::instance->hasHoming())
-    Game::instance->mechs[small].setAction(runSmall);
+    m.setAction(runSmall);
 }
 
 void Mech::dieSmall(int t) {
