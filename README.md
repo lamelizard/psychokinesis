@@ -29,3 +29,8 @@ settings:
 * Alt+F toggles free camera ()
 * Alt+F11 Linux Fullscreen
 * Alt+Enter Windows Fullscreen
+
+## Compilation notes
+
+* You can use [cmake](https://cmake.org/) to create project files
+* on Linux you may need the packages `xorg-dev` and `libgl1-mesa-dev`
