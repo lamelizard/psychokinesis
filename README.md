@@ -9,7 +9,7 @@ Of the two robots up there is one with a weak security protocol,
 we hacked it and uploaded your mind.
 Please be aware that the enemy has areas with nanomachines that can hack
 your emotion processor, who knows to what result...
-Oh, and did I mention that your robot has no way to attack of its own?
+Oh, and did I mention that your robot has no way of attacking on its own?
 
 ## How to play
 
