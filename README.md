@@ -35,6 +35,20 @@ settings:
 * Alt+F11 Linux Fullscreen
 * Alt+Enter Windows Fullscreen
 
+## Features
+
+* async resource loading
+* hardware PCF shadows
+* area dependent shaders
+* interpolated skeleton animation
+* 3D sound
+* PBR & GGX shader with cubemap reflections
+* deferred shading
+* SSAA & FXAA
+* instanced rendering
+* selective depth-prepass
+
+
 ## Compilation notes
 
 * You can use [cmake](https://cmake.org/) to create project files
