@@ -12,7 +12,7 @@ set(CMAKE_CXX_STANDARD 14)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 # some dependencies want to build as shared libs
-set(BUILD_SHARED_LIBS ON CACHE BOOL " " FORCE)
+set(BUILD_SHARED_LIBS OFF CACHE BOOL " " FORCE)
 
 # ==============================================================================
 # Set bin dir
