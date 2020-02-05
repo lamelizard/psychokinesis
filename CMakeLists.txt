@@ -49,6 +49,7 @@ endif()
 add_subdirectory(extern/ctracer)
 
 # Add GLOW lib
+set(GLOW_LINK_TYPE STATIC CACHE STRING "" FORCE)
 add_subdirectory(extern/glow)
 
 # Add GLFW lib (with disabled spam)
@@ -122,7 +123,7 @@ foreach(TARGET_NAME
     BulletSoftBody
     LinearMath
     assimp
-	soloud
+    soloud
     IrrXML
     zlibstatic
     )
@@ -205,3 +206,25 @@ if(MSVC)
     set_property(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR} PROPERTY VS_STARTUP_PROJECT ${PROJECT_NAME})
 	add_definitions(-D_ENABLE_EXTENDED_ALIGNED_STORAGE) # fixes compilation (entityx?)
 endif()
+
+
+# CPack
+set(CPACK_PACKAGE_FILE_NAME "psychokinesis")
+install(TARGETS
+        ${PROJECT_NAME}
+        # changed in subfolders, would need 3.13 oterwise 
+        #glfw
+        #glad
+        #glow
+        #glow-extras
+        RUNTIME DESTINATION bin
+        LIBRARY DESTINATION lib
+        PERMISSIONS OWNER_EXECUTE OWNER_WRITE OWNER_READ)
+install(DIRECTORY data/ DESTINATION data)
+install(FILES README.md Credits.txt DESTINATION .)
+if(UNIX)
+    set(CPACK_GENERATOR "TGZ")
+elseif(WIN32)
+    set(CPACK_GENERATOR "ZIP")
+endif(UNIX)
+INCLUDE(CPack)

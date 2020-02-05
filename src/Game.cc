@@ -1401,7 +1401,7 @@ bool Game::onKey(int key, int scancode, int action, int mods) {
     case GLFW_KEY_S:
       mShadowFactor *= 2;
       if (mShadowFactor > 4)
-        mShadowFactor = 1;
+        mShadowFactor = 2; // 1 breaks my gt 1030...
       break;
     default:;
     }

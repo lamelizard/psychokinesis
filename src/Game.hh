@@ -108,8 +108,8 @@ private:
   glm::vec3 debugAnimationTimes = {0, 0, 0};
   float debugAnimationAngle = 0;
   float drawTime = 0;
-  int mShadowFactor = 2;
-  int mCurrentShadowFactor = 2;
+  int mShadowFactor = 4;
+  int mCurrentShadowFactor = 4;
   float mSSAAFactor = 1;
   float mCurrentSSAAFactor = 1;
 

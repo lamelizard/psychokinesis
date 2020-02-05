@@ -13,6 +13,11 @@ Oh, and did I mention that your robot has no way to attack of its own?
 
 ## How to play
 
+required:
+* 64bit OS
+* min. 2GB VRAM
+* on Linux: Alsa
+
 recommended:
 * headphones
 * controller
