@@ -1,5 +1,7 @@
 # Psychokinesis
 
+Download the game from [itch.io](https://lamelizard.itch.io/psychokinesis).
+
 ## Story
 
 Minds can be transferred into machines.
