@@ -11,7 +11,7 @@ ADD . / project/
 WORKDIR /build
 
 RUN cmake -G "Unix Makefiles" -DCMAKE_BUILD_TYPE=Release ../project \
-    && make -j8 \
+    && make -j4 \
     && make package
 
 WORKDIR /
@@ -30,3 +30,7 @@ CMD ["/bin/bash"]
 # docker stop $(docker ps -aq)
 # docker rm $(docker ps -aq)
 # docker rmi $(docker images -q)
+# Windows:
+# FOR /f "tokens=*" %i IN ('docker ps -aq') DO docker stop %i
+# FOR /f "tokens=*" %i IN ('docker ps -aq') DO docker rm %i
+# FOR /f "tokens=*" %i IN ('docker ps -q') DO docker rmi %i
